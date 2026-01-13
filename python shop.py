@@ -1,44 +1,16 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime
 
-# Page Configuration for Mobile & Desktop
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# Database setup
-if 'inventory' not in st.session_state: st.session_state.inventory = {}
-if 'sales' not in st.session_state: st.session_state.sales = []
-if 'expenses' not in st.session_state: st.session_state.expenses = []
+st.title("🐾 LAIKA PET MART")
+st.write("Welcome, *Ayush Saxena*! Aapki App Live Hai.")
 
-# MNC Style Sidebar
-st.sidebar.title("🐾 LAIKA PET MART")
-menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Stock Entry", "💸 Udhaar Tracker", "💰 Expense Manager"])
+# 4 MNC Dashboard Cards
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("TOTAL SALES", "Rs. 0")
+col2.metric("TOTAL PURCHASE", "Rs. 0")
+col3.metric("GROSS PROFIT", "Rs. 0")
+col4.metric("NET PROFIT", "Rs. 0")
 
-# 1. DASHBOARD
-if menu == "📊 Dashboard":
-    st.title("Business Financial Dashboard")
-    t_sale = sum(s['total'] for s in st.session_state.sales)
-    t_profit = sum(s['profit'] for s in st.session_state.sales)
-    t_exp = sum(e['amount'] for e in st.session_state.expenses)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("TOTAL SALES", f"Rs. {t_sale:,}")
-    col2.metric("GROSS PROFIT", f"Rs. {t_profit:,}")
-    col3.metric("EXPENSES", f"Rs. {t_exp:,}")
-    col4.metric("NET PROFIT", f"Rs. {t_profit - t_exp:,}")
-
-# 2. BILLING
-elif menu == "🧾 Billing":
-    st.title("Billing Terminal")
-    if not st.session_state.inventory:
-        st.warning("Pehle Stock Entry karein!")
-    else:
-        item = st.selectbox("Select Item", list(st.session_state.inventory.keys()))
-        q = st.number_input("Quantity", min_value=1)
-        r = st.number_input("Rate", min_value=0.0)
-        if st.button("GENERATE BILL"):
-            buy_p = st.session_state.inventory[item]['p_price']
-            total = q * r
-            profit = (r - buy_p) * q
-            st.session_state.sales.append({"date": datetime.now().strftime("%H:%M"), "total": total, "profit": profit})
-            st.success(f"Billed: Rs. {total}")
+st.sidebar.title("Menu")
+menu = st.sidebar.radio("Navigate", ["Dashboard", "Billing", "Stock Entry", "Udhaar Tracker"])
