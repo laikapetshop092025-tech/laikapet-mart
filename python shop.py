@@ -2,15 +2,15 @@ import streamlit as st
 
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-st.title("🐾 LAIKA PET MART")
-st.write("Welcome, *Ayush Saxena*! Aapki App Live Hai.")
-
-# 4 MNC Dashboard Cards
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("TOTAL SALES", "Rs. 0")
-col2.metric("TOTAL PURCHASE", "Rs. 0")
-col3.metric("GROSS PROFIT", "Rs. 0")
-col4.metric("NET PROFIT", "Rs. 0")
-
+st.title("🐾 LAIKA PET MART - MASTER ADMIN")
 st.sidebar.title("Menu")
-menu = st.sidebar.radio("Navigate", ["Dashboard", "Billing", "Stock Entry", "Udhaar Tracker"])
+menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Stock", "💸 Udhaar"])
+
+if menu == "📊 Dashboard":
+    st.subheader("Business Health")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("SALES", "Rs. 0")
+    c2.metric("PURCHASE", "Rs. 0")
+    c3.metric("GROSS PROFIT", "Rs. 0")
+    c4.metric("NET PROFIT", "Rs. 0")
+    st.info("Bhai, aapka software ab live hai! Phone par check karein.")
