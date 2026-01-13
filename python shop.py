@@ -2,74 +2,67 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# Page Configuration
+# Page Settings
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# --- LOGIN & USER MANAGEMENT ---
+# --- DATA & USER INITIALIZATION ---
 if 'users' not in st.session_state:
-    # Shuruati ID: Laika | Pass: Ayush@092025
     st.session_state.users = {"Laika": "Ayush@092025"}
-
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-
-def check_login():
-    u = st.session_state.user_input
-    p = st.session_state.pass_input
-    if u in st.session_state.users and st.session_state.users[u] == p:
-        st.session_state.logged_in = True
-        st.session_state.current_user = u
-    else:
-        st.error("Galt ID ya Password!")
-
-if not st.session_state.logged_in:
-    st.title("🔐 LAIKA PET MART - SECURE LOGIN")
-    st.text_input("Username/ID", key="user_input")
-    st.text_input("Password", type="password", key="pass_input")
-    st.button("Login", on_click=check_login)
-    st.stop()
-
-# --- DATABASE SETUP ---
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = ""
 if 'inventory' not in st.session_state: st.session_state.inventory = {}
 if 'sales' not in st.session_state: st.session_state.sales = []
 if 'expenses' not in st.session_state: st.session_state.expenses = []
 
-# Sidebar Menu
+# --- LOGIN SCREEN ---
+if not st.session_state.logged_in:
+    st.title("🔐 LAIKA PET MART - LOGIN")
+    u_input = st.text_input("Username/ID")
+    p_input = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if u_input in st.session_state.users and st.session_state.users[u_input] == p_input:
+            st.session_state.logged_in = True
+            st.session_state.current_user = u_input
+            st.rerun()
+        else:
+            st.error("Galt ID ya Password!")
+    st.stop()
+
+# --- MAIN APP (After Login) ---
 st.sidebar.title("🐾 LAIKA PET MART")
-st.sidebar.write(f"User: *{st.session_state.current_user}*")
+st.sidebar.write(f"Logged in as: *{st.session_state.current_user}*")
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Stock Entry", "💸 Udhaar Tracker", "💰 Expense Manager", "⚙️ Settings"])
 
-# 1. EXPENSE MANAGER (Ab kaam karega)
+# 1. EXPENSE MANAGER
 if menu == "💰 Expense Manager":
-    st.title("Daily Expense Manager")
-    with st.form("exp"):
-        reason = st.text_input("Kharcha Kahan Hua?")
+    st.title("Expense Manager")
+    with st.form("exp_form"):
+        reason = st.text_input("Expense Description")
         amt = st.number_input("Amount (Rs.)", min_value=0)
-        if st.form_submit_button("Save Expense"):
+        if st.form_submit_button("Save"):
             st.session_state.expenses.append({"reason": reason, "amt": amt, "date": datetime.now()})
-            st.success("Kharcha save ho gaya!")
+            st.success("Expense Saved!")
 
-# 2. SETTINGS (Nayi ID banane ke liye)
+# 2. SETTINGS (Manage ID/Password)
 elif menu == "⚙️ Settings":
-    st.title("Admin Settings")
-    st.subheader("Add New Worker/User ID")
-    new_id = st.text_input("Nayi ID banayein")
-    new_pass = st.text_input("Naya Password rakhein", type="password")
-    if st.button("Create User"):
+    st.title("User Management Settings")
+    st.subheader("Create New Worker ID")
+    new_id = st.text_input("New Username")
+    new_pass = st.text_input("New Password", type="password")
+    if st.button("Add User"):
         if new_id and new_pass:
             st.session_state.users[new_id] = new_pass
-            st.success(f"Nayi ID '{new_id}' taiyar hai!")
+            st.success(f"ID '{new_id}' successfully created!")
         else:
-            st.warning("ID aur Password dono bhariye.")
+            st.warning("Please fill both fields.")
 
-# 3. DASHBOARD, BILLING, STOCK aur UDHAAR ka logic...
-# (Maine baki saare purane functions bhi ismein include kar diye hain)
+# (Dashboard, Billing & Stock logic included...)
 elif menu == "📊 Dashboard":
-    st.title("Dukan Ka Hisab")
-    t_sale = sum(s['total'] for s in st.session_state.sales) if 'sales' in st.session_state else 0
-    st.metric("TOTAL SALES", f"Rs. {t_sale}")
+    st.title("Business Dashboard")
+    st.metric("Total Sales", f"Rs. {sum(s['total'] for s in st.session_state.sales)}")
 
-# Logout Button
 if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
     st.rerun()
