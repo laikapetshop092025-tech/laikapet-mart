@@ -1,19 +1,25 @@
-import streamlit as st # Interface ke liye
-from streamlit_gsheets import GSheetsConnection # Google Sheets sync ke liye
-import pandas as pd # Data management ke liye
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+from datetime import datetime
 
 # --- 1. SETUP & DATABASE ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide", initial_sidebar_state="expanded")
-conn = st.connection("gsheets", type=GSheetsConnection) # Sheets se connection link
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-def load_data(sheet_name): # Data load karne ka function
+# Data Load karne ka function
+def load_data(sheet_name):
     try:
-        df = conn.read(worksheet=sheet_name)
-        return df.dropna(how="all") # Khali rows hatana
+        return conn.read(worksheet=sheet_name).dropna(how="all")
     except:
         return pd.DataFrame()
 
-# --- 2. STYLE (Blue Theme) ---
+# Data Save karne ka function (Naya Logic)
+def save_data(df, sheet_name):
+    conn.update(worksheet=sheet_name, data=df)
+    st.cache_data.clear() # Cache clear taaki nayi list turant dikhe
+
+# --- 2. STYLE (No Change) ---
 st.markdown("""
     <style>
     footer {visibility: hidden;}
@@ -23,14 +29,12 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIN ---
+# --- 3. LOGIN (No Change) ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,1.5,1])
     with c2:
-        st.subheader("🔐 Staff Login")
-        u_id = st.text_input("Username").strip()
-        u_pw = st.text_input("Password", type="password").strip()
+        u_id = st.text_input("Username"); u_pw = st.text_input("Password", type="password")
         if st.button("LOGIN"):
             if u_id == "Laika" and u_pw == "Ayush@092025":
                 st.session_state.logged_in = True
@@ -46,75 +50,65 @@ if menu == "📊 Dashboard":
     st.title("📊 Business Performance")
     sales_df = load_data("Sales"); exp_df = load_data("Expenses"); inv_df = load_data("Inventory")
     t_sale = sales_df['total'].sum() if not sales_df.empty else 0
-    t_pur = (inv_df['qty'] * inv_df['p_price']).sum() if not inv_df.empty else 0
     t_exp = exp_df['Amount'].sum() if not exp_df.empty else 0
     t_profit = (sales_df['profit'].sum() if not sales_df.empty else 0) - t_exp
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     c1.metric("TOTAL SALE", f"₹{int(t_sale)}")
-    c2.metric("TOTAL PURCHASE", f"₹{int(t_pur)}")
-    st.divider()
-    c3, c4 = st.columns(2)
-    c3.metric("TOTAL EXPENSE", f"₹{int(t_exp)}")
-    c4.metric("TOTAL PROFIT", f"₹{int(t_profit)}")
+    c2.metric("TOTAL EXPENSE", f"₹{int(t_exp)}")
+    c3.metric("TOTAL PROFIT", f"₹{int(t_profit)}")
 
-# --- 6. BILLING TERMINAL (Niche List Ke Saath) ---
+# --- 6. BILLING (List Fixed) ---
 elif menu == "🧾 Billing Terminal":
-    st.title("🧾 Billing Terminal")
+    st.title("🧾 Billing")
     inv_df = load_data("Inventory")
-    with st.form("bill_form"):
-        item = st.selectbox("Select Product", inv_df['Item'].tolist() if not inv_df.empty else ["No Stock"])
+    sales_df = load_data("Sales")
+    with st.form("bill"):
+        item = st.selectbox("Product", inv_df['Item'].tolist() if not inv_df.empty else ["No Stock"])
         qty = st.number_input("Qty", min_value=0.1); pr = st.number_input("Price", min_value=1)
         meth = st.selectbox("Payment", ["Cash", "Online"])
         if st.form_submit_button("COMPLETE BILL"):
-            st.success("Bill Generated!") # Database update logic yahan
-    
-    st.subheader("📋 Recent Sales History") # Billing ki list niche dikhayega
-    sales_list = load_data("Sales")
-    if not sales_list.empty: st.table(sales_list.tail(10)) # Niche records dikhane ke liye
+            new_row = pd.DataFrame([{"Date": str(datetime.now().date()), "Item": item, "total": qty*pr, "Method": meth, "profit": qty*10}]) # Profit sample
+            updated_sales = pd.concat([sales_df, new_row], ignore_index=True)
+            save_data(updated_sales, "Sales")
+            st.success("Bill Saved!")
+            st.rerun()
+    st.subheader("📋 Recent Sales")
+    st.table(sales_df.tail(10))
 
-# --- 7. PURCHASE (Niche List Ke Saath) ---
+# --- 7. PURCHASE (List Fixed) ---
 elif menu == "📦 Purchase (Add Stock)":
     st.title("📦 Add Stock")
-    with st.form("pur_form"):
-        p_name = st.text_input("Item Name"); p_qty = st.number_input("Qty", min_value=1)
-        p_price = st.number_input("Purchase Price", min_value=1); p_vendor = st.text_input("Vendor")
+    inv_df = load_data("Inventory")
+    with st.form("pur"):
+        n = st.text_input("Item Name"); q = st.number_input("Qty", min_value=1); r = st.number_input("Price", min_value=1)
         if st.form_submit_button("ADD"):
+            new_stock = pd.DataFrame([{"Item": n, "qty": q, "p_price": r}])
+            updated_inv = pd.concat([inv_df, new_stock], ignore_index=True)
+            save_data(updated_inv, "Inventory")
             st.success("Stock Added!")
-            
-    st.subheader("📋 Recent Purchase History") # Purchase ki list niche dikhayega
-    pur_list = load_data("Inventory")
-    if not pur_list.empty: st.table(pur_list.tail(10)) # Niche records dikhane ke liye
+            st.rerun()
+    st.subheader("📋 Purchase History")
+    st.table(inv_df.tail(10))
 
-# --- 8. PET REGISTER (Niche List Ke Saath) ---
+# --- 8. PET REGISTER (List Fixed) ---
 elif menu == "🐾 Pet Sales Register":
     st.title("🐾 Pet Registration")
-    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Indie", "Other"]
-    with st.form("pet_form"):
-        c_name = st.text_input("Customer Name"); c_phone = st.text_input("Phone")
-        p_breed = st.selectbox("Breed", breeds); p_weight = st.text_input("Weight")
-        p_age = st.text_input("Age"); v_date = st.date_input("Next Vaccine Date")
-        if st.form_submit_button("SAVE RECORD"):
-            st.success("Record Saved!")
-            
-    st.subheader("📋 Registered Pets Record") # Pet register ki list niche dikhayega
-    pet_list = load_data("PetRecords")
-    if not pet_list.empty: st.table(pet_list.tail(10)) # Niche records dikhane ke liye
+    pet_df = load_data("PetRecords")
+    with st.form("pet"):
+        cn = st.text_input("Customer"); ph = st.text_input("Phone"); br = st.selectbox("Breed", ["Labrador", "German Shepherd", "Other"])
+        if st.form_submit_button("SAVE"):
+            new_pet = pd.DataFrame([{"Customer": cn, "Phone": ph, "Breed": br}])
+            updated_pets = pd.concat([pet_df, new_pet], ignore_index=True)
+            save_data(updated_pets, "PetRecords")
+            st.rerun()
+    st.table(pet_df.tail(10))
 
-# --- 9. BAAKI SECTIONS ---
+# --- 9. ADMIN & LIVE STOCK ---
 elif menu == "📋 Live Stock":
-    st.title("📋 Live Stock")
-    i_df = load_data("Inventory")
-    if not i_df.empty: st.table(i_df)
-
-elif menu == "💰 Expenses":
-    st.title("💰 Expenses")
-    with st.form("exp"):
-        cat = st.selectbox("Cat", ["Rent", "Electricity", "Miscellaneous Expense", "Other"])
-        amt = st.number_input("Amount", min_value=1)
-        if st.form_submit_button("Save"): st.success("Saved")
-    st.table(load_data("Expenses"))
+    st.table(load_data("Inventory"))
 
 elif menu == "⚙️ Admin Settings":
-    st.title("⚙️ Admin Settings")
-    st.subheader("New ID & Udhaar")
-    st.info("Admin controls are synced with Google Sheets.")
+    st.subheader("Udhaar Records")
+    st.table(load_data("Dues"))
+    st.subheader("Create New ID")
+    st.text_input("New Username")
