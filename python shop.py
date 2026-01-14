@@ -73,7 +73,7 @@ elif menu == "🐾 Pet Sales Register":
     st.title("🐾 Pet Registration")
     
     # Dog Breeds ki list dropdown ke liye
-    dog_breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Rottweiler", "Doberman", "Siberian Husky", "Boxer", "Shih Tzu", "Cocker Spaniel", "Pitbull", "Indie/Desi", "Other"]
+    dog_breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Rottweiler", "Doberman", "Siberian Husky", "Boxer", "Shih Tzu", "Cocker Spaniel", "Pitbull", "Indie/Desi", "Other", "Cat"]
 
     with st.form("pet_form"): # Registration form
         c1, c2 = st.columns(2)
@@ -127,3 +127,4 @@ elif menu == "⚙️ Admin Settings":
     c_name = st.text_input("Company Name")
     u_amt = st.number_input("Udhaar Amount", min_value=1)
     if st.button("Save Udhaar"): st.success("Updated!")
+
