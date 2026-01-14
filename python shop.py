@@ -2,18 +2,18 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- Page Setup: App ka naam aur choudaai set karna ---
+# --- Page Config ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# --- Database Initialization: Data ko save rakhne ke liye ---
-if 'users' not in st.session_state: st.session_state.users = {"Laika": "Ayush@092025"}
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+# --- Database Setup ---
 if 'inventory' not in st.session_state: st.session_state.inventory = {}
 if 'sales' not in st.session_state: st.session_state.sales = []
 if 'pet_records' not in st.session_state: st.session_state.pet_records = []
 if 'expenses' not in st.session_state: st.session_state.expenses = []
+if 'users' not in st.session_state: st.session_state.users = {"Laika": "Ayush@092025"}
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- Login System: Suraksha ke liye ---
+# --- Login Logic ---
 if not st.session_state.logged_in:
     st.title("🔐 LAIKA PET MART - LOGIN")
     u = st.text_input("Username")
@@ -25,15 +25,11 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- Sidebar: Menu Buttons ---
+# --- Menu ---
 st.sidebar.title("🐾 LAIKA PET MART")
-menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🐾 Pet Sales & Vaccine", "🧾 Sales Entry (Bechna)", "📦 Purchase (Maal Lana)", "📋 Live Stock", "💰 Expense Manager", "⚙️ Admin Settings"])
+menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🐾 Pet Sales", "🧾 Sales Entry", "📦 Purchase (Add Stock)", "📋 Live Stock", "💰 Expenses", "⚙️ Settings"])
 
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
-
-# --- 1. Dashboard: Business Summary ---
+# --- 1. DASHBOARD ---
 if menu == "📊 Dashboard":
     st.title("🚀 Business Overview")
     t_sales = sum(s['total'] for s in st.session_state.sales)
@@ -46,92 +42,103 @@ if menu == "📊 Dashboard":
     c3.metric("NET PROFIT", f"₹{t_prof:,.2f}")
     c4.metric("EXPENSES", f"₹{t_exp:,.2f}")
 
-# --- 2. Pet Sales: Janwar ka record ---
-elif menu == "🐾 Pet Sales & Vaccine":
-    st.title("🐾 Pet Lifecycle Record")
-    with st.form("pet_form", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1:
+# --- 2. PET SALES (With Breed Dropdown) ---
+elif menu == "🐾 Pet Sales":
+    st.title("🐾 Pet Registration")
+    # Popular breeds ki list
+    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Rottweiler", "Doberman", "Indie/Desi", "Persian Cat", "Siamese Cat", "Other"]
+    
+    with st.form("pet_f", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
             name = st.text_input("Customer Name")
             phone = st.text_input("Phone Number")
-        with c2:
-            pet = st.text_input("Pet Breed/Type")
-            next_v = st.date_input("Agli Vaccine Date", datetime.now() + timedelta(days=30))
-        if st.form_submit_button("SAVE PET RECORD"):
-            st.session_state.pet_records.append({"Customer": name, "Phone": phone, "Pet": pet, "Next Due": next_v})
-            st.success("Record Saved!")
-    if st.session_state.pet_records: st.table(pd.DataFrame(st.session_state.pet_records))
+        with col2:
+            breed_sel = st.selectbox("Select Breed", breeds)
+            next_v = st.date_input("Next Vaccine Due", datetime.now() + timedelta(days=30))
+        if st.form_submit_button("SAVE"):
+            st.session_state.pet_records.append({"Customer": name, "Phone": phone, "Breed": breed_sel, "Due": next_v})
+            st.success("Saved!")
+    st.write("### Recent Pet Sales")
+    st.dataframe(pd.DataFrame(st.session_state.pet_records))
 
-# --- 3. Sales Entry: Maal bechna (Billing ki jagah) ---
-elif menu == "🧾 Sales Entry (Bechna)":
-    st.title("🧾 Sales Entry")
+# --- 3. SALES ENTRY (With Live Stock Check) ---
+elif menu == "🧾 Sales Entry":
+    st.title("🧾 Make a Sale")
     if not st.session_state.inventory:
         st.warning("Pehle Purchase mein maal add karein!")
     else:
         with st.form("sale_f", clear_on_submit=True):
-            item_sel = st.selectbox("Item Chunein", list(st.session_state.inventory.keys()))
-            u_type = st.session_state.inventory[item_sel].get('unit', 'Unit')
-            avail = st.session_state.inventory[item_sel]['qty']
-            st.info(f"Available Stock: {avail} {u_type}")
+            item = st.selectbox("Select Item", list(st.session_state.inventory.keys()))
+            # Live Stock dikhana
+            avail = st.session_state.inventory[item]['qty']
+            unit = st.session_state.inventory[item]['unit']
+            st.info(f"Current Stock Available: {avail} {unit}")
             
-            c1, c2 = st.columns(2)
-            with c1: q_sell = st.number_input(f"Selling Qty ({u_type})", min_value=0.01)
-            with c2: s_price = st.number_input("Selling Price (Kis rate par becha)", min_value=0.0)
+            qty = st.number_input(f"Qty to Sell ({unit})", min_value=0.01)
+            price = st.number_input("Selling Price (Per Unit)", min_value=0.0)
             
             if st.form_submit_button("COMPLETE SALE"):
-                if q_sell <= avail:
-                    st.session_state.inventory[item_sel]['qty'] -= q_sell
-                    total = q_sell * s_price
-                    # Profit: (Bechne ka rate - Khareed ka rate) * Quantity
-                    profit = (s_price - st.session_state.inventory[item_sel]['p_price']) * q_sell
-                    st.session_state.sales.append({"item": item_sel, "total": total, "profit": profit, "qty": q_sell, "date": datetime.now()})
-                    st.success(f"Sale Done! ₹{total} Stock se minus ho gaya.")
-                else: st.error("Itna Stock nahi hai!")
+                if qty <= avail:
+                    st.session_state.inventory[item]['qty'] -= qty
+                    total = qty * price
+                    profit = (price - st.session_state.inventory[item]['p_price']) * qty
+                    st.session_state.sales.append({"Item": item, "total": total, "profit": profit, "Date": datetime.now()})
+                    st.success(f"Sale Successful! ₹{total}")
+                else:
+                    st.error("Stock mein itna maal nahi hai!")
 
-# --- 4. Purchase: Maal dukan mein lana ---
-elif menu == "📦 Purchase (Maal Lana)":
-    st.title("📦 Purchase Entry")
+# --- 4. PURCHASE (With List Below) ---
+elif menu == "📦 Purchase (Add Stock)":
+    st.title("📦 Add New Stock")
     with st.form("pur_f", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
             n = st.text_input("Item Name")
-            unit = st.selectbox("Unit Type", ["KG", "PCS"])
+            u = st.selectbox("Unit", ["KG", "PCS"])
         with col2:
-            buy_p = st.number_input("Purchase Price (Khareed Rate)", min_value=0.0)
-            qty = st.number_input("Quantity/Weight", min_value=0.0)
-        if st.form_submit_button("ADD TO STOCK"):
-            if n:
-                if n in st.session_state.inventory: st.session_state.inventory[n]['qty'] += qty
-                else: st.session_state.inventory[n] = {'p_price': buy_p, 'qty': qty, 'unit': unit}
-                st.success(f"{n} added to Live Stock!")
-
-# --- 5. Live Stock: Kitna maal bacha hai ---
-elif menu == "📋 Live Stock":
-    st.title("📋 Live Stock Report")
+            rate = st.number_input("Purchase Price", min_value=0.0)
+            q = st.number_input("Quantity", min_value=0.0)
+        if st.form_submit_button("ADD STOCK"):
+            if n in st.session_state.inventory: st.session_state.inventory[n]['qty'] += q
+            else: st.session_state.inventory[n] = {'p_price': rate, 'qty': q, 'unit': u}
+            st.success("Stock Added!")
+    
+    st.write("---")
+    st.write("### Purchase History / Stock List")
     if st.session_state.inventory:
-        df = pd.DataFrame.from_dict(st.session_state.inventory, orient='index').reset_index()
-        df.columns = ['Item Name', 'Buy Rate', 'Available Qty', 'Unit']
-        st.table(df)
-    else: st.info("Stock Khali Hai.")
+        df_pur = pd.DataFrame.from_dict(st.session_state.inventory, orient='index').reset_index()
+        df_pur.columns = ['Item Name', 'Buy Rate', 'Current Qty', 'Unit']
+        st.table(df_pur)
 
-# --- 6. Expense Manager: Daily Kharcha ---
-elif menu == "💰 Expense Manager":
-    st.title("💰 Expense Tracker")
-    with st.form("exp_f", clear_on_submit=True):
-        res = st.text_input("Kharcha Detail")
-        amt = st.number_input("Amount", min_value=0.0)
-        if st.form_submit_button("SAVE EXPENSE"):
-            st.session_state.expenses.append({"Reason": res, "Amount": amt, "Date": datetime.now().date()})
-            st.success("Expense Saved!")
-    if st.session_state.expenses: st.table(pd.DataFrame(st.session_state.expenses))
+# --- 5. LIVE STOCK (Fixing the Error) ---
+elif menu == "📋 Live Stock":
+    st.title("📋 Live Stock Inventory")
+    if st.session_state.inventory:
+        data = []
+        for k, v in st.session_state.inventory.items():
+            data.append({"Item": k, "Qty": v['qty'], "Unit": v['unit'], "Value": v['qty'] * v['p_price']})
+        st.table(pd.DataFrame(data))
+    else:
+        st.info("Stock Khali Hai.")
 
-# --- 7. Admin Settings: Password & ID Control ---
-elif menu == "⚙️ Admin Settings":
-    st.title("⚙️ Authority Settings")
+# --- 6. EXPENSES ---
+elif menu == "💰 Expenses":
+    st.title("💰 Expense Manager")
+    with st.form("exp"):
+        r = st.text_input("Reason")
+        a = st.number_input("Amount", min_value=0.0)
+        if st.form_submit_button("Save"):
+            st.session_state.expenses.append({"Reason": r, "Amount": a, "Date": datetime.now()})
+    st.table(pd.DataFrame(st.session_state.expenses))
+
+# --- 7. SETTINGS ---
+elif menu == "⚙️ Settings":
+    st.title("⚙️ Admin Settings")
     if st.session_state.current_user == "Laika":
-        u = st.text_input("New Staff Username")
-        p = st.text_input("New Password", type="password")
-        if st.button("CREATE STAFF ID"):
-            st.session_state.users[u] = p
-            st.success(f"ID '{u}' Created!")
-    else: st.warning("Only Admin (Laika) can access this.")
+        new_u = st.text_input("New Staff ID")
+        new_p = st.text_input("New Password")
+        if st.button("Create"):
+            st.session_state.users[new_u] = new_p
+            st.success("Created!")
+    else: st.warning("No Access")
