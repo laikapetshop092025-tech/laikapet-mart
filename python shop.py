@@ -44,42 +44,41 @@ if menu == "📊 Dashboard":
     net_profit = sum(s.get('profit', 0) for s in st.session_state.sales) - total_expenses
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("TOTAL REVENUE (Bikri)", f"₹{int(total_revenue)}")
-    c2.metric("TOTAL PURCHASE (Stock)", f"₹{int(total_purchase_val)}")
-    c3.metric("EXPENSES (Nikale Paise)", f"₹{int(total_expenses)}")
+    c1.metric("TOTAL REVENUE", f"₹{int(total_revenue)}")
+    c2.metric("TOTAL PURCHASE", f"₹{int(total_purchase_val)}")
+    c3.metric("EXPENSES", f"₹{int(total_expenses)}")
     st.write("---")
     c4, c5, c6 = st.columns(3)
     c4.metric("TODAY'S PROFIT", f"₹{int(daily_profit)}")
-    c5.metric("NET PROFIT (Bachat)", f"₹{int(net_profit)}")
+    c5.metric("NET PROFIT", f"₹{int(net_profit)}")
     c6.metric("PETS SOLD", len(st.session_state.pet_records))
 
-# --- 6. PET SALES REGISTER (Yahan Breeds Add Ki Gayi Hain) ---
+# --- 6. PET SALES REGISTER (With Delete) ---
 elif menu == "🐾 Pet Sales Register":
     st.title("🐾 New Pet Entry")
-    # Updated Breed List
-    breed_list = [
-        "Labrador", "German Shepherd", "Golden Retriever", "Pug", "Indie / Mixed", 
-        "Persian Cat", "Rottweiler", "Pitbull", "Shih Tzu", "Beagle", 
-        "Cocker Spaniel", "Doberman", "Siberian Husky", "Pomeranian", "Chihuahua", "Other"
-    ]
+    breed_list = ["Labrador", "German Shepherd", "Golden Retriever", "Pug", "Indie / Mixed", "Persian Cat", "Rottweiler", "Pitbull", "Shih Tzu", "Beagle", "Cocker Spaniel", "Doberman", "Siberian Husky", "Pomeranian", "Chihuahua", "Other"]
     with st.form("pet_form"):
         c1, c2 = st.columns(2)
         with c1: 
-            name = st.text_input("Customer Name")
-            phone = st.text_input("Phone")
-            breed = st.selectbox("Select Breed", breed_list)
+            name = st.text_input("Customer Name"); phone = st.text_input("Phone"); breed = st.selectbox("Select Breed", breed_list)
         with c2: 
-            age = st.text_input("Age")
-            wt = st.text_input("Weight")
-            dv = st.date_input("Next Vaccine")
+            age = st.text_input("Age"); wt = st.text_input("Weight"); dv = st.date_input("Next Vaccine")
         if st.form_submit_button("SAVE"):
-            st.session_state.pet_records.append({"Date": datetime.now().date(), "Customer": name, "Phone": phone, "Breed": breed, "Age": age, "Weight": wt, "Due": dv})
-            st.success("Record Saved!")
-    if st.session_state.pet_records: st.table(pd.DataFrame(st.session_state.pet_records))
+            st.session_state.pet_records.append({"Customer": name, "Phone": phone, "Breed": breed, "Age": age, "Weight": wt, "Due": dv})
+            st.rerun()
+    
+    st.write("---")
+    st.subheader("📋 Registered Pets")
+    for i, pet in enumerate(st.session_state.pet_records):
+        col1, col2 = st.columns([4, 1])
+        col1.write(f"*{pet['Customer']}* | {pet['Breed']} | Vaccine Due: {pet['Due']}")
+        if col2.button("🗑️ Delete", key=f"pet_{i}"):
+            st.session_state.pet_records.pop(i)
+            st.rerun()
 
-# --- 7. BILLING TERMINAL ---
+# --- 7. BILLING TERMINAL (With Delete & Stock Revert) ---
 elif menu == "🧾 Billing Terminal":
-    st.title("🧾 Billing")
+    st.title("🧾 Billing & Sales History")
     if not st.session_state.inventory:
         st.warning("Pehle Purchase mein stock bhariye!")
     else:
@@ -96,22 +95,41 @@ elif menu == "🧾 Billing Terminal":
                     st.session_state.inventory[item]['qty'] -= q_sell
                     total = q_sell * r_sell
                     profit = (r_sell - inv['p_price']) * q_sell
-                    st.session_state.sales.append({"Date": datetime.now().date(), "Item": item, "total": total, "profit": profit, "Customer": cust})
-                    st.success(f"Bill Generated! Total: ₹{total}")
+                    st.session_state.sales.append({"Date": datetime.now().date(), "Item": item, "Qty": q_sell, "total": total, "profit": profit, "Customer": cust})
+                    st.rerun()
                 else: st.error("Stock Kam Hai!")
 
-# --- 8. PURCHASE (Add Stock) ---
+    st.write("---")
+    st.subheader("📜 Today's Sales Summary")
+    for i, sale in enumerate(st.session_state.sales):
+        col1, col2 = st.columns([4, 1])
+        col1.write(f"*{sale['Item']}* | {sale['Qty']} | Total: ₹{sale['total']} | Cust: {sale['Customer']}")
+        if col2.button("🗑️ Delete Bill", key=f"sale_{i}"):
+            # Revert Stock
+            if sale['Item'] in st.session_state.inventory:
+                st.session_state.inventory[sale['Item']]['qty'] += sale['Qty']
+            st.session_state.sales.pop(i)
+            st.rerun()
+
+# --- 8. PURCHASE (With Delete) ---
 elif menu == "📦 Purchase (Add Stock)":
-    st.title("📦 Add Stock")
+    st.title("📦 Stock Entry")
     with st.form("purchase_form"):
         n = st.text_input("Item Name"); u = st.selectbox("Unit", ["KG", "PCS", "Packet"])
         r = st.number_input("Purchase Price", min_value=1); q = st.number_input("Quantity", min_value=1)
         if st.form_submit_button("Add Stock"):
             if n in st.session_state.inventory: st.session_state.inventory[n]['qty'] += q
             else: st.session_state.inventory[n] = {'p_price': r, 'qty': q, 'unit': u, 'Date': datetime.now().date()}
-            st.success("Stock Added!")
-    if st.session_state.inventory:
-        st.table(pd.DataFrame([{"Item": k, "Stock": v['qty'], "Unit": v['unit']} for k, v in st.session_state.inventory.items()]))
+            st.rerun()
+    
+    st.write("---")
+    st.subheader("📋 Current Inventory")
+    for item, v in list(st.session_state.inventory.items()):
+        col1, col2 = st.columns([4, 1])
+        col1.write(f"*{item}* | Available: {v['qty']} {v['unit']} | Buy Rate: ₹{v['p_price']}")
+        if col2.button("🗑️ Remove Item", key=f"inv_{item}"):
+            del st.session_state.inventory[item]
+            st.rerun()
 
 # --- 9. LIVE STOCK ---
 elif menu == "📋 Live Stock":
@@ -119,13 +137,23 @@ elif menu == "📋 Live Stock":
     if st.session_state.inventory:
         st.table(pd.DataFrame([{"Item": k, "Available": v['qty'], "Unit": v['unit']} for k, v in st.session_state.inventory.items()]))
 
-# --- 10. EXPENSES ---
+# --- 10. EXPENSES (With Delete) ---
 elif menu == "💰 Expenses":
     st.title("💰 Expenses")
     with st.form("exp"):
         r = st.text_input("Reason"); a = st.number_input("Amount", min_value=1)
-        if st.form_submit_button("Save"): st.session_state.expenses.append({"Reason": r, "Amount": a, "Date": datetime.now().date()})
-    st.table(pd.DataFrame(st.session_state.expenses))
+        if st.form_submit_button("Save"):
+            st.session_state.expenses.append({"Reason": r, "Amount": a, "Date": datetime.now().date()})
+            st.rerun()
+    
+    st.write("---")
+    st.subheader("📜 Expense History")
+    for i, ex in enumerate(st.session_state.expenses):
+        col1, col2 = st.columns([4, 1])
+        col1.write(f"{ex['Date']} | *{ex['Reason']}* | ₹{ex['Amount']}")
+        if col2.button("🗑️ Delete", key=f"exp_{i}"):
+            st.session_state.expenses.pop(i)
+            st.rerun()
 
 # --- 11. ADMIN SETTINGS ---
 elif menu == "⚙️ Admin Settings":
