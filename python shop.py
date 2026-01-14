@@ -1,4 +1,4 @@
-    import streamlit as st
+import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Data load karne ka function (Hamesha naya data uthayega)
+# Data load karne ka function
 def load_data(sheet):
     try:
         return conn.read(worksheet=sheet, ttl=0).dropna(how="all")
@@ -30,22 +30,24 @@ if not st.session_state.logged_in:
 st.sidebar.title("🐾 LAIKA PET MART")
 menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "💰 Expenses", "📋 Live Stock", "🐾 Pet Register", "⚙️ Admin Settings"])
 
-# --- 4. DASHBOARD (Total Sale, Expense, Profit) ---
+# --- 4. DASHBOARD (SALE, PURCHASE, EXPENSE, PROFIT) ---
 if menu == "📊 Dashboard":
     st.title("📊 Business Overview")
-    s_df = load_data("Sales"); e_df = load_data("Expenses")
+    s_df = load_data("Sales"); e_df = load_data("Expenses"); i_df = load_data("Inventory")
     t_sale = s_df['total'].sum() if not s_df.empty else 0
+    t_pur = (i_df['qty'] * i_df['p_price']).sum() if not i_df.empty else 0
     t_exp = e_df['Amount'].sum() if not e_df.empty else 0
     t_profit = t_sale - t_exp
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("TOTAL SALE", f"₹{int(t_sale)}")
-    c2.metric("TOTAL EXPENSE", f"₹{int(t_exp)}")
-    c3.metric("TOTAL PROFIT", f"₹{int(t_profit)}")
+    c2.metric("TOTAL PURCHASE", f"₹{int(t_pur)}")
+    c3.metric("TOTAL EXPENSE", f"₹{int(t_exp)}")
+    c4.metric("TOTAL PROFIT", f"₹{int(t_profit)}")
 
-# --- 5. PURCHASE (Stock Entry + History List) ---
+# --- 5. PURCHASE (LIST KE SAATH) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase / Add Stock")
-    inv_df = load_data("Inventory") # Purana stock padhna
+    inv_df = load_data("Inventory")
     with st.form("pur_f"):
         n = st.text_input("Item Name")
         c1, c2 = st.columns(2)
@@ -54,37 +56,31 @@ elif menu == "📦 Purchase":
         p = st.number_input("Purchase Price", min_value=1)
         if st.form_submit_button("ADD TO STOCK"):
             new_r = pd.DataFrame([{"Item": n, "qty": q, "Unit": u, "p_price": p, "Date": str(datetime.now().date())}])
-            updated_inv = pd.concat([inv_df, new_r], ignore_index=True)
-            conn.update(worksheet="Inventory", data=updated_inv) # Seedha sheet mein likhna
+            conn.update(worksheet="Inventory", data=pd.concat([inv_df, new_r], ignore_index=True))
             st.success("Stock Added!"); st.rerun()
-    st.subheader("📋 Purchase History")
-    st.table(inv_df.tail(10)) # Niche list dikhana
+    st.subheader("📋 Purchase History (Stock Entry List)")
+    st.table(inv_df.tail(10))
 
-# --- 6. BILLING (Live Stock Dropdown + List) ---
+# --- 6. BILLING (ONLINE/OFFLINE + LIST) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing Terminal")
     inv_df = load_data("Inventory"); sales_df = load_data("Sales")
     with st.form("bill_f"):
-        item_list = inv_df['Item'].unique().tolist() if not inv_df.empty else ["No Stock"]
-        it = st.selectbox("Select Product", item_list)
+        it_list = inv_df['Item'].unique().tolist() if not inv_df.empty else ["No Stock"]
+        it = st.selectbox("Select Product", it_list)
         c1, c2, c3 = st.columns(3)
         with c1: qty = st.number_input("Qty", min_value=0.1)
         with c2: unit = st.selectbox("Unit", ["Pcs", "Kg", "Gm", "Pkt"])
         with c3: price = st.number_input("Rate", min_value=1)
-        mode = st.selectbox("Payment", ["Online", "Cash"])
+        mode = st.selectbox("Payment Mode", ["Online", "Cash"])
         if st.form_submit_button("COMPLETE BILL"):
             new_s = pd.DataFrame([{"Date": str(datetime.now().date()), "Item": it, "Qty": f"{qty} {unit}", "total": qty*price, "Mode": mode}])
             conn.update(worksheet="Sales", data=pd.concat([sales_df, new_s], ignore_index=True))
             st.success("Bill Saved!"); st.rerun()
-    st.subheader("📋 Recent Sales")
+    st.subheader("📋 Recent Sales History")
     st.table(sales_df.tail(10))
 
-# --- 7. LIVE STOCK (Everything from Purchase) ---
-elif menu == "📋 Live Stock":
-    st.header("📋 Current Shop Stock")
-    st.table(load_data("Inventory"))
-
-# --- 8. EXPENSES (Dropdown + List) ---
+# --- 7. EXPENSES (MISCELLANEOUS ADDED) ---
 elif menu == "💰 Expenses":
     st.header("💰 Expense Records")
     e_df = load_data("Expenses")
@@ -97,14 +93,14 @@ elif menu == "💰 Expenses":
             st.success("Saved!"); st.rerun()
     st.table(e_df.tail(10))
 
-# --- 9. PET REGISTER (Full Details) ---
+# --- 8. PET REGISTER (PHONE, BREED, AGE, WT, VAX) ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
     p_df = load_data("PetRecords")
     with st.form("pet_f"):
         c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone")
-        with c2: br = st.text_input("Breed"); wt = st.text_input("Weight"); age = st.text_input("Age")
+        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone Number")
+        with c2: br = st.text_input("Breed"); wt = st.text_input("Weight (Kg)"); age = st.text_input("Age")
         vax = st.date_input("Vaccine Date")
         if st.form_submit_button("SAVE"):
             new_p = pd.DataFrame([{"Customer": cn, "Phone": ph, "Breed": br, "Weight": wt, "Age": age, "Vaccine": str(vax)}])
@@ -112,9 +108,9 @@ elif menu == "🐾 Pet Register":
             st.success("Saved!"); st.rerun()
     st.table(p_df.tail(10))
 
-# --- 10. ADMIN SETTINGS (Dues + New ID) ---
+# --- 9. ADMIN SETTINGS (UDHAAR + NEW ID) ---
 elif menu == "⚙️ Admin Settings":
-    st.header("⚙️ Admin Controls")
+    st.header("⚙️ Admin Settings")
     d_df = load_data("Dues")
     with st.expander("Record Udhaar (Dues)"):
         comp = st.text_input("Company Name"); amt = st.number_input("Amount")
@@ -125,6 +121,10 @@ elif menu == "⚙️ Admin Settings":
     st.table(d_df)
     st.divider()
     st.subheader("👤 Create New Staff ID")
-    new_u = st.text_input("New Username"); new_p = st.text_input("Password", type="password")
-    if st.button("CREATE ID"):
-        st.success(f"ID Created for {new_u} (Check Sheet 'Users')")
+    new_u = st.text_input("New Staff Name"); new_p = st.text_input("Password", type="password")
+    if st.button("CREATE ID"): st.success(f"ID Created for {new_u}!")
+
+# --- 10. LIVE STOCK ---
+elif menu == "📋 Live Stock":
+    st.header("📋 Current Shop Stock")
+    st.table(load_data("Inventory"))
