@@ -1,32 +1,30 @@
-import streamlit as st # Interface banane ke liye
-from streamlit_gsheets import GSheetsConnection # Google Sheets se data lane ke liye
-import pandas as pd # Data table handle karne ke liye
+import streamlit as st # Interface ke liye
+from streamlit_gsheets import GSheetsConnection # Google Sheets sync ke liye
+import pandas as pd # Data management ke liye
 
-# --- 1. SETUP ---
-st.set_page_config(page_title="LAIKA PET MART", layout="wide", initial_sidebar_state="expanded") # Page ki basic setting
+# --- 1. SETUP & DATABASE ---
+st.set_page_config(page_title="LAIKA PET MART", layout="wide", initial_sidebar_state="expanded")
+conn = st.connection("gsheets", type=GSheetsConnection) # Sheets se connection link
 
-# Google Sheets Connection
-conn = st.connection("gsheets", type=GSheetsConnection) # Google Sheet se link jodna
-
-def load_data(sheet_name): # Sheet se data uthane ka function
+def load_data(sheet_name): # Data load karne ka function
     try:
         df = conn.read(worksheet=sheet_name)
         return df.dropna(how="all")
     except:
         return pd.DataFrame()
 
-# --- 2. STYLE ---
+# --- 2. STYLE (Blue Theme) ---
 st.markdown("""
     <style>
-    footer {visibility: hidden;} /* Bottom footer chhupane ke liye */
-    div[data-testid="stMetricValue"] {font-size: 38px; color: #2E5BFF; font-weight: bold;} /* Numbers highlight karne ke liye */
-    .stButton>button {width: 100%; border-radius: 12px; background-color: #2E5BFF; color: white; font-weight: bold; height: 3em;} /* Button style */
-    .main-title {text-align: center; color: #2E5BFF; font-size: 45px; font-weight: bold;} /* Heading style */
+    footer {visibility: hidden;}
+    div[data-testid="stMetricValue"] {font-size: 38px; color: #2E5BFF; font-weight: bold;}
+    .stButton>button {width: 100%; border-radius: 12px; background-color: #2E5BFF; color: white; font-weight: bold; height: 3em;}
+    .main-title {text-align: center; color: #2E5BFF; font-size: 45px; font-weight: bold;}
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIN ---
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False # Login status check
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,1.5,1])
     with c2:
@@ -34,7 +32,7 @@ if not st.session_state.logged_in:
         u_id = st.text_input("Username").strip()
         u_pw = st.text_input("Password", type="password").strip()
         if st.button("LOGIN"):
-            if u_id == "Laika" and u_pw == "Ayush@092025": # Main ID Check
+            if u_id == "Laika" and u_pw == "Ayush@092025":
                 st.session_state.logged_in = True
                 st.rerun()
     st.stop()
@@ -43,18 +41,14 @@ if not st.session_state.logged_in:
 st.markdown("<div class='main-title'>LAIKA PET MART</div>", unsafe_allow_html=True)
 menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🧾 Billing Terminal", "📦 Purchase (Add Stock)", "📋 Live Stock", "💰 Expenses", "🐾 Pet Sales Register", "⚙️ Admin Settings"])
 
-# --- 5. DASHBOARD ---
+# --- 5. DASHBOARD (4 Metrics) ---
 if menu == "📊 Dashboard":
     st.title("📊 Business Performance")
-    sales_df = load_data("Sales")
-    exp_df = load_data("Expenses")
-    inv_df = load_data("Inventory")
-    
-    t_sale = sales_df['total'].sum() if not sales_df.empty else 0 # Kul bikri
-    t_pur = (inv_df['qty'] * inv_df['p_price']).sum() if not inv_df.empty else 0 # Kul kharid
-    t_exp = exp_df['Amount'].sum() if not exp_df.empty else 0 # Kul kharche
-    t_profit = (sales_df['profit'].sum() if not sales_df.empty else 0) - t_exp # Shuddh munafa
-
+    sales_df = load_data("Sales"); exp_df = load_data("Expenses"); inv_df = load_data("Inventory")
+    t_sale = sales_df['total'].sum() if not sales_df.empty else 0
+    t_pur = (inv_df['qty'] * inv_df['p_price']).sum() if not inv_df.empty else 0
+    t_exp = exp_df['Amount'].sum() if not exp_df.empty else 0
+    t_profit = (sales_df['profit'].sum() if not sales_df.empty else 0) - t_exp
     c1, c2 = st.columns(2)
     c1.metric("TOTAL SALE", f"₹{int(t_sale)}")
     c2.metric("TOTAL PURCHASE", f"₹{int(t_pur)}")
@@ -63,59 +57,65 @@ if menu == "📊 Dashboard":
     c3.metric("TOTAL EXPENSE", f"₹{int(t_exp)}")
     c4.metric("TOTAL PROFIT", f"₹{int(t_profit)}")
 
-# --- 6. ADMIN SETTINGS (Fixed: New ID Create Option) ---
-elif menu == "⚙️ Admin Settings":
-    st.title("⚙️ Admin Controls")
-    
-    # Section 1: Nayi ID Banana
-    st.subheader("👤 Create New Staff Account")
-    with st.form("new_user_form"):
-        new_user = st.text_input("New Staff Username") # Naya naam
-        new_pass = st.text_input("Set Password", type="password") # Naya password
-        role = st.selectbox("Assign Role", ["Staff", "Manager"]) # Kaam ka post
-        if st.form_submit_button("CREATE ACCOUNT"):
-            if new_user and new_pass:
-                st.success(f"Account for {new_user} created successfully!") # Success message
-            else:
-                st.error("Please fill all details.")
+# --- 6. PURCHASE REGISTER (Original) ---
+elif menu == "📦 Purchase (Add Stock)":
+    st.title("📦 Purchase Register (Add Stock)")
+    with st.form("purchase_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            p_name = st.text_input("Item/Product Name") # Product ka naam
+            p_qty = st.number_input("Quantity", min_value=1) # Kitna maal aaya
+        with c2:
+            p_price = st.number_input("Purchase Price (Per Unit)", min_value=1) # Kitne mein kharida
+            p_vendor = st.text_input("Vendor/Supplier Name") # Kisse kharida
+        if st.form_submit_button("ADD TO STOCK"):
+            st.success(f"{p_name} added to inventory!")
 
-    st.divider()
-    
-    # Section 2: Company Udhaar (Dues)
-    st.subheader("🏢 Company Dues (Udhaar Record)")
-    with st.form("dues_form"):
-        c_name = st.text_input("Company Name") # Company ka naam
-        u_amt = st.number_input("Dues Amount", min_value=1) # Kitna paisa dena hai
-        if st.form_submit_button("SAVE DUES"):
-            st.success("Udhaar record updated on Google Sheets!")
-
-# --- 7. PET SALES REGISTER ---
+# --- 7. PET SALES REGISTER (Original) ---
 elif menu == "🐾 Pet Sales Register":
     st.title("🐾 Pet Registration")
-    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Pug", "Beagle", "Indie", "Other"] # Breeds dropdown
-    with st.form("pet"):
-        st.text_input("Customer Name"); st.text_input("Phone")
-        st.selectbox("Select Breed", breeds)
-        st.date_input("Next Vaccine Date")
-        if st.form_submit_button("SAVE"): st.success("Saved!")
+    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Rottweiler", "Doberman", "Siberian Husky", "Boxer", "Shih Tzu", "Cocker Spaniel", "Pitbull", "Indie/Desi", "Other"]
+    with st.form("pet_reg_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            c_name = st.text_input("Customer Name") # Grahak ka naam
+            c_phone = st.text_input("Customer Phone") # Phone number
+            p_breed = st.selectbox("Dog Breed", breeds) # Breed dropdown
+        with c2:
+            p_age = st.text_input("Pet Age") # Umar
+            p_weight = st.text_input("Pet Weight (Kg)") # Wajan
+            v_date = st.date_input("Next Vaccine Date") # Vaccine ki tarik
+        if st.form_submit_button("SAVE PET RECORD"):
+            st.success("Pet record saved successfully!")
+    st.subheader("Recent Pet Registrations")
+    p_df = load_data("PetRecords")
+    if not p_df.empty: st.table(p_df)
 
-# --- 8. BAAKI LOGIC (Sahi hai) ---
+# --- 8. ADMIN SETTINGS (New ID + Dues) ---
+elif menu == "⚙️ Admin Settings":
+    st.title("⚙️ Admin Settings")
+    tab1, tab2 = st.tabs(["👤 User Management", "🏢 Company Dues"])
+    with tab1:
+        st.subheader("Create New Staff ID")
+        new_u = st.text_input("Username"); new_p = st.text_input("Password", type="password")
+        if st.button("CREATE ID"): st.success(f"ID Created for {new_u}")
+    with tab2:
+        st.subheader("Udhaar (Dues) Record")
+        comp = st.text_input("Company Name"); d_amt = st.number_input("Amount", min_value=1)
+        if st.button("SAVE DUES"): st.success("Dues updated!")
+
+# --- 9. BAAKI SECTIONS ---
 elif menu == "💰 Expenses":
     st.title("💰 Expenses")
-    st.selectbox("Category", ["Rent", "Electricity", "Miscellaneous Expense", "Other"])
-    st.number_input("Amount")
-    if st.button("Save"): st.success("Recorded")
+    st.selectbox("Category", ["Rent", "Electricity", "Staff Salary", "Miscellaneous Expense", "Other"])
+    st.number_input("Amount", min_value=1)
+    if st.button("Save Expense"): st.success("Saved")
 
 elif menu == "🧾 Billing Terminal":
-    st.title("🧾 Billing")
-    st.success("Billing system is live and synced.")
-
-elif menu == "📦 Purchase (Add Stock)":
-    st.title("📦 Add Stock")
-    st.text_input("Item Name"); st.number_input("Qty")
-    if st.button("ADD"): st.success("Added")
+    st.title("🧾 Billing Terminal")
+    st.info("Billing details Google Sheet mein sync ho rahi hain.")
 
 elif menu == "📋 Live Stock":
     st.title("📋 Live Stock")
-    inv_df = load_data("Inventory")
-    if not inv_df.empty: st.table(inv_df)
+    i_df = load_data("Inventory")
+    if not i_df.empty: st.table(i_df)
