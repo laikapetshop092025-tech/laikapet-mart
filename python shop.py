@@ -3,11 +3,11 @@ import pandas as pd
 from datetime import datetime, timedelta
 import io
 
-# --- 1. PAGE SETUP ---
+# --- 1. PAGE SETUP & LOGO ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 st.markdown("<h1 style='text-align: center; color: #4A90E2;'>🐾 LAIKA PET MART</h1>", unsafe_allow_html=True)
 
-# --- 2. DATA INITIALIZATION ---
+# --- 2. DATA INITIALIZATION (Crash-Proof) ---
 if 'inventory' not in st.session_state: st.session_state.inventory = {}
 if 'sales' not in st.session_state: st.session_state.sales = []
 if 'pet_records' not in st.session_state: st.session_state.pet_records = []
@@ -23,106 +23,94 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True; st.session_state.current_user = u; st.rerun()
     st.stop()
 
-# --- 4. SIDEBAR ---
-menu = st.sidebar.radio("Menu", ["📊 Dashboard & Reports", "🐾 Pet Sales Register", "🧾 Billing & Sales", "📦 Purchase (Add Stock)", "📋 Live Stock", "💰 Expenses", "⚙️ Admin Settings"])
+# --- 4. SIDEBAR MENU ---
+menu = st.sidebar.radio("Navigation", ["📊 Dashboard & Excel", "🐾 Pet Sales Register", "🧾 Billing Terminal", "📦 Purchase (Add Stock)", "📋 Live Stock", "💰 Expenses", "⚙️ Admin Settings"])
 
 # --- 5. DASHBOARD & EXCEL REPORTS ---
-if menu == "📊 Dashboard & Reports":
-    st.title("📊 Business Analytics")
-    t_sales = sum(s.get('Total Amount', 0) for s in st.session_state.sales)
-    t_exp = sum(e.get('Amount', 0) for e in st.session_state.expenses)
-    t_prof = sum(s.get('Profit', 0) for s in st.session_state.sales) - t_exp
+if menu == "📊 Dashboard & Excel":
+    st.title("📊 Business Reports")
+    t_sales = sum(s.get('Total', 0) for s in st.session_state.sales)
+    t_prof = sum(s.get('Profit', 0) for s in st.session_state.sales) - sum(e.get('Amount', 0) for e in st.session_state.expenses)
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric("TOTAL REVENUE", f"₹{int(t_sales)}")
-    c2.metric("NET PROFIT", f"₹{int(t_prof)}")
-    c3.metric("EXPENSES", f"₹{int(t_exp)}")
+    col1, col2 = st.columns(2)
+    col1.metric("REVENUE", f"₹{int(t_sales)}")
+    col2.metric("NET PROFIT", f"₹{int(t_prof)}")
 
     st.write("---")
-    st.subheader("📥 Download Business Reports (Excel)")
-    col_a, col_b = st.columns(2)
-    
     if st.session_state.sales:
         df_s = pd.DataFrame(st.session_state.sales)
-        output_s = io.BytesIO()
-        with pd.ExcelWriter(output_s, engine='xlsxwriter') as writer:
-            df_s.to_excel(writer, index=False, sheet_name='Sales')
-        col_a.download_button("📥 Download Sales Report", data=output_s.getvalue(), file_name="Sales_Report.xlsx")
+        towrite = io.BytesIO()
+        df_s.to_excel(towrite, index=False, engine='xlsxwriter')
+        st.download_button("📥 Download Sales Report (Excel)", data=towrite.getvalue(), file_name="Sales_Report.xlsx")
 
-    if st.session_state.inventory:
-        df_p = pd.DataFrame([{"Item": k, **v} for k, v in st.session_state.inventory.items()])
-        output_p = io.BytesIO()
-        with pd.ExcelWriter(output_p, engine='xlsxwriter') as writer:
-            df_p.to_excel(writer, index=False, sheet_name='Inventory')
-        col_b.download_button("📥 Download Stock Report", data=output_p.getvalue(), file_name="Stock_Report.xlsx")
+# --- 6. PET SALES REGISTER (Fixed NameError) ---
+elif menu == "🐾 Pet Sales Register":
+    st.title("🐾 New Pet Entry")
+    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Pug", "Indie", "Persian Cat", "Other"]
+    with st.form("pet_f", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            name = st.text_input("Customer Name"); phone = st.text_input("Phone"); br = st.selectbox("Breed", breeds)
+        with c2:
+            ag = st.text_input("Age"); wt = st.text_input("Weight"); dv = st.date_input("Next Vaccine")
+        if st.form_submit_button("SAVE RECORD"):
+            st.session_state.pet_records.append({"Customer": name, "Breed": br, "Age": ag, "Weight": wt, "Due": dv})
+            st.success("Saved!")
+    if st.session_state.pet_records: st.table(pd.DataFrame(st.session_state.pet_records))
 
-# --- 6. BILLING & SALES ENTRY ---
-elif menu == "🧾 Billing & Sales":
-    st.title("🧾 Billing Terminal")
+# --- 7. BILLING TERMINAL (Dropdown & Unit Fix) ---
+elif menu == "🧾 Billing Terminal":
+    st.title("🧾 Generate Bill")
     if not st.session_state.inventory:
         st.warning("Pehle Purchase mein stock bhariye!")
     else:
-        with st.form("bill_form", clear_on_submit=True):
-            item = st.selectbox("Select Product", list(st.session_state.inventory.keys()))
-            info = st.session_state.inventory[item]
-            st.info(f"Available Stock: {info.get('qty', 0)} {info.get('unit', 'Unit')}")
+        with st.form("billing_machine"):
+            item_sel = st.selectbox("Select Product (Dropdown)", list(st.session_state.inventory.keys()))
+            inv_info = st.session_state.inventory[item_sel]
             
             c1, c2, c3 = st.columns(3)
-            with c1: unit_s = st.selectbox("Unit", ["KG", "PCS", "Packet"])
-            with c2: qty_s = st.number_input("Quantity", min_value=0.01, step=0.1)
-            with c3: price_s = st.number_input("Rate (₹)", min_value=1, step=1)
+            with c1: u_sel = st.selectbox("Unit", ["KG", "PCS", "Packet"])
+            with c2: q_sel = st.number_input("Quantity", min_value=0.1, step=0.1)
+            with c3: r_sel = st.number_input("Rate (₹)", min_value=1, step=1)
             
             cust = st.text_input("Customer Name")
             if st.form_submit_button("COMPLETE SALE & GENERATE BILL"):
-                if qty_s <= info.get('qty', 0):
-                    st.session_state.inventory[item]['qty'] -= qty_s
-                    total = qty_s * price_s
-                    profit = (price_s - info.get('p_price', 0)) * qty_s
-                    sale_data = {"Date": datetime.now().date(), "Customer": cust, "Item": item, "Qty": qty_s, "Unit": unit_s, "Rate": price_s, "Total Amount": total, "Profit": profit}
-                    st.session_state.sales.append(sale_data)
-                    
-                    st.success("Sale Recorded!")
-                    st.markdown(f"### 📄 INVOICE: {item}\n*Customer:* {cust}\n*Total: ₹{total}*")
+                avail = inv_info.get('qty', 0)
+                if q_sel <= avail:
+                    st.session_state.inventory[item_sel]['qty'] -= q_sel
+                    total = q_sel * r_sel
+                    profit = (r_sel - inv_info.get('p_price', 0)) * q_sel
+                    st.session_state.sales.append({"Date": datetime.now().date(), "Item": item_sel, "Qty": q_sel, "Unit": u_sel, "Total": total, "Profit": profit})
+                    st.success(f"Bill Generated! Total: ₹{total}")
                 else: st.error("Stock Kam Hai!")
 
-# --- 7. PET SALES REGISTER ---
-elif menu == "🐾 Pet Sales Register":
-    st.title("🐾 Pet Lifecycle Record")
-    with st.form("pet_f", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1: n = st.text_input("Customer"); p = st.text_input("Phone"); br = st.text_input("Breed")
-        with col2: ag = st.text_input("Age"); wt = st.text_input("Weight"); dv = st.date_input("Next Vaccine")
-        if st.form_submit_button("Save"):
-            st.session_state.pet_records.append({"Customer": n, "Breed": br, "Age": ag, "Weight": wt, "Next Due": dv})
-    if st.session_state.pet_records: st.table(pd.DataFrame(st.session_state.pet_records))
-
-# --- 8. PURCHASE ---
+# --- 8. PURCHASE & 9. LIVE STOCK ---
 elif menu == "📦 Purchase (Add Stock)":
-    st.title("📦 Add Stock")
-    with st.form("pur_f", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1: name = st.text_input("Item Name"); unit = st.selectbox("Unit", ["KG", "PCS", "Packet"])
-        with col2: buy = st.number_input("Buy Rate", min_value=1); qty = st.number_input("Qty", min_value=1)
-        if st.form_submit_button("Add Stock"):
-            if name in st.session_state.inventory: st.session_state.inventory[name]['qty'] += qty
-            else: st.session_state.inventory[name] = {'p_price': buy, 'qty': qty, 'unit': unit}
+    st.title("📦 Stock Entry")
+    with st.form("p_f", clear_on_submit=True):
+        n = st.text_input("Item Name"); u = st.selectbox("Unit", ["KG", "PCS", "Packet"])
+        r = st.number_input("Buy Rate", min_value=1); q = st.number_input("Qty", min_value=1)
+        if st.form_submit_button("Add to Inventory"):
+            if n in st.session_state.inventory: st.session_state.inventory[n]['qty'] += q
+            else: st.session_state.inventory[n] = {'p_price': r, 'qty': q, 'unit': u}
     if st.session_state.inventory:
-        st.write("### Current Stock")
         st.table(pd.DataFrame([{"Item": k, "Stock": v.get('qty',0), "Unit": v.get('unit','Unit')} for k, v in st.session_state.inventory.items()]))
 
-# --- 9. LIVE STOCK, EXPENSES, ADMIN ---
 elif menu == "📋 Live Stock":
     st.title("📋 Current Inventory")
     if st.session_state.inventory:
         st.table(pd.DataFrame([{"Item": k, "Available": v.get('qty',0), "Unit": v.get('unit','Unit')} for k, v in st.session_state.inventory.items()]))
+
+# --- EXPENSES & SETTINGS ---
 elif menu == "💰 Expenses":
     st.title("💰 Expenses")
-    with st.form("exp"):
-        r = st.text_input("Reason"); a = st.number_input("Amount", min_value=1)
-        if st.form_submit_button("Save"): st.session_state.expenses.append({"Reason": r, "Amount": a, "Date": datetime.now().date()})
+    with st.form("e"):
+        res = st.text_input("Reason"); amt = st.number_input("Amount", min_value=1)
+        if st.form_submit_button("Save"): st.session_state.expenses.append({"Reason": res, "Amount": amt, "Date": datetime.now().date()})
     st.table(pd.DataFrame(st.session_state.expenses))
+
 elif menu == "⚙️ Admin Settings":
-    st.title("⚙️ Authority")
+    st.title("⚙️ Staff Management")
     if st.session_state.current_user == "Laika":
         u = st.text_input("New ID"); p = st.text_input("New Password")
-        if st.button("Create"): st.session_state.users[u] = p; st.success("Done!")
+        if st.button("Create Staff Account"): st.session_state.users[u] = p; st.success("Created!")
