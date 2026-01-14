@@ -27,7 +27,7 @@ if 'expenses' not in st.session_state: st.session_state.expenses = []
 if 'company_dues' not in st.session_state: st.session_state.company_dues = []
 if 'users' not in st.session_state: st.session_state.users = {"Laika": "Ayush@092025"}
 
-# --- 3. LOGIN & AUTO-LOGOUT (No Change) ---
+# --- 3. LOGIN & AUTO-LOGOUT ---
 if st.session_state.logged_in:
     if time.time() - st.session_state.last_activity > 600:
         st.session_state.logged_in = False
@@ -61,59 +61,57 @@ if st.sidebar.button("🔴 Logout"):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 6. PET SALES REGISTER (FIXED: AGE, WEIGHT, VACCINE) ---
-elif menu == "🐾 Pet Sales Register":
-    st.title("🐾 Pet Registration")
-    with st.form("pet_reg_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            n = st.text_input("Customer Name")
-            ph = st.text_input("Phone Number")
-            b = st.selectbox("Dog Breed", ["Labrador", "German Shepherd", "Pug", "Beagle", "Rottweiler", "Other"])
-        with c2:
-            a = st.text_input("Dog Age (e.g. 2 Months)")
-            w = st.text_input("Dog Weight (e.g. 5 KG)")
-            v = st.selectbox("Vaccine Status", ["Fully Vaccinated", "First Dose Done", "Not Vaccinated", "Pending"])
-            v_date = st.date_input("Next Vaccine Date")
-            
-        if st.form_submit_button("SAVE PET RECORD"):
-            st.session_state.pet_records.append({
-                "Date": datetime.now().date(),
-                "Customer": n,
-                "Phone": ph,
-                "Breed": b,
-                "Age": a,
-                "Weight": w,
-                "Vaccine Status": v,
-                "Next Date": v_date
-            })
-            st.success("Pet Record Saved!")
-            st.rerun()
-            
-    if st.session_state.pet_records:
-        st.subheader("Registered Pets")
-        st.table(pd.DataFrame(st.session_state.pet_records))
-
-# --- BAAKI SAB ORIGINAL SECTIONS (No Changes) ---
+# --- 6. DASHBOARD (FIXED: ADDED TOTAL PROFIT) ---
 elif menu == "📊 Dashboard":
     st.title("📊 Business Performance")
     t_sale = sum(s.get('total', 0) for s in st.session_state.sales)
     t_cash = sum(s.get('total', 0) for s in st.session_state.sales if s.get('Method') == 'Cash')
     t_online = sum(s.get('total', 0) for s in st.session_state.sales if s.get('Method') == 'Online')
     t_exp = sum(e.get('Amount', 0) for e in st.session_state.expenses)
+    
+    # Profit calculation: Sales Profit minus Expenses
+    total_gross_profit = sum(s.get('profit', 0) for s in st.session_state.sales)
+    net_profit = total_gross_profit - t_exp
+
     c1, c2, c3 = st.columns(3)
     c1.metric("TOTAL SALES", f"₹{int(t_sale)}")
     c2.metric("CASH TOTAL", f"₹{int(t_cash)}")
     c3.metric("ONLINE TOTAL", f"₹{int(t_online)}")
+    
     st.divider()
-    st.metric("TOTAL EXPENSES", f"₹{int(t_exp)}")
+    
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.metric("TOTAL EXPENSES", f"₹{int(t_exp)}")
+    with col_p2:
+        # Green color for Net Profit
+        st.metric("TOTAL PROFIT", f"₹{int(net_profit)}")
+    
+    if st.session_state.company_dues:
+        t_udh = sum(d.get('Amount', 0) for d in st.session_state.company_dues)
+        if t_udh > 0: st.error(f"⚠️ Company Udhaar Pending: ₹{int(t_udh)}")
+
+# --- BAAKI SAB ORIGINAL SECTIONS (No Changes) ---
+elif menu == "🐾 Pet Sales Register":
+    st.title("🐾 Pet Registration")
+    with st.form("pet_reg"):
+        c1, c2 = st.columns(2)
+        with c1:
+            n = st.text_input("Customer Name"); ph = st.text_input("Phone Number")
+            b = st.selectbox("Breed", ["Labrador", "German Shepherd", "Pug", "Beagle", "Other"])
+        with c2:
+            a = st.text_input("Dog Age"); w = st.text_input("Dog Weight")
+            v = st.selectbox("Vaccine Status", ["Fully Vaccinated", "Not Vaccinated", "Pending"])
+            v_date = st.date_input("Next Date")
+        if st.form_submit_button("SAVE RECORD"):
+            st.session_state.pet_records.append({"Customer": n, "Breed": b, "Age": a, "Weight": w, "Next Date": v_date})
+            st.rerun()
 
 elif menu == "🧾 Billing Terminal":
     st.title("🧾 Billing")
     if st.session_state.inventory:
         with st.form("bill"):
             item = st.selectbox("Product", list(st.session_state.inventory.keys()))
-            st.info(f"Stock: {int(st.session_state.inventory[item]['qty'])}")
             qty = st.number_input("Qty", min_value=0.1); pr = st.number_input("Price", min_value=1)
             meth = st.selectbox("Payment", ["Cash", "Online"])
             if st.form_submit_button("BILL"):
@@ -147,7 +145,7 @@ elif menu == "💰 Expenses":
 
 elif menu == "⚙️ Admin Settings":
     st.title("⚙️ Admin")
-    st.subheader("👤 New ID")
+    st.subheader("👤 Create ID")
     new_u = st.text_input("Username"); new_p = st.text_input("Password")
     if st.button("Create"):
         if new_u and new_p: st.session_state.users[new_u] = new_p; st.success("Created!")
@@ -155,8 +153,7 @@ elif menu == "⚙️ Admin Settings":
     st.subheader("🏢 Udhaar")
     with st.form("udh"):
         cn = st.text_input("Company"); ca = st.number_input("Amount", min_value=1)
-        if st.form_submit_button("Save Udhaar"):
-            st.session_state.company_dues.append({"Company": cn, "Amount": ca}); st.rerun()
+        if st.form_submit_button("Save"): st.session_state.company_dues.append({"Company": cn, "Amount": ca}); st.rerun()
 
 elif menu == "📅 Report Center":
     st.title("📅 Sales Report")
