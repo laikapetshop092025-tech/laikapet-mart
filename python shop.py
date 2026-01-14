@@ -17,7 +17,7 @@ st.markdown("""
 
 st.markdown("<div class='main-title'>🐾 LAIKA PET MART</div>", unsafe_allow_html=True)
 
-# --- 2. DATA INITIALIZATION (Crash-Proof) ---
+# --- 2. DATA INITIALIZATION ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'last_activity' not in st.session_state: st.session_state.last_activity = time.time()
 if 'inventory' not in st.session_state: st.session_state.inventory = {}
@@ -27,7 +27,7 @@ if 'expenses' not in st.session_state: st.session_state.expenses = []
 if 'company_dues' not in st.session_state: st.session_state.company_dues = []
 if 'users' not in st.session_state: st.session_state.users = {"Laika": "Ayush@092025"}
 
-# --- 3. AUTO-LOGOUT LOGIC ---
+# --- 3. AUTO-LOGOUT ---
 if st.session_state.logged_in:
     if time.time() - st.session_state.last_activity > 600:
         st.session_state.logged_in = False
@@ -63,8 +63,43 @@ if st.sidebar.button("🔴 Logout"):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 6. DASHBOARD (Original Metrics + Udhaar Alert) ---
-if menu == "📊 Dashboard":
+# --- 6. PET SALES REGISTER (Wapas Saare Options Add Kar Diye) ---
+if menu == "🐾 Pet Sales Register":
+    st.title("🐾 Pet Registration & Vaccine Record")
+    with st.form("pet_reg_form", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            cust_name = st.text_input("Customer Name")
+            cust_phone = st.text_input("Customer Phone Number")
+            # Dog Breed Dropdown
+            dog_breed = st.selectbox("Select Dog Breed", ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Rottweiler", "Indie", "Other"])
+        with c2:
+            dog_age = st.text_input("Dog Age (e.g. 2 Months / 1 Year)")
+            dog_weight = st.text_input("Dog Weight (kg)")
+            vaccine_date = st.date_input("Next Vaccine Date", datetime.now())
+        
+        if st.form_submit_button("SAVE PET RECORD"):
+            if cust_name and cust_phone:
+                st.session_state.pet_records.append({
+                    "Date": datetime.now().date(),
+                    "Customer": cust_name,
+                    "Phone": cust_phone,
+                    "Breed": dog_breed,
+                    "Age": dog_age,
+                    "Weight": dog_weight,
+                    "Next Vaccine": vaccine_date
+                })
+                st.success(f"Record for {cust_name} saved!")
+                st.rerun()
+            else:
+                st.error("Please enter Customer Name and Phone!")
+
+    if st.session_state.pet_records:
+        st.write("### Recent Registrations")
+        st.table(pd.DataFrame(st.session_state.pet_records))
+
+# --- 7. DASHBOARD ---
+elif menu == "📊 Dashboard":
     st.title("📊 Business Analytics")
     t_sale = sum(s.get('total', 0) for s in st.session_state.sales)
     t_exp = sum(e.get('Amount', 0) for e in st.session_state.expenses)
@@ -81,42 +116,30 @@ if menu == "📊 Dashboard":
     if t_udh > 0:
         st.error(f"⚠️ Pending Company Udhaar: ₹{int(t_udh)}")
 
-# --- 7. ADMIN SETTINGS (Fixed with Udhaar Record) ---
+# --- 8. ADMIN SETTINGS (Udhaar Option) ---
 elif menu == "⚙️ Admin Settings":
     st.title("⚙️ Admin Settings")
-    
-    # Udhaar Section (Wapas add kiya hai)
     st.subheader("🏢 Company Udhaar (Pending Payments)")
     with st.form("udh_form", clear_on_submit=True):
         c_name = st.text_input("Company Name")
         c_amt = st.number_input("Pending Amount (₹)", min_value=1)
-        if st.form_submit_button("Save Udhaar Record"):
+        if st.form_submit_button("Save Udhaar"):
             st.session_state.company_dues.append({"Company": c_name, "Amount": c_amt, "Date": datetime.now().date()})
-            st.success("Udhaar record saved!")
             st.rerun()
     
     if st.session_state.company_dues:
         st.table(pd.DataFrame(st.session_state.company_dues))
         for i, d in enumerate(st.session_state.company_dues):
             if st.button(f"Clear Udhaar: {d['Company']}", key=f"udh_{i}"):
-                st.session_state.company_dues.pop(i)
-                st.rerun()
-    
-    st.write("---")
-    st.subheader("👤 Create Staff ID")
-    new_u = st.text_input("New Username"); new_p = st.text_input("New Password")
-    if st.button("Create ID"):
-        st.session_state.users[new_u] = new_p
-        st.success("Staff Account Created!")
+                st.session_state.company_dues.pop(i); st.rerun()
 
-# --- BAAKI ORIGINAL CODE (Billing, Purchase, etc.) ---
+# --- BAAKI ORIGINAL SECTIONS (Billing, Purchase, Stock, Report) ---
 elif menu == "🧾 Billing Terminal":
     st.title("🧾 Billing")
-    if not st.session_state.inventory: st.warning("Stock khali hai!")
-    else:
-        with st.form("bill_form"):
+    if st.session_state.inventory:
+        with st.form("bill_f"):
             item = st.selectbox("Product", list(st.session_state.inventory.keys()))
-            qty = st.number_input("Quantity", min_value=0.1); pr = st.number_input("Price", min_value=1)
+            qty = st.number_input("Qty", min_value=0.1); pr = st.number_input("Price", min_value=1)
             cust = st.text_input("Customer Name")
             if st.form_submit_button("Generate Bill"):
                 inv = st.session_state.inventory[item]
@@ -127,9 +150,9 @@ elif menu == "🧾 Billing Terminal":
 
 elif menu == "📦 Purchase (Add Stock)":
     st.title("📦 Add Stock")
-    with st.form("pur_form"):
-        n = st.text_input("Item Name"); r = st.number_input("Purchase Price", min_value=1)
-        q = st.number_input("Quantity", min_value=1); u = st.selectbox("Unit", ["KG", "PCS", "Packet"])
+    with st.form("pur_f"):
+        n = st.text_input("Item Name"); r = st.number_input("Price", min_value=1)
+        q = st.number_input("Qty", min_value=1); u = st.selectbox("Unit", ["KG", "PCS", "Packet"])
         if st.form_submit_button("Add Stock"):
             if n in st.session_state.inventory: st.session_state.inventory[n]['qty'] += q
             else: st.session_state.inventory[n] = {'qty': q, 'p_price': r, 'unit': u}
@@ -138,32 +161,19 @@ elif menu == "📦 Purchase (Add Stock)":
 elif menu == "📋 Live Stock":
     st.title("📋 Live Stock")
     if st.session_state.inventory:
-        st.table(pd.DataFrame([{"Item": k, "Available": v['qty'], "Unit": v['unit']} for k, v in st.session_state.inventory.items()]))
+        st.table(pd.DataFrame([{"Item": k, "Stock": v['qty'], "Unit": v['unit']} for k, v in st.session_state.inventory.items()]))
 
 elif menu == "💰 Expenses":
     st.title("💰 Expenses")
-    cats = ["Rent", "Electricity", "Staff Salary", "Other"]
-    e_cat = st.selectbox("Category", cats); e_amt = st.number_input("Amount", min_value=1)
-    if st.button("Save Expense"):
-        st.session_state.expenses.append({"Date": datetime.now().date(), "Amount": e_amt, "Category": e_cat})
+    cat = st.selectbox("Category", ["Rent", "Electricity", "Staff", "Other"])
+    amt = st.number_input("Amount", min_value=1)
+    if st.button("Save"):
+        st.session_state.expenses.append({"Date": datetime.now().date(), "Amount": amt, "Category": cat})
         st.rerun()
 
 elif menu == "📅 Report Center":
-    st.title("📅 Monthly Report Center")
+    st.title("📅 Monthly Report")
     if st.session_state.sales:
-        df_all = pd.DataFrame(st.session_state.sales)
-        df_all['Date'] = pd.to_datetime(df_all['Date'])
-        df_all['Month'] = df_all['Date'].dt.strftime('%B %Y')
-        selected_month = st.selectbox("Select Month", df_all['Month'].unique())
-        monthly_df = df_all[df_all['Month'] == selected_month]
-        st.table(monthly_df)
-        csv = monthly_df.to_csv(index=False).encode('utf-8')
-        st.download_button(f"📥 Download {selected_month} Report", csv, f"Report_{selected_month}.csv", "text/csv")
-
-elif menu == "🐾 Pet Sales Register":
-    st.title("🐾 Pet Registration")
-    with st.form("pet_reg"):
-        n = st.text_input("Customer Name"); ph = st.text_input("Phone")
-        if st.form_submit_button("Save"):
-            st.session_state.pet_records.append({"Customer": n, "Phone": ph})
-            st.rerun()
+        df = pd.DataFrame(st.session_state.sales)
+        st.table(df)
+        st.download_button("Download Excel", df.to_csv(index=False).encode('utf-8'), "Report.csv", "text/csv")
