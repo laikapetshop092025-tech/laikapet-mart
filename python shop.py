@@ -33,52 +33,51 @@ if st.sidebar.button("🔴 Logout"):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 5. DASHBOARD (Waisa hi jaisa pichli bar tha) ---
+# --- 5. DASHBOARD ---
 if menu == "📊 Dashboard":
     st.title("📊 Business Analytics")
     today = datetime.now().date()
-    
-    # Calculations
     total_revenue = sum(s.get('total', 0) for s in st.session_state.sales)
     total_expenses = sum(e.get('Amount', 0) for e in st.session_state.expenses)
     total_purchase_val = sum(v.get('qty', 0) * v.get('p_price', 0) for v in st.session_state.inventory.values())
     daily_profit = sum(s.get('profit', 0) for s in st.session_state.sales if s.get('Date') == today)
     net_profit = sum(s.get('profit', 0) for s in st.session_state.sales) - total_expenses
 
-    # Metrics Display
     c1, c2, c3 = st.columns(3)
     c1.metric("TOTAL REVENUE (Bikri)", f"₹{int(total_revenue)}")
     c2.metric("TOTAL PURCHASE (Stock)", f"₹{int(total_purchase_val)}")
     c3.metric("EXPENSES (Nikale Paise)", f"₹{int(total_expenses)}")
-    
     st.write("---")
     c4, c5, c6 = st.columns(3)
     c4.metric("TODAY'S PROFIT", f"₹{int(daily_profit)}")
     c5.metric("NET PROFIT (Bachat)", f"₹{int(net_profit)}")
     c6.metric("PETS SOLD", len(st.session_state.pet_records))
 
-    # DATA SAFETY SECTION
-    st.write("---")
-    st.subheader("💾 Data Backup (Hamesha ke liye safe rakhein)")
-    st.info("Bhai, din khatam hone par niche diye button se apna record download kar liya karein, taaki reboot hone par data na khoye.")
-    
-    if st.session_state.sales:
-        csv = pd.DataFrame(st.session_state.sales).to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Sales Report (Excel)", csv, "sales_backup.csv", "text/csv")
-
-# --- BAAKI CODE (NO CHANGE) ---
-
+# --- 6. PET SALES REGISTER (Yahan Breeds Add Ki Gayi Hain) ---
 elif menu == "🐾 Pet Sales Register":
     st.title("🐾 New Pet Entry")
+    # Updated Breed List
+    breed_list = [
+        "Labrador", "German Shepherd", "Golden Retriever", "Pug", "Indie / Mixed", 
+        "Persian Cat", "Rottweiler", "Pitbull", "Shih Tzu", "Beagle", 
+        "Cocker Spaniel", "Doberman", "Siberian Husky", "Pomeranian", "Chihuahua", "Other"
+    ]
     with st.form("pet_form"):
         c1, c2 = st.columns(2)
-        with c1: name = st.text_input("Customer Name"); phone = st.text_input("Phone")
-        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); dv = st.date_input("Next Vaccine")
+        with c1: 
+            name = st.text_input("Customer Name")
+            phone = st.text_input("Phone")
+            breed = st.selectbox("Select Breed", breed_list)
+        with c2: 
+            age = st.text_input("Age")
+            wt = st.text_input("Weight")
+            dv = st.date_input("Next Vaccine")
         if st.form_submit_button("SAVE"):
-            st.session_state.pet_records.append({"Date": today, "Customer": name, "Phone": phone, "Age": age, "Weight": wt, "Due": dv})
+            st.session_state.pet_records.append({"Date": datetime.now().date(), "Customer": name, "Phone": phone, "Breed": breed, "Age": age, "Weight": wt, "Due": dv})
             st.success("Record Saved!")
     if st.session_state.pet_records: st.table(pd.DataFrame(st.session_state.pet_records))
 
+# --- 7. BILLING TERMINAL ---
 elif menu == "🧾 Billing Terminal":
     st.title("🧾 Billing")
     if not st.session_state.inventory:
@@ -101,6 +100,7 @@ elif menu == "🧾 Billing Terminal":
                     st.success(f"Bill Generated! Total: ₹{total}")
                 else: st.error("Stock Kam Hai!")
 
+# --- 8. PURCHASE (Add Stock) ---
 elif menu == "📦 Purchase (Add Stock)":
     st.title("📦 Add Stock")
     with st.form("purchase_form"):
@@ -113,11 +113,13 @@ elif menu == "📦 Purchase (Add Stock)":
     if st.session_state.inventory:
         st.table(pd.DataFrame([{"Item": k, "Stock": v['qty'], "Unit": v['unit']} for k, v in st.session_state.inventory.items()]))
 
+# --- 9. LIVE STOCK ---
 elif menu == "📋 Live Stock":
     st.title("📋 Live Stock")
     if st.session_state.inventory:
         st.table(pd.DataFrame([{"Item": k, "Available": v['qty'], "Unit": v['unit']} for k, v in st.session_state.inventory.items()]))
 
+# --- 10. EXPENSES ---
 elif menu == "💰 Expenses":
     st.title("💰 Expenses")
     with st.form("exp"):
@@ -125,6 +127,7 @@ elif menu == "💰 Expenses":
         if st.form_submit_button("Save"): st.session_state.expenses.append({"Reason": r, "Amount": a, "Date": datetime.now().date()})
     st.table(pd.DataFrame(st.session_state.expenses))
 
+# --- 11. ADMIN SETTINGS ---
 elif menu == "⚙️ Admin Settings":
     st.title("⚙️ Admin Settings")
     if st.session_state.current_user == "Laika":
