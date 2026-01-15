@@ -58,11 +58,12 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (COLORFUL) ---
+# --- 4. DASHBOARD (COLORFUL & CLEAN) ---
 if menu == "📊 Dashboard":
     today_str = datetime.now().strftime('%d %B, %Y')
     month_name = datetime.now().strftime('%B %Y')
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
+    
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
 
@@ -98,19 +99,20 @@ if menu == "📊 Dashboard":
 
     st.markdown(f"#### 📅 Today's Report: <span style='color: #FF4B4B;'>{today_str}</span>", unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"*Today Sale*\n### ₹{int(ts)}")
-    with c2: st.warning(f"*Today Purchase*\n### ₹{int(tp)}")
-    with c3: st.success(f"*Margin Profit*\n### ₹{int(tm)}")
-    with c4: st.error(f"*Today Expense*\n### ₹{int(te)}")
+    # .2f matlab dot ke baad sirf 2 zero
+    with c1: st.info(f"*Today Sale*\n### ₹{ts:,.2f}")
+    with c2: st.warning(f"*Today Purchase*\n### ₹{tp:,.2f}")
+    with c3: st.success(f"*Margin Profit*\n### ₹{tm:,.2f}")
+    with c4: st.error(f"*Today Expense*\n### ₹{te:,.2f}")
 
     st.divider()
 
     st.markdown(f"#### 🗓️ Monthly Summary: <span style='color: #1E88E5;'>{month_name}</span>", unsafe_allow_html=True)
     m1, m2, m3, m4 = st.columns(4)
-    with m1: st.info(f"*Total Sale*\n### ₹{int(ms)}")
-    with m2: st.warning(f"*Total Purchase*\n### ₹{int(mp)}")
-    with m3: st.success(f"*Net Margin*\n### ₹{int(mm)}")
-    with m4: st.error(f"*Total Expense*\n### ₹{int(me)}")
+    with m1: st.info(f"*Total Sale*\n### ₹{ms:,.2f}")
+    with m2: st.warning(f"*Total Purchase*\n### ₹{mp:,.2f}")
+    with m3: st.success(f"*Net Margin*\n### ₹{mm:,.2f}")
+    with m4: st.error(f"*Total Expense*\n### ₹{me:,.2f}")
 
 # --- 5. BILLING ---
 elif menu == "🧾 Billing":
@@ -173,35 +175,29 @@ elif menu == "💰 Expenses":
     if st.button("❌ DELETE LAST EXPENSE"):
         if delete_data("Expenses"): st.success("Expense Deleted!"); time.sleep(1); st.rerun()
 
-# --- 9. ADMIN SETTINGS (SMART UDHAAR SYSTEM) ---
+# --- 9. ADMIN SETTINGS (SMART UDHAAR) ---
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
     st.subheader("🏢 Company Dues & Payments")
-    
     with st.form("due_form"):
         comp = st.text_input("Company Name")
         col1, col2 = st.columns(2)
         with col1: amt = st.number_input("Amount")
         with col2: type = st.selectbox("Transaction Type", ["Udhaar Liya (+)", "Payment Diya (-)"])
-        
         if st.form_submit_button("UPDATE RECORD"):
-            # Agar "Payment Diya" select kiya toh amount ko minus (-) bana denge
             final_amt = amt if "Udhaar" in type else -amt
             save_data("Dues", [comp, final_amt, str(datetime.now().date())])
             st.success("Record Updated!"); time.sleep(1); st.rerun()
 
-    # Dues Calculation Logic
     dues_df = load_data("Dues")
     if not dues_df.empty:
         st.markdown("### 📊 Balance Summary")
         balance_list = []
         for company in dues_df.iloc[:, 0].unique():
             total_bal = pd.to_numeric(dues_df[dues_df.iloc[:, 0] == company].iloc[:, 1], errors='coerce').sum()
-            balance_list.append({"Company": company, "Total Balance Due": f"₹{int(total_bal)}"})
-        
+            balance_list.append({"Company": company, "Total Balance Due": f"₹{total_bal:,.2f}"})
         st.table(pd.DataFrame(balance_list))
         st.divider()
-        st.markdown("### 📝 Recent Transactions")
         st.table(dues_df.tail(10))
     
     if st.button("❌ DELETE LAST DUES ENTRY"):
