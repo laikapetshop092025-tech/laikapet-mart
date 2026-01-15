@@ -1,4 +1,4 @@
-import streamlit as st
+[12:00 pm, 15/1/2026] Laika pet Shop: import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
@@ -131,3 +131,79 @@ elif menu == "⚙️ Admin Settings":
     st.subheader("👤 Create New Staff ID")
     new_u = st.text_input("New Staff Name"); new_p = st.text_input("Password", type="password")
     if st.button("CREATE ID"): st.success(f"ID Created for {new_u}!")
+[12:04 pm, 15/1/2026] Laika pet Shop: function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(e.parameter.sheet);
+  sheet.appendRow(data);
+  return ContentService.createTextOutput("Success");
+}
+[12:04 pm, 15/1/2026] Laika pet Shop: import streamlit as st
+import pandas as pd
+import requests
+from datetime import datetime
+
+# --- 1. SETUP ---
+st.set_page_config(page_title="LAIKA PET MART", layout="wide")
+
+# APNA APPS SCRIPT URL YAHAN DALEIN
+SCRIPT_URL = "YAHAN_APNA_URL_PASTE_KAREIN" 
+SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
+
+def save_to_gsheet(sheet_name, data_list):
+    requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list)
+
+def load_from_gsheet(sheet_name):
+    try: return pd.read_csv(SHEET_LINK + sheet_name)
+    except: return pd.DataFrame()
+
+# --- 2. LOGIN ---
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if not st.session_state.logged_in:
+    u = st.text_input("Username").strip()
+    p = st.text_input("Password", type="password").strip()
+    if st.button("LOGIN"):
+        if u == "Laika" and p == "Ayush@092025":
+            st.session_state.logged_in = True
+            st.rerun()
+    st.stop()
+
+# --- 3. MENU ---
+menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
+
+# --- 4. PURCHASE (Jo yahan bharenge wo Stock mein dikhega) ---
+if menu == "📦 Purchase":
+    st.header("📦 Purchase / Add Stock")
+    with st.form("pur_f"):
+        n = st.text_input("Item Name")
+        c1, c2 = st.columns(2)
+        with c1: q = st.number_input("Qty", min_value=0.1)
+        with c2: u = st.selectbox("Unit", ["Pcs", "Kg", "Gm", "Pkt"])
+        p = st.number_input("Purchase Price")
+        if st.form_submit_button("ADD TO STOCK"):
+            save_to_gsheet("Inventory", [n, q, u, p, str(datetime.now().date())])
+            st.success("Stock Added Successfully!"); st.rerun()
+    st.subheader("📋 Recent Purchase List")
+    st.table(load_from_gsheet("Inventory").tail(10))
+
+# --- 5. BILLING (Stock se Item uthayega) ---
+elif menu == "🧾 Billing":
+    st.header("🧾 Billing Terminal")
+    inv_df = load_from_gsheet("Inventory")
+    with st.form("bill_f"):
+        # Dropdown mein wahi items aayenge jo Purchase mein dale hain
+        items = inv_df['Item'].unique().tolist() if not inv_df.empty else ["No Stock"]
+        it = st.selectbox("Select Product", items)
+        qty = st.number_input("Qty", min_value=0.1)
+        pr = st.number_input("Selling Price")
+        mode = st.selectbox("Payment", ["Online", "Cash"])
+        if st.form_submit_button("COMPLETE BILL"):
+            save_to_gsheet("Sales", [str(datetime.now().date()), it, qty, qty*pr, mode])
+            st.success("Bill Saved!"); st.rerun()
+    st.table(load_from_gsheet("Sales").tail(10))
+
+# --- 6. LIVE STOCK ---
+elif menu == "📋 Live Stock":
+    st.header("📋 Current Shop Stock")
+    st.table(load_from_gsheet("Inventory"))
+
+# --- 7. BAAKI SECTIONS (Admin, Pet Register etc. logic same rahega) ---
