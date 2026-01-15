@@ -8,7 +8,7 @@ import os
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# AAPKA NAYA URL (Bilkul wahi hai)
+# AAPKA NAYA URL
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
 
@@ -45,14 +45,15 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- 3. SIDEBAR (LOGO & NAVIGATION) ---
-st.sidebar.markdown("<h1 style='text-align: center; color: #FF4B4B;'>🐾 LAIKA</h1>", unsafe_allow_html=True)
+# --- 3. SIDEBAR (LOGO & WELCOME MESSAGE) ---
+st.sidebar.markdown("<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>", unsafe_allow_html=True)
 
-# Logo Logic: Automatic from GitHub file
+# Ladke wala pet logo (Ladka aur Dog icon)
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3048/3048122.png", use_container_width=True)
+
+# GitHub wala logo agar upload hai toh (Option)
 if os.path.exists("logo.png"):
     st.sidebar.image("logo.png", use_container_width=True)
-elif os.path.exists("logo.jpg"):
-    st.sidebar.image("logo.jpg", use_container_width=True)
 
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
@@ -62,10 +63,8 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
 
 # --- 4. DASHBOARD (BEAUTIFUL & DYNAMIC) ---
 if menu == "📊 Dashboard":
-    # Automatic Date & Month Name
     today_str = datetime.now().strftime('%d %B, %Y')
     month_name = datetime.now().strftime('%B %Y')
-    
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Overview</h2>", unsafe_allow_html=True)
     
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses")
@@ -97,7 +96,6 @@ if menu == "📊 Dashboard":
     ts, tp, tm, te = get_stats(s_df, i_df, e_df, "today")
     ms, mp, mm, me = get_stats(s_df, i_df, e_df, "month")
 
-    # --- TODAY'S SECTION ---
     st.markdown(f"### 📅 Today's Report: <span style='color: #FF4B4B;'>{today_str}</span>", unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.info(f"*Today Sale*\n### ₹{int(ts)}")
@@ -107,7 +105,6 @@ if menu == "📊 Dashboard":
 
     st.divider()
 
-    # --- MONTHLY SECTION ---
     st.markdown(f"### 🗓️ Monthly Summary: <span style='color: #1E88E5;'>{month_name}</span>", unsafe_allow_html=True)
     m1, m2, m3, m4 = st.columns(4)
     with m1: st.info(f"*Total Sale*\n### ₹{int(ms)}")
@@ -115,7 +112,7 @@ if menu == "📊 Dashboard":
     with m3: st.success(f"*Net Margin*\n### ₹{int(mm)}")
     with m4: st.error(f"*Total Expense*\n### ₹{int(me)}")
 
-# --- BAAKI CODE (NO CHANGES - AS REQUESTED) ---
+# --- 5. BILLING (NO CHANGES) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -128,6 +125,7 @@ elif menu == "🧾 Billing":
     if st.button("❌ DELETE LAST SALE"):
         if delete_data("Sales"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
+# --- 6. PURCHASE (NO CHANGES) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
@@ -138,6 +136,7 @@ elif menu == "📦 Purchase":
     if st.button("❌ DELETE LAST PURCHASE"):
         if delete_data("Inventory"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
+# --- 7. LIVE STOCK ---
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -149,19 +148,36 @@ elif menu == "📋 Live Stock":
             stock_list.append({"Product": item, "Available": p_q - s_q})
         st.table(pd.DataFrame(stock_list))
 
+# --- 8. PET REGISTER (DROPDOWN ADDED) ---
 elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Register")
+    st.header("🐾 Pet Registration")
+    
+    # Breeds List
+    dog_breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Rottweiler", "Indie Dog", "Husky", "Boxer"]
+    cat_breeds = ["Persian Cat", "Siamese Cat", "Maine Coon", "Indie Cat", "Bengal Cat"]
+    all_breeds = dog_breeds + cat_breeds + ["Other"]
+
     with st.form("pet"):
         c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Customer"); ph = st.text_input("Phone"); br = st.text_input("Breed")
-        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Next Vaccine")
-        if st.form_submit_button("SAVE"):
+        with c1: 
+            cn = st.text_input("Customer Name")
+            ph = st.text_input("Phone Number")
+            br = st.selectbox("Select Breed", all_breeds) # Dropdown yahan hai
+        with c2: 
+            age = st.text_input("Pet Age")
+            wt = st.text_input("Weight (Kg)")
+            vax = st.date_input("Next Vaccine Date")
+        
+        if st.form_submit_button("SAVE RECORD"):
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
+    
+    st.subheader("Recent Records")
     st.table(load_data("PetRecords").tail(5))
 
+# --- 9. EXPENSES & ADMIN ---
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
-    cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Other"]); amt = st.number_input("Amount")
+    cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Pet Food", "Other"]); amt = st.number_input("Amount")
     if st.button("Save Expense"):
         save_data("Expenses", [str(datetime.now().date()), cat, amt]); time.sleep(1); st.rerun()
     st.table(load_data("Expenses").tail(5))
