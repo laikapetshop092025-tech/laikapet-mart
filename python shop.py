@@ -6,15 +6,18 @@ from datetime import datetime
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# ZAROORI: Yahan apna Apps Script URL paste karein (Jo Step 1 mein mila)
+# ZAROORI: Yahan apna Apps Script URL paste karein (Jo aapne copy kiya hai)
 SCRIPT_URL = "YAHAN_APNA_WEB_APP_URL_PASTE_KAREIN" 
 SHEET_LINK = "https://script.google.com/macros/s/AKfycbyrdoefZ5_7WFNekqeTO0BCE9fiuW2FP-1OvvPgjFIfwAr-LhjDLrayFH-728BPReYa/exec"
+
+# Data Save karne ka function
 def save_data(sheet_name, data_list):
     try:
         response = requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list)
         return response.text == "Success"
     except: return False
 
+# Data Load karne ka function
 def load_data(sheet_name):
     try:
         df = pd.read_csv(SHEET_LINK + sheet_name)
@@ -22,7 +25,7 @@ def load_data(sheet_name):
         return df
     except: return pd.DataFrame()
 
-# --- 2. LOGIN ---
+# --- 2. LOGIN SYSTEM ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     st.header("🔐 LOGIN - LAIKA PET MART")
@@ -39,14 +42,18 @@ menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🧾 Billing", "📦 P
 
 # --- 4. DASHBOARD (SALE, PURCHASE, EXPENSE, PROFIT) ---
 if menu == "📊 Dashboard":
-    st.title("📊 Business Overview")
+    st.title("📊 Business Performance")
     s_df = load_data("Sales"); e_df = load_data("Expenses"); i_df = load_data("Inventory")
+    
     t_sale = pd.to_numeric(s_df.iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
     t_exp = pd.to_numeric(e_df.iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
     t_pur = (pd.to_numeric(i_df.iloc[:, 1], errors='coerce') * pd.to_numeric(i_df.iloc[:, 3], errors='coerce')).sum() if not i_df.empty else 0
+    
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("TOTAL SALE", f"₹{int(t_sale)}"); c2.metric("TOTAL PURCHASE", f"₹{int(t_pur)}")
-    c3.metric("TOTAL EXPENSE", f"₹{int(t_exp)}"); c4.metric("TOTAL PROFIT", f"₹{int(t_sale - t_exp - t_pur)}")
+    c1.metric("TOTAL SALE", f"₹{int(t_sale)}")
+    c2.metric("TOTAL PURCHASE", f"₹{int(t_pur)}")
+    c3.metric("TOTAL EXPENSE", f"₹{int(t_exp)}")
+    c4.metric("TOTAL PROFIT", f"₹{int(t_sale - t_exp - t_pur)}")
 
 # --- 5. PURCHASE (STOCK ENTRY) ---
 elif menu == "📦 Purchase":
@@ -58,11 +65,12 @@ elif menu == "📦 Purchase":
         with c1: q = st.number_input("Qty", min_value=0.1)
         with c2: p = st.number_input("Purchase Price")
         if st.form_submit_button("ADD STOCK"):
-            save_data("Inventory", [n, q, "Pcs", p, str(datetime.now().date())])
-            st.rerun()
+            if save_data("Inventory", [n, q, "Pcs", p, str(datetime.now().date())]):
+                st.success("Stock Added!"); st.rerun()
+    st.subheader("📋 Purchase History")
     st.table(inv_df.tail(10))
 
-# --- 6. BILLING (STOCK DROPDOWN) ---
+# --- 6. BILLING (STOCK SYNC) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing Terminal")
     inv_df = load_data("Inventory")
