@@ -28,10 +28,9 @@ def load_data(sheet_name):
         url = f"{SHEET_LINK}{sheet_name}&cache={time.time()}"
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
-        # Error fix: Date column check
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        elif not df.empty and len(df.columns) >= 5: # Agar heading galat hai toh 5th column uthao
+        elif not df.empty and len(df.columns) >= 5:
             df.rename(columns={df.columns[4]: 'Date'}, inplace=True)
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df
@@ -49,19 +48,20 @@ if not st.session_state.logged_in:
     st.stop()
 
 # --- 3. SIDEBAR ---
-st.sidebar.markdown("<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>", unsafe_allow_html=True)
+st.sidebar.markdown("<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>")
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (STABLE VERSION) ---
+# --- 4. DASHBOARD (UPDATED PROFIT & DATE LOGIC) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
+    curr_m_name = datetime.now().strftime('%B') # Mahine ka naam (January, etc.)
 
-    # Money Balances logic
+    # Balances
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -81,32 +81,38 @@ if menu == "📊 Dashboard":
     
     st.divider()
 
-    def get_full_stats(sales_df, inv_df, exp_df, filter_type="today"):
-        # Yahan Error Fix kiya hai (Handling empty or missing Date)
+    def get_full_stats(sales_df, inv_df, filter_type="today"):
         if filter_type == "today":
             s_sub = sales_df[sales_df['Date'].dt.date == today_dt] if not sales_df.empty and 'Date' in sales_df.columns else pd.DataFrame()
             i_sub = inv_df[inv_df['Date'].dt.date == today_dt] if not inv_df.empty and 'Date' in inv_df.columns else pd.DataFrame()
-            e_sub = exp_df[exp_df['Date'].dt.date == today_dt] if not exp_df.empty and 'Date' in exp_df.columns else pd.DataFrame()
         else:
             s_sub = sales_df[sales_df['Date'].dt.month == curr_m] if not sales_df.empty and 'Date' in sales_df.columns else pd.DataFrame()
             i_sub = inv_df[inv_df['Date'].dt.month == curr_m] if not inv_df.empty and 'Date' in inv_df.columns else pd.DataFrame()
-            e_sub = exp_df[exp_df['Date'].dt.month == curr_m] if not exp_df.empty and 'Date' in exp_df.columns else pd.DataFrame()
         
         t_sale = pd.to_numeric(s_sub.iloc[:, 3], errors='coerce').sum() if not s_sub.empty else 0
         t_pur = pd.to_numeric(i_sub.iloc[:, 1] * i_sub.iloc[:, 3], errors='coerce').sum() if not i_sub.empty else 0
-        t_exp = pd.to_numeric(e_sub.iloc[:, 2], errors='coerce').sum() if not e_sub.empty else 0
-        return t_sale, t_pur, t_exp, (t_sale - t_pur)
+        return t_sale, t_pur, (t_sale - t_pur)
 
-    ts, tp, te, tpr = get_full_stats(s_df, i_df, e_df, "today")
-    ms, mp, me, mpr = get_full_stats(s_df, i_df, e_df, "month")
+    ts, tp, tpr = get_full_stats(s_df, i_df, "today")
+    ms, mp, mpr = get_full_stats(s_df, i_df, "month")
     
-    st.markdown(f"#### 📅 Today's Stats"); c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Net Profit", f"₹{tpr:,.2f}")
-    st.divider()
-    st.markdown(f"#### 🗓️ Monthly Stats"); m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Sale", f"₹{ms:,.2f}"); m2.metric("Purchase", f"₹{mp:,.2f}"); m3.metric("Expense", f"₹{me:,.2f}"); m4.metric("Profit", f"₹{mpr:,.2f}")
+    # Today Section with Date
+    st.markdown(f"#### 📅 Date: {today_dt.strftime('%d %B, %Y')}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Today Sale", f"₹{ts:,.2f}")
+    c2.metric("Today Purchase", f"₹{tp:,.2f}")
+    c3.metric("Sale - Purchase (Profit)", f"₹{tpr:,.2f}")
 
-# --- BAAKI CODE (AS IT IS) ---
+    st.divider()
+    
+    # Monthly Section with Month Name
+    st.markdown(f"#### 🗓️ Month: {curr_m_name} {datetime.now().year}")
+    m1, m2, m3 = st.columns(3)
+    m1.metric(f"{curr_m_name} Sale", f"₹{ms:,.2f}")
+    m2.metric(f"{curr_m_name} Purchase", f"₹{mp:,.2f}")
+    m3.metric(f"{curr_m_name} Profit (S-P)", f"₹{mpr:,.2f}")
+
+# --- BAAKI CODE (BILKUL SAME) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
