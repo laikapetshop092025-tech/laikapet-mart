@@ -58,12 +58,11 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (COLORFUL & DYNAMIC) ---
+# --- 4. DASHBOARD (COLORFUL) ---
 if menu == "📊 Dashboard":
     today_str = datetime.now().strftime('%d %B, %Y')
     month_name = datetime.now().strftime('%B %Y')
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
-    
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
 
@@ -162,7 +161,7 @@ elif menu == "📋 Live Stock":
             stock_list.append({"Product": item, "Purchased": t_purchased, "Sold": t_sold, "Available": t_purchased - t_sold, "Unit": unit})
         st.table(pd.DataFrame(stock_list))
 
-# --- 8. EXPENSES (DELETE ADDED) ---
+# --- 8. EXPENSES ---
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
     with st.form("exp"):
@@ -171,10 +170,44 @@ elif menu == "💰 Expenses":
         if st.form_submit_button("Save Expense"):
             save_data("Expenses", [str(datetime.now().date()), cat, amt]); time.sleep(1); st.rerun()
     st.table(load_data("Expenses").tail(5))
-    if st.button("❌ DELETE LAST EXPENSE"): # Naya Delete Option
+    if st.button("❌ DELETE LAST EXPENSE"):
         if delete_data("Expenses"): st.success("Expense Deleted!"); time.sleep(1); st.rerun()
 
-# --- 9. PET REGISTER & ADMIN ---
+# --- 9. ADMIN SETTINGS (SMART UDHAAR SYSTEM) ---
+elif menu == "⚙️ Admin Settings":
+    st.header("⚙️ Admin Settings")
+    st.subheader("🏢 Company Dues & Payments")
+    
+    with st.form("due_form"):
+        comp = st.text_input("Company Name")
+        col1, col2 = st.columns(2)
+        with col1: amt = st.number_input("Amount")
+        with col2: type = st.selectbox("Transaction Type", ["Udhaar Liya (+)", "Payment Diya (-)"])
+        
+        if st.form_submit_button("UPDATE RECORD"):
+            # Agar "Payment Diya" select kiya toh amount ko minus (-) bana denge
+            final_amt = amt if "Udhaar" in type else -amt
+            save_data("Dues", [comp, final_amt, str(datetime.now().date())])
+            st.success("Record Updated!"); time.sleep(1); st.rerun()
+
+    # Dues Calculation Logic
+    dues_df = load_data("Dues")
+    if not dues_df.empty:
+        st.markdown("### 📊 Balance Summary")
+        balance_list = []
+        for company in dues_df.iloc[:, 0].unique():
+            total_bal = pd.to_numeric(dues_df[dues_df.iloc[:, 0] == company].iloc[:, 1], errors='coerce').sum()
+            balance_list.append({"Company": company, "Total Balance Due": f"₹{int(total_bal)}"})
+        
+        st.table(pd.DataFrame(balance_list))
+        st.divider()
+        st.markdown("### 📝 Recent Transactions")
+        st.table(dues_df.tail(10))
+    
+    if st.button("❌ DELETE LAST DUES ENTRY"):
+        if delete_data("Dues"): st.success("Entry Deleted!"); time.sleep(1); st.rerun()
+
+# --- 10. PET REGISTER ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
     dog_breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Indie Dog", "Husky", "Boxer", "Pitbull", "Shih Tzu"]
@@ -186,12 +219,3 @@ elif menu == "🐾 Pet Register":
         if st.form_submit_button("SAVE RECORD"):
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
     st.table(load_data("PetRecords").tail(5))
-
-elif menu == "⚙️ Admin Settings":
-    st.header("⚙️ Admin Settings")
-    st.subheader("🏢 Company Dues")
-    with st.form("due"):
-        comp = st.text_input("Company Name"); amt = st.number_input("Due Amount")
-        if st.form_submit_button("SAVE DUE"):
-            save_data("Dues", [comp, amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
-    st.table(load_data("Dues"))
