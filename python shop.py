@@ -56,13 +56,14 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (S-P PROFIT & DATE/MONTH LOGIC) ---
+# --- 4. DASHBOARD ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
     curr_m_name = datetime.now().strftime('%B')
 
+    # Balances
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -82,29 +83,40 @@ if menu == "📊 Dashboard":
     
     st.divider()
 
-    def get_full_stats(sales_df, inv_df, filter_type="today"):
+    def get_stats(sales_df, inv_df, exp_df, filter_type="today"):
         if filter_type == "today":
             s_sub = sales_df[sales_df['Date'].dt.date == today_dt] if not sales_df.empty and 'Date' in sales_df.columns else pd.DataFrame()
             i_sub = inv_df[inv_df['Date'].dt.date == today_dt] if not inv_df.empty and 'Date' in inv_df.columns else pd.DataFrame()
+            e_sub = exp_df[exp_df['Date'].dt.date == today_dt] if not exp_df.empty and 'Date' in exp_df.columns else pd.DataFrame()
         else:
             s_sub = sales_df[sales_df['Date'].dt.month == curr_m] if not sales_df.empty and 'Date' in sales_df.columns else pd.DataFrame()
             i_sub = inv_df[inv_df['Date'].dt.month == curr_m] if not inv_df.empty and 'Date' in inv_df.columns else pd.DataFrame()
+            e_sub = exp_df[exp_df['Date'].dt.month == curr_m] if not exp_df.empty and 'Date' in exp_df.columns else pd.DataFrame()
         
         t_sale = pd.to_numeric(s_sub.iloc[:, 3], errors='coerce').sum() if not s_sub.empty else 0
         t_pur = pd.to_numeric(i_sub.iloc[:, 1] * i_sub.iloc[:, 3], errors='coerce').sum() if not i_sub.empty else 0
-        return t_sale, t_pur, (t_sale - t_pur)
+        t_exp = pd.to_numeric(e_sub.iloc[:, 2], errors='coerce').sum() if not e_sub.empty else 0
+        return t_sale, t_pur, t_exp, (t_sale - t_pur)
 
-    ts, tp, tpr = get_full_stats(s_df, i_df, "today")
-    ms, mp, mpr = get_full_stats(s_df, i_df, "month")
+    ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
+    ms, mp, me, mpr = get_stats(s_df, i_df, e_df, "month")
     
+    # Today stats with Profit (S-P)
     st.markdown(f"#### 📅 Date: {today_dt.strftime('%d %B, %Y')}")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Today Purchase", f"₹{tp:,.2f}"); c3.metric("Profit (S-P)", f"₹{tpr:,.2f}")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Today Sale", f"₹{ts:,.2f}")
+    c2.metric("Today Purchase", f"₹{tp:,.2f}")
+    c3.metric("Today Expense", f"₹{te:,.2f}")
+    c4.metric("Profit (S-P)", f"₹{tpr:,.2f}")
 
     st.divider()
+    # Monthly stats with Profit (S-P)
     st.markdown(f"#### 🗓️ Month: {curr_m_name} {datetime.now().year}")
-    m1, m2, m3 = st.columns(3)
-    m1.metric(f"{curr_m_name} Sale", f"₹{ms:,.2f}"); m2.metric(f"{curr_m_name} Purchase", f"₹{mp:,.2f}"); m3.metric(f"{curr_m_name} Profit (S-P)", f"₹{mpr:,.2f}")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Monthly Sale", f"₹{ms:,.2f}")
+    m2.metric("Monthly Purchase", f"₹{mp:,.2f}")
+    m3.metric("Monthly Expense", f"₹{me:,.2f}")
+    m4.metric("Monthly Profit (S-P)", f"₹{mpr:,.2f}")
 
 # --- BAAKI TABS (SAB FIXED) ---
 elif menu == "🧾 Billing":
