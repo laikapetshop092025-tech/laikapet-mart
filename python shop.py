@@ -33,24 +33,35 @@ def load_data(sheet_name):
         return df
     except: return pd.DataFrame()
 
-# --- 2. LOGIN SYSTEM ---
+# --- 2. LOGIN SYSTEM (Vapas Jodh Diya) ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+
 if not st.session_state.logged_in:
     st.markdown("<h1 style='text-align: center;'>🔐 LAIKA PET MART LOGIN</h1>", unsafe_allow_html=True)
-    u = st.text_input("Username").strip(); p = st.text_input("Password", type="password").strip()
-    if st.button("LOGIN", use_container_width=True):
-        if u == "Laika" and p == "Ayush@092025":
-            st.session_state.logged_in = True
-            st.rerun()
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        u = st.text_input("Username").strip()
+        p = st.text_input("Password", type="password").strip()
+        if st.button("LOGIN", use_container_width=True):
+            if u == "Laika" and p == "Ayush@092025":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Galat Password ya Username!")
     st.stop()
 
-# --- 3. SIDEBAR ---
+# --- 3. SIDEBAR (LOGO & LOGOUT BUTTON) ---
 st.sidebar.markdown("<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>", unsafe_allow_html=True)
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3048/3048122.png", use_container_width=True)
 
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
-# --- 4. DASHBOARD ---
+st.sidebar.divider()
+if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
+    st.session_state.logged_in = False
+    st.rerun()
+
+# --- 4. DASHBOARD (SAB KUCH TANCH HAI) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
@@ -88,8 +99,7 @@ if menu == "📊 Dashboard":
         t_sale = pd.to_numeric(s_sub.iloc[:, 3], errors='coerce').sum() if not s_sub.empty else 0
         t_pur = pd.to_numeric(i_sub.iloc[:, 1] * i_sub.iloc[:, 3], errors='coerce').sum() if not i_sub.empty else 0
         t_exp = pd.to_numeric(e_sub.iloc[:, 2], errors='coerce').sum() if not e_sub.empty else 0
-        t_profit = t_sale - t_pur
-        return t_sale, t_pur, t_exp, t_profit
+        return t_sale, t_pur, t_exp, (t_sale - t_pur)
 
     ts, tp, te, tpr = get_full_stats(s_df, i_df, e_df, "today")
     ms, mp, me, mpr = get_full_stats(s_df, i_df, e_df, "month")
@@ -103,25 +113,7 @@ if menu == "📊 Dashboard":
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Purchase", f"₹{mp:,.2f}"); m3.metric("Monthly Expense", f"₹{me:,.2f}"); m4.metric("Monthly Profit", f"₹{mpr:,.2f}")
 
-# --- 5. PET REGISTER (DELETE BUTTON ADDED BACK) ---
-elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration")
-    dog_breeds = ["Labrador", "German Shepherd", "Beagle", "Pug", "Indie Dog", "Shih Tzu"]
-    with st.form("pet"):
-        c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Name"); ph = st.text_input("Phone"); br = st.selectbox("Breed", dog_breeds + ["Other"])
-        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
-        if st.form_submit_button("SAVE PET RECORD"):
-            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
-    
-    pet_df = load_data("PetRecords")
-    if not pet_df.empty: pet_df = pet_df[pet_df.iloc[:, 0] != "Aman"]
-    st.table(pet_df.tail(10))
-    
-    if st.button("❌ DELETE LAST PET ENTRY"): # Ye raha wapas jodh diya
-        if delete_data("PetRecords"): st.success("Deleted!"); time.sleep(1); st.rerun()
-
-# --- BAAKI TABS (SAME AS BEFORE) ---
+# --- BAAKI TABS (SAME AS BEFORE - ALL DELETE BUTTONS INTACT) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -160,6 +152,21 @@ elif menu == "💰 Expenses":
     st.table(load_data("Expenses").tail(10))
     if st.button("❌ DELETE LAST EXPENSE"):
         if delete_data("Expenses"): st.success("Deleted!"); time.sleep(1); st.rerun()
+
+elif menu == "🐾 Pet Register":
+    st.header("🐾 Pet Registration")
+    dog_breeds = ["Labrador", "German Shepherd", "Beagle", "Pug", "Indie Dog", "Shih Tzu"]
+    with st.form("pet"):
+        c1, c2 = st.columns(2)
+        with c1: cn = st.text_input("Name"); ph = st.text_input("Phone"); br = st.selectbox("Breed", dog_breeds + ["Other"])
+        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+        if st.form_submit_button("SAVE PET RECORD"):
+            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
+    pet_df = load_data("PetRecords")
+    if not pet_df.empty: pet_df = pet_df[pet_df.iloc[:, 0] != "Aman"]
+    st.table(pet_df.tail(10))
+    if st.button("❌ DELETE LAST PET ENTRY"):
+        if delete_data("PetRecords"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
