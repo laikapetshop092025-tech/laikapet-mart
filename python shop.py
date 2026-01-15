@@ -50,16 +50,18 @@ if not st.session_state.logged_in:
 # --- 3. SIDEBAR ---
 st.sidebar.markdown("<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>")
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
+
+st.sidebar.divider()
 if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (UPDATED PROFIT & DATE LOGIC) ---
+# --- 4. DASHBOARD (S-P PROFIT & DATE/MONTH LOGIC) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
-    curr_m_name = datetime.now().strftime('%B') # Mahine ka naam (January, etc.)
+    curr_m_name = datetime.now().strftime('%B')
 
     # Balances
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
@@ -96,41 +98,19 @@ if menu == "📊 Dashboard":
     ts, tp, tpr = get_full_stats(s_df, i_df, "today")
     ms, mp, mpr = get_full_stats(s_df, i_df, "month")
     
-    # Today Section with Date
+    # Today Stats
     st.markdown(f"#### 📅 Date: {today_dt.strftime('%d %B, %Y')}")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Today Sale", f"₹{ts:,.2f}")
-    c2.metric("Today Purchase", f"₹{tp:,.2f}")
-    c3.metric("Sale - Purchase (Profit)", f"₹{tpr:,.2f}")
+    c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Today Purchase", f"₹{tp:,.2f}"); c3.metric("Profit (S-P)", f"₹{tpr:,.2f}")
 
     st.divider()
     
-    # Monthly Section with Month Name
+    # Monthly Stats
     st.markdown(f"#### 🗓️ Month: {curr_m_name} {datetime.now().year}")
     m1, m2, m3 = st.columns(3)
-    m1.metric(f"{curr_m_name} Sale", f"₹{ms:,.2f}")
-    m2.metric(f"{curr_m_name} Purchase", f"₹{mp:,.2f}")
-    m3.metric(f"{curr_m_name} Profit (S-P)", f"₹{mpr:,.2f}")
+    m1.metric(f"{curr_m_name} Sale", f"₹{ms:,.2f}"); m2.metric(f"{curr_m_name} Purchase", f"₹{mp:,.2f}"); m3.metric(f"{curr_m_name} Profit (S-P)", f"₹{mpr:,.2f}")
 
 # --- BAAKI CODE (BILKUL SAME) ---
-elif menu == "📦 Purchase":
-    st.header("📦 Purchase")
-    with st.form("pur"):
-        n = st.text_input("Item Name"); c1, c2 = st.columns(2)
-        with c1: q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
-        with c2: p = st.number_input("Rate")
-        if st.form_submit_button("ADD STOCK"):
-            save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
-    st.table(load_data("Inventory").tail(10))
-
-elif menu == "📋 Live Stock":
-    st.header("📋 Live Stock")
-    i_df = load_data("Inventory"); s_df = load_data("Sales")
-    if not i_df.empty:
-        inv_grouped = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
-        inv_grouped.columns = ['Item Name', 'Total Purchased', 'Unit']
-        st.table(inv_grouped)
-
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -144,6 +124,20 @@ elif menu == "🧾 Billing":
         if st.form_submit_button("SAVE BILL"):
             save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode]); time.sleep(1); st.rerun()
     st.table(load_data("Sales").tail(10))
+    if st.button("❌ DELETE LAST SALE"):
+        if delete_data("Sales"): st.success("Deleted!"); time.sleep(1); st.rerun()
+
+elif menu == "📦 Purchase":
+    st.header("📦 Purchase")
+    with st.form("pur"):
+        n = st.text_input("Item Name"); c1, c2 = st.columns(2)
+        with c1: q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
+        with c2: p = st.number_input("Rate")
+        if st.form_submit_button("ADD STOCK"):
+            save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    st.table(load_data("Inventory").tail(10))
+    if st.button("❌ DELETE LAST PURCHASE"):
+        if delete_data("Inventory"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
@@ -153,6 +147,16 @@ elif menu == "💰 Expenses":
         if st.form_submit_button("Save Expense"):
             save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
     st.table(load_data("Expenses").tail(10))
+    if st.button("❌ DELETE LAST EXPENSE"):
+        if delete_data("Expenses"): st.success("Deleted!"); time.sleep(1); st.rerun()
+
+elif menu == "📋 Live Stock":
+    st.header("📋 Live Stock")
+    i_df = load_data("Inventory"); s_df = load_data("Sales")
+    if not i_df.empty:
+        inv_grouped = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
+        inv_grouped.columns = ['Item Name', 'Total Purchased', 'Unit']
+        st.table(inv_grouped)
 
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
@@ -184,3 +188,5 @@ elif menu == "⚙️ Admin Settings":
     dues_df = load_data("Dues")
     if not dues_df.empty: dues_df = dues_df[dues_df.iloc[:, 0] != "Baba Pet Shop"]
     st.table(dues_df.tail(10))
+    if st.button("❌ DELETE LAST COMPANY ENTRY"):
+        if delete_data("Dues"): st.success("Deleted!"); time.sleep(1); st.rerun(
