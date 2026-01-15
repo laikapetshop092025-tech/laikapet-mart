@@ -36,53 +36,64 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- 3. MENU (NO CHANGES) ---
+# --- 3. MENU ---
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
-# --- 4. DASHBOARD (FIXED FOR GROSS PROFIT) ---
+# --- 4. DASHBOARD (MARGIN-BASED PROFIT) ---
 if menu == "📊 Dashboard":
-    st.markdown("<h2 style='text-align: center; color: #4A90E2;'>📊 Business Performance Dashboard</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #4A90E2;'>📊 Margin Profit Dashboard</h2>", unsafe_allow_html=True)
     
     s_df = load_data("Sales")
+    i_df = load_data("Inventory")
     e_df = load_data("Expenses")
 
     today = datetime.now().date()
     curr_month = datetime.now().month
     curr_year = datetime.now().year
 
-    # Calculations for Today
+    # Profit Calculation Logic (Sale Price - Purchase Price)
+    def calculate_margin_profit(sales_subset, inventory_df):
+        total_profit = 0
+        total_sale_amt = 0
+        for index, row in sales_subset.iterrows():
+            item_name = row.iloc[1]
+            qty_sold = pd.to_numeric(row.iloc[2], errors='coerce')
+            sale_amt = pd.to_numeric(row.iloc[3], errors='coerce')
+            total_sale_amt += sale_amt
+            
+            # Find Purchase Price for this item
+            item_info = inventory_df[inventory_df.iloc[:, 0] == item_name]
+            if not item_info.empty:
+                pur_price = pd.to_numeric(item_info.iloc[-1, 3], errors='coerce') # Latest purchase price
+                cost_price = pur_price * qty_sold
+                total_profit += (sale_amt - cost_price)
+            else:
+                # Agar purchase price nahi milti toh poora sale amt hi profit (Adjust as needed)
+                total_profit += 0 
+        return total_sale_amt, total_profit
+
+    # Filter Data
     s_today = s_df[s_df['Date'].dt.date == today] if not s_df.empty else pd.DataFrame()
-    e_today = e_df[e_df['Date'].dt.date == today] if not e_df.empty else pd.DataFrame()
-    
-    sale_today = pd.to_numeric(s_today.iloc[:, 3], errors='coerce').sum() if not s_today.empty else 0
-    exp_today = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty else 0
-    gross_today = sale_today - exp_today
-
-    # Calculations for This Month
     s_month = s_df[(s_df['Date'].dt.month == curr_month) & (s_df['Date'].dt.year == curr_year)] if not s_df.empty else pd.DataFrame()
-    e_month = e_df[(e_df['Date'].dt.month == curr_month) & (df_s['Date'].dt.year == curr_year)] if not e_df.empty else pd.DataFrame()
     
-    sale_month = pd.to_numeric(s_month.iloc[:, 3], errors='coerce').sum() if not s_month.empty else 0
-    exp_month = pd.to_numeric(e_month.iloc[:, 2], errors='coerce').sum() if not e_month.empty else 0
-    gross_month = sale_month - exp_month
+    sale_t, profit_t = calculate_margin_profit(s_today, i_df)
+    sale_m, profit_m = calculate_margin_profit(s_month, i_df)
 
-    # Dashboard Cards
+    # Dashboard UI
     st.markdown("---")
-    st.subheader(f"📍 Today's Gross Status ({today})")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Today's Sale", f"₹{int(sale_today)}")
-    c2.metric("Today's Expense", f"₹{int(exp_today)}")
-    c3.metric("GROSS PROFIT (TODAY)", f"₹{int(gross_today)}", delta=f"{int(gross_today)}")
+    st.subheader(f"📍 Today's Margin Summary ({today})")
+    c1, c2 = st.columns(2)
+    c1.metric("Today's Total Sale", f"₹{int(sale_t)}")
+    c2.metric("Today's Net Margin Profit", f"₹{int(profit_t)}", delta=f"{int(profit_t)}")
 
     st.markdown("---")
-    st.subheader(f"📅 Monthly Gross Status ({datetime.now().strftime('%B')})")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Monthly Sale", f"₹{int(sale_month)}")
-    m2.metric("Monthly Expense", f"₹{int(exp_month)}")
-    m3.metric("GROSS PROFIT (MONTH)", f"₹{int(gross_month)}", delta=f"{int(gross_month)}")
+    st.subheader(f"📅 Monthly Margin Summary ({datetime.now().strftime('%B')})")
+    m1, m2 = st.columns(2)
+    m1.metric("Monthly Total Sale", f"₹{int(sale_m)}")
+    m2.metric("Monthly Net Margin Profit", f"₹{int(profit_m)}", delta=f"{int(profit_m)}")
     st.markdown("---")
 
-# --- BAAKI CODE (BILKUL VAISA HI HAI - NO CHANGES) ---
+# --- BAAKI CODE (BILKUL SAME - NO CHANGES) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing Terminal")
     inv_df = load_data("Inventory")
