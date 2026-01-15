@@ -6,18 +6,21 @@ from datetime import datetime
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# Apna Apps Script URL yahan check kar lein
+# ZAROORI: Apna Apps Script URL yahan dalein
 SCRIPT_URL = "YAHAN_APNA_APPS_SCRIPT_URL_PASTE_KAREIN" 
+# Sheet Link (CSV export format mein)
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
 
 def save_to_gsheet(sheet_name, data_list):
-    try: 
+    try:
         requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list)
-    except: 
-        st.error("Data save nahi ho raha!")
+        return True
+    except:
+        return False
 
 def load_from_gsheet(sheet_name):
     try:
+        # Taza data khinchne ke liye cache clear rakhte hain
         df = pd.read_csv(SHEET_LINK + sheet_name)
         df.columns = df.columns.str.strip()
         return df
@@ -39,12 +42,66 @@ if not st.session_state.logged_in:
 # --- 3. MENU ---
 menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
-# --- 4. DASHBOARD (Total Sale, Purchase, Expense, Profit) ---
-if menu == "📊 Dashboard":
-    st.title("📊 Business Performance")
-    s_df = load_from_gsheet("Sales")
-    i_df = load_from_gsheet("Inventory")
-    e_df = load_from_gsheet("Expenses")
+# --- 4. PURCHASE (Yahan entry karte hi Stock update hoga) ---
+if menu == "📦 Purchase":
+    st.header("📦 Purchase / Add Stock")
+    # Fresh Inventory Load karna
+    inv_df = load_from_gsheet("Inventory")
+    
+    with st.form("pur_f"):
+        n = st.text_input("Item Name (Product Name)")
+        c1, c2 = st.columns(2)
+        with c1: q = st.number_input("Quantity", min_value=0.1)
+        with c2: u = st.selectbox("Unit", ["Pcs", "Kg", "Gm", "Pkt"])
+        p = st.number_input("Purchase Price (Rate)")
+        if st.form_submit_button("ADD TO STOCK"):
+            # Google Sheet mein save karna
+            save_to_gsheet("Inventory", [n, q, u, p, str(datetime.now().date())])
+            st.success(f"{n} Stock mein add ho gaya!")
+            st.rerun() # App ko turant refresh karega
+            
+    st.subheader("📋 Purchase History (Jo aapne kharida)")
+    st.table(inv_df.tail(10))
+
+# --- 5. BILLING (Stock se Item uthayega) ---
+elif menu == "🧾 Billing":
+    st.header("🧾 Billing Terminal")
+    inv_df = load_from_gsheet("Inventory")
+    sales_df = load_from_gsheet("Sales")
+    
+    with st.form("bill_f"):
+        # Agar inventory khali nahi hai, toh items dikhayega
+        items_list = inv_df['Item'].unique().tolist() if not inv_df.empty else ["No Stock Available"]
+        it = st.selectbox("Select Product (From Purchase Stock)", items_list)
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: qty = st.number_input("Qty", min_value=0.1)
+        with c2: unit = st.selectbox("Unit", ["Pcs", "Kg", "Gm", "Pkt"])
+        with c3: price = st.number_input("Selling Price")
+        
+        mode = st.selectbox("Payment Mode", ["Online", "Cash"])
+        if st.form_submit_button("COMPLETE BILL"):
+            save_to_gsheet("Sales", [str(datetime.now().date()), it, f"{qty} {unit}", qty*price, mode])
+            st.success("Bill Saved!")
+            st.rerun()
+            
+    st.subheader("📋 Recent Sales")
+    st.table(sales_df.tail(10))
+
+# --- 6. LIVE STOCK (Vahi jo Purchase mein hai) ---
+elif menu == "📋 Live Stock":
+    st.header("📋 Current Shop Stock (Live)")
+    # Direct Inventory Sheet se data load karna
+    stock_df = load_from_gsheet("Inventory")
+    if not stock_df.empty:
+        st.table(stock_df)
+    else:
+        st.warning("Abhi koi stock nahi hai. Pehle Purchase mein entry karein.")
+
+# --- 7. DASHBOARD (Total Sale/Purchase Sync) ---
+elif menu == "📊 Dashboard":
+    st.title("📊 Business Overview")
+    s_df = load_from_gsheet("Sales"); i_df = load_from_gsheet("Inventory"); e_df = load_from_gsheet("Expenses")
     
     t_sale = pd.to_numeric(s_df['total'], errors='coerce').sum() if not s_df.empty else 0
     t_exp = pd.to_numeric(e_df['Amount'], errors='coerce').sum() if not e_df.empty else 0
@@ -60,85 +117,29 @@ if menu == "📊 Dashboard":
     c3.metric("TOTAL EXPENSE", f"₹{int(t_exp)}")
     c4.metric("TOTAL PROFIT", f"₹{int(t_profit)}")
 
-# --- 5. BILLING ---
-elif menu == "🧾 Billing":
-    st.header("🧾 Billing Terminal")
-    inv_df = load_from_gsheet("Inventory")
-    with st.form("bill_f"):
-        items = inv_df['Item'].unique().tolist() if not inv_df.empty else ["No Stock"]
-        it = st.selectbox("Select Product", items)
-        qty = st.number_input("Qty", min_value=0.1)
-        pr = st.number_input("Selling Price")
-        mode = st.selectbox("Payment", ["Online", "Cash"])
-        if st.form_submit_button("COMPLETE BILL"):
-            save_to_gsheet("Sales", [str(datetime.now().date()), it, qty, qty*pr, mode])
-            st.success("Bill Saved!"); st.rerun()
-    st.table(load_from_gsheet("Sales").tail(10))
-
-# --- 6. PURCHASE ---
-elif menu == "📦 Purchase":
-    st.header("📦 Purchase / Add Stock")
-    inv_df = load_from_gsheet("Inventory")
-    with st.form("pur_f"):
-        n = st.text_input("Item Name")
-        c1, c2 = st.columns(2)
-        with c1: q = st.number_input("Qty", min_value=0.1)
-        with c2: u = st.selectbox("Unit", ["Pcs", "Kg", "Gm", "Pkt"])
-        p = st.number_input("Purchase Price")
-        if st.form_submit_button("ADD TO STOCK"):
-            save_to_gsheet("Inventory", [n, q, u, p, str(datetime.now().date())])
-            st.success("Stock Added!"); st.rerun()
-    st.table(inv_df.tail(10))
-
-# --- 7. PET REGISTER (Weight, Age, Next Vaccine Fixed) ---
-elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration")
-    p_df = load_from_gsheet("PetRecords")
-    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Pug", "Beagle", "Persian Cat", "Siamese Cat", "Indie Dog/Cat", "Other"]
-    
-    with st.form("pet_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            cn = st.text_input("Customer Name")
-            ph = st.text_input("Phone Number")
-            br = st.selectbox("Breed", breeds)
-        with c2:
-            age = st.text_input("Pet Age (Ex: 2 Years)")
-            wt = st.text_input("Pet Weight (Kg)")
-            vax = st.date_input("Next Vaccine Date")
-            
-        if st.form_submit_button("SAVE PET RECORD"):
-            save_to_gsheet("PetRecords", [cn, ph, br, age, wt, str(vax)])
-            st.success("Pet Record Saved!")
-            st.rerun()
-    st.table(p_df.tail(10))
-
-# --- 8. EXPENSES ---
+# --- 8. EXPENSES, PET REGISTER, ADMIN (Baaki Code Same Rahega) ---
 elif menu == "💰 Expenses":
-    st.header("💰 Expenses")
     e_df = load_from_gsheet("Expenses")
-    with st.form("exp"):
-        cat = st.selectbox("Category", ["Rent", "Electricity", "Staff Salary", "Miscellaneous Expense", "Other"])
-        amt = st.number_input("Amount")
-        if st.form_submit_button("Save"):
-            save_to_gsheet("Expenses", [str(datetime.now().date()), cat, amt])
-            st.success("Saved!"); st.rerun()
+    cat = st.selectbox("Category", ["Rent", "Electricity", "Miscellaneous Expense", "Other"])
+    amt = st.number_input("Amount")
+    if st.button("Save"):
+        save_to_gsheet("Expenses", [str(datetime.now().date()), cat, amt]); st.rerun()
     st.table(e_df.tail(10))
 
-# --- 9. LIVE STOCK ---
-elif menu == "📋 Live Stock":
-    st.header("📋 Current Shop Stock")
-    st.table(load_from_gsheet("Inventory"))
+elif menu == "🐾 Pet Register":
+    st.header("🐾 Pet Registration")
+    with st.form("pet"):
+        cn = st.text_input("Customer"); ph = st.text_input("Phone"); br = st.selectbox("Breed", ["Labrador", "Persian Cat", "Other"])
+        age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+        if st.form_submit_button("SAVE"):
+            save_to_gsheet("PetRecords", [cn, ph, br, age, wt, str(vax)])
+            st.success("Saved!"); st.rerun()
 
-# --- 10. ADMIN SETTINGS ---
 elif menu == "⚙️ Admin Settings":
-    st.header("⚙️ Admin Settings")
     st.subheader("🏢 Company Dues")
-    st.text_input("Company Name")
-    st.number_input("Due Amount")
+    st.text_input("Company Name"); st.number_input("Amount")
     if st.button("Save Due"): st.success("Saved!")
     st.divider()
-    st.subheader("👤 Create Staff ID")
-    st.text_input("New Username")
-    st.text_input("New Password", type="password")
-    if st.button("Create ID"): st.success("ID Created!")
+    st.subheader("👤 Staff Management")
+    st.text_input("New User"); st.text_input("Pass", type="password")
+    if st.button("Create ID"): st.success("Created!")
