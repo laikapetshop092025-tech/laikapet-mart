@@ -63,7 +63,6 @@ if menu == "📊 Dashboard":
     today_dt = datetime.now().date(); curr_m = datetime.now().month
     curr_m_name = datetime.now().strftime('%B')
 
-    # Balances
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -98,19 +97,16 @@ if menu == "📊 Dashboard":
     ts, tp, tpr = get_full_stats(s_df, i_df, "today")
     ms, mp, mpr = get_full_stats(s_df, i_df, "month")
     
-    # Today Stats
     st.markdown(f"#### 📅 Date: {today_dt.strftime('%d %B, %Y')}")
     c1, c2, c3 = st.columns(3)
     c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Today Purchase", f"₹{tp:,.2f}"); c3.metric("Profit (S-P)", f"₹{tpr:,.2f}")
 
     st.divider()
-    
-    # Monthly Stats
     st.markdown(f"#### 🗓️ Month: {curr_m_name} {datetime.now().year}")
     m1, m2, m3 = st.columns(3)
     m1.metric(f"{curr_m_name} Sale", f"₹{ms:,.2f}"); m2.metric(f"{curr_m_name} Purchase", f"₹{mp:,.2f}"); m3.metric(f"{curr_m_name} Profit (S-P)", f"₹{mpr:,.2f}")
 
-# --- BAAKI CODE (BILKUL SAME) ---
+# --- BAAKI TABS (SAB FIXED) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -189,4 +185,4 @@ elif menu == "⚙️ Admin Settings":
     if not dues_df.empty: dues_df = dues_df[dues_df.iloc[:, 0] != "Baba Pet Shop"]
     st.table(dues_df.tail(10))
     if st.button("❌ DELETE LAST COMPANY ENTRY"):
-        if delete_data("Dues"): st.success("Deleted!"); time.sleep(1); st.rerun(
+        if delete_data("Dues"): st.success("Deleted!"); time.sleep(1); st.rerun()
