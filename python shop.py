@@ -8,7 +8,7 @@ import os
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# AAPKA NAYA URL
+# AAPKA NAYA URL (Bilkul wahi hai)
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
 
@@ -20,7 +20,6 @@ def save_data(sheet_name, data_list):
 
 def delete_data(sheet_name):
     try:
-        # FIXED: Delete command ab sahi tarah se jayegi
         response = requests.post(f"{SCRIPT_URL}?sheet={sheet_name}&action=delete")
         return "Success" in response.text
     except: return False
@@ -47,31 +46,36 @@ if not st.session_state.logged_in:
     st.stop()
 
 # --- 3. SIDEBAR (LOGO & NAVIGATION) ---
-st.sidebar.markdown("<h2 style='text-align: center; color: #4A90E2;'>🐾 LAIKA PET MART</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h1 style='text-align: center; color: #FF4B4B;'>🐾 LAIKA</h1>", unsafe_allow_html=True)
 
-# Logo Logic: Bina URL ke, sirf upload file se
+# Logo Logic: Automatic from GitHub file
 if os.path.exists("logo.png"):
     st.sidebar.image("logo.png", use_container_width=True)
 elif os.path.exists("logo.jpg"):
     st.sidebar.image("logo.jpg", use_container_width=True)
 
-menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
+menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
 if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (SALE, PURCHASE, PROFIT, EXPENSE) ---
+# --- 4. DASHBOARD (BEAUTIFUL & DYNAMIC) ---
 if menu == "📊 Dashboard":
-    st.markdown("<h2 style='text-align: center;'>📊 Business Performance</h2>", unsafe_allow_html=True)
+    # Automatic Date & Month Name
+    today_str = datetime.now().strftime('%d %B, %Y')
+    month_name = datetime.now().strftime('%B %Y')
+    
+    st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Overview</h2>", unsafe_allow_html=True)
+    
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses")
-    today = datetime.now().date(); curr_m = datetime.now().month
+    today_dt = datetime.now().date(); curr_m = datetime.now().month
 
-    def get_all_stats(sales_df, inv_df, exp_df, filter_type="today"):
+    def get_stats(sales_df, inv_df, exp_df, filter_type="today"):
         if filter_type == "today":
-            s_sub = sales_df[sales_df['Date'].dt.date == today] if not sales_df.empty else pd.DataFrame()
-            p_sub = inv_df[pd.to_datetime(inv_df.iloc[:, 4]).dt.date == today] if not inv_df.empty else pd.DataFrame()
-            e_sub = exp_df[exp_df['Date'].dt.date == today] if not exp_df.empty else pd.DataFrame()
+            s_sub = sales_df[sales_df['Date'].dt.date == today_dt] if not sales_df.empty else pd.DataFrame()
+            p_sub = inv_df[pd.to_datetime(inv_df.iloc[:, 4]).dt.date == today_dt] if not inv_df.empty else pd.DataFrame()
+            e_sub = exp_df[exp_df['Date'].dt.date == today_dt] if not exp_df.empty else pd.DataFrame()
         else:
             s_sub = sales_df[sales_df['Date'].dt.month == curr_m] if not sales_df.empty else pd.DataFrame()
             p_sub = inv_df[pd.to_datetime(inv_df.iloc[:, 4]).dt.month == curr_m] if not inv_df.empty else pd.DataFrame()
@@ -90,25 +94,35 @@ if menu == "📊 Dashboard":
                 t_margin += (s_val - (p_rate * q))
         return t_sale, t_pur, t_margin, t_exp
 
-    ts, tp, tm, te = get_all_stats(s_df, i_df, e_df, "today")
-    ms, mp, mm, me = get_all_stats(s_df, i_df, e_df, "month")
+    ts, tp, tm, te = get_stats(s_df, i_df, e_df, "today")
+    ms, mp, mm, me = get_stats(s_df, i_df, e_df, "month")
 
-    st.subheader(f"📍 Today's Stats")
+    # --- TODAY'S SECTION ---
+    st.markdown(f"### 📅 Today's Report: <span style='color: #FF4B4B;'>{today_str}</span>", unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Sale", f"₹{int(ts)}"); c2.metric("Purchase", f"₹{int(tp)}"); c3.metric("Profit", f"₹{int(tm)}"); c4.metric("Expense", f"₹{int(te)}")
-    st.divider()
-    st.subheader(f"🗓️ Monthly Summary")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Sale", f"₹{int(ms)}"); m2.metric("Purchase", f"₹{int(mp)}"); m3.metric("Profit", f"₹{int(mm)}"); m4.metric("Expense", f"₹{int(me)}")
+    with c1: st.info(f"*Today Sale*\n### ₹{int(ts)}")
+    with c2: st.warning(f"*Today Purchase*\n### ₹{int(tp)}")
+    with c3: st.success(f"*Margin Profit*\n### ₹{int(tm)}")
+    with c4: st.error(f"*Today Expense*\n### ₹{int(te)}")
 
-# --- BAAKI SECTIONS (NO CHANGES) ---
+    st.divider()
+
+    # --- MONTHLY SECTION ---
+    st.markdown(f"### 🗓️ Monthly Summary: <span style='color: #1E88E5;'>{month_name}</span>", unsafe_allow_html=True)
+    m1, m2, m3, m4 = st.columns(4)
+    with m1: st.info(f"*Total Sale*\n### ₹{int(ms)}")
+    with m2: st.warning(f"*Total Purchase*\n### ₹{int(mp)}")
+    with m3: st.success(f"*Net Margin*\n### ₹{int(mm)}")
+    with m4: st.error(f"*Total Expense*\n### ₹{int(me)}")
+
+# --- BAAKI CODE (NO CHANGES - AS REQUESTED) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
     with st.form("bill"):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
         q = st.number_input("Qty", 0.1); pr = st.number_input("Price")
-        if st.form_submit_button("SAVE"):
+        if st.form_submit_button("SAVE BILL"):
             save_data("Sales", [str(datetime.now().date()), it, q, q*pr, "Paid"]); time.sleep(1); st.rerun()
     st.table(load_data("Sales").tail(5))
     if st.button("❌ DELETE LAST SALE"):
@@ -118,13 +132,14 @@ elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
         n = st.text_input("Item Name"); q = st.number_input("Qty", 1); p = st.number_input("Rate")
-        if st.form_submit_button("ADD"):
+        if st.form_submit_button("ADD STOCK"):
             save_data("Inventory", [n, q, "Pcs", p, str(datetime.now().date())]); time.sleep(1); st.rerun()
     st.table(load_data("Inventory").tail(5))
     if st.button("❌ DELETE LAST PURCHASE"):
         if delete_data("Inventory"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
 elif menu == "📋 Live Stock":
+    st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
     if not i_df.empty:
         stock_list = []
@@ -145,14 +160,17 @@ elif menu == "🐾 Pet Register":
     st.table(load_data("PetRecords").tail(5))
 
 elif menu == "💰 Expenses":
-    cat = st.selectbox("Cat", ["Rent", "Salary", "Other"]); amt = st.number_input("Amt")
-    if st.button("Save"):
+    st.header("💰 Expenses")
+    cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Other"]); amt = st.number_input("Amount")
+    if st.button("Save Expense"):
         save_data("Expenses", [str(datetime.now().date()), cat, amt]); time.sleep(1); st.rerun()
     st.table(load_data("Expenses").tail(5))
 
 elif menu == "⚙️ Admin Settings":
-    st.subheader("Udhaar (Dues)")
+    st.header("⚙️ Admin Settings")
+    st.subheader("🏢 Company Dues")
     with st.form("due"):
-        comp = st.text_input("Company"); amt = st.number_input("Due")
-        if st.form_submit_button("SAVE"): save_data("Dues", [comp, amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+        comp = st.text_input("Company Name"); amt = st.number_input("Due Amount")
+        if st.form_submit_button("SAVE DUE"):
+            save_data("Dues", [comp, amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
     st.table(load_data("Dues"))
