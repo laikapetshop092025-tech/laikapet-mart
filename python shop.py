@@ -8,7 +8,7 @@ st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
 # AAPKA URL (Ismein Naya Deployment wala Link hona chahiye)
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx5hCffTuFBHYDFXKGV9s88OCOId5BJsMbDHo0gMoPOM5_6nbZSaCr9Iu5tp1V1d4qX/exec" 
-SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
+SHEET_LINK = "https://script.google.com/macros/s/AKfycbx1qVD5g_QHIfDLG-T9ii-EC5Bb6U9iYyQ_gycSGxU2o-BNYdGkQrGCjNpIFdedjFJn/exec"
 
 # --- FUNCTIONS (SAVE & DELETE) ---
 def save_data(sheet_name, data_list):
@@ -175,3 +175,4 @@ elif menu == "💰 Expenses":
     if st.button("Save Expense"):
         save_data("Expenses", [str(datetime.now().date()), cat, amt]); st.rerun()
     st.table(load_data("Expenses").tail(5))
+
