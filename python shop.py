@@ -56,7 +56,7 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (S-P PROFIT & DATE/MONTH LOGIC) ---
+# --- 4. DASHBOARD (S-P PROFIT & DATE LOGIC) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
@@ -82,31 +82,40 @@ if menu == "📊 Dashboard":
     
     st.divider()
 
-    def get_full_stats(sales_df, inv_df, filter_type="today"):
+    def get_stats(sales_df, inv_df, exp_df, filter_type="today"):
         if filter_type == "today":
             s_sub = sales_df[sales_df['Date'].dt.date == today_dt] if not sales_df.empty and 'Date' in sales_df.columns else pd.DataFrame()
             i_sub = inv_df[inv_df['Date'].dt.date == today_dt] if not inv_df.empty and 'Date' in inv_df.columns else pd.DataFrame()
+            e_sub = exp_df[exp_df['Date'].dt.date == today_dt] if not exp_df.empty and 'Date' in exp_df.columns else pd.DataFrame()
         else:
             s_sub = sales_df[sales_df['Date'].dt.month == curr_m] if not sales_df.empty and 'Date' in sales_df.columns else pd.DataFrame()
             i_sub = inv_df[inv_df['Date'].dt.month == curr_m] if not inv_df.empty and 'Date' in inv_df.columns else pd.DataFrame()
+            e_sub = exp_df[exp_df['Date'].dt.month == curr_m] if not exp_df.empty and 'Date' in exp_df.columns else pd.DataFrame()
         
-        t_sale = pd.to_numeric(s_sub.iloc[:, 3], errors='coerce').sum() if not s_sub.empty else 0
-        t_pur = pd.to_numeric(i_sub.iloc[:, 1] * i_sub.iloc[:, 3], errors='coerce').sum() if not i_sub.empty else 0
-        return t_sale, t_pur, (t_sale - t_pur)
+        ts = pd.to_numeric(s_sub.iloc[:, 3], errors='coerce').sum() if not s_sub.empty else 0
+        tp = pd.to_numeric(i_sub.iloc[:, 1] * i_sub.iloc[:, 3], errors='coerce').sum() if not i_sub.empty else 0
+        te = pd.to_numeric(e_sub.iloc[:, 2], errors='coerce').sum() if not e_sub.empty else 0
+        return ts, tp, te, (ts - tp)
 
-    ts, tp, tpr = get_full_stats(s_df, i_df, "today")
-    ms, mp, mpr = get_full_stats(s_df, i_df, "month")
+    ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
+    ms, mp, me, mpr = get_stats(s_df, i_df, e_df, "month")
     
     st.markdown(f"#### 📅 Date: {today_dt.strftime('%d %B, %Y')}")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Today Purchase", f"₹{tp:,.2f}"); c3.metric("Profit (S-P)", f"₹{tpr:,.2f}")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Today Sale", f"₹{ts:,.2f}")
+    c2.metric("Today Purchase", f"₹{tp:,.2f}")
+    c3.metric("Today Expense", f"₹{te:,.2f}")
+    c4.metric("Profit (S-P)", f"₹{tpr:,.2f}")
 
     st.divider()
     st.markdown(f"#### 🗓️ Month: {curr_m_name} {datetime.now().year}")
-    m1, m2, m3 = st.columns(3)
-    m1.metric(f"{curr_m_name} Sale", f"₹{ms:,.2f}"); m2.metric(f"{curr_m_name} Purchase", f"₹{mp:,.2f}"); m3.metric(f"{curr_m_name} Profit (S-P)", f"₹{mpr:,.2f}")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Monthly Sale", f"₹{ms:,.2f}")
+    m2.metric("Monthly Purchase", f"₹{mp:,.2f}")
+    m3.metric("Monthly Expense", f"₹{me:,.2f}")
+    m4.metric("Monthly Profit (S-P)", f"₹{mpr:,.2f}")
 
-# --- BAAKI CODE (BILKUL SAME) ---
+# --- BAAKI TABS (ORIGINAL NO CHHEDA CHHEDI) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -146,6 +155,21 @@ elif menu == "💰 Expenses":
     if st.button("❌ DELETE LAST EXPENSE"):
         if delete_data("Expenses"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
+elif menu == "🐾 Pet Register":
+    st.header("🐾 Pet Registration")
+    dog_breeds = ["Labrador", "German Shepherd", "Beagle", "Pug", "Indie Dog", "Shih Tzu"]
+    with st.form("pet"):
+        c1, c2 = st.columns(2)
+        with c1: cn = st.text_input("Name"); ph = st.text_input("Phone"); br = st.selectbox("Breed", dog_breeds + ["Other"])
+        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+        if st.form_submit_button("SAVE PET RECORD"):
+            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
+    pet_df = load_data("PetRecords")
+    if not pet_df.empty: pet_df = pet_df[pet_df.iloc[:, 0] != "Aman"]
+    st.table(pet_df.tail(10))
+    if st.button("❌ DELETE LAST PET"):
+        if delete_data("PetRecords"): st.success("Deleted!"); time.sleep(1); st.rerun()
+
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -153,21 +177,6 @@ elif menu == "📋 Live Stock":
         inv_grouped = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
         inv_grouped.columns = ['Item Name', 'Total Purchased', 'Unit']
         st.table(inv_grouped)
-
-elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration")
-    dog_breeds = ["Labrador", "German Shepherd", "Beagle", "Pug", "Indie Dog", "Shih Tzu"]
-    with st.form("pet"):
-        c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Name"); ph = st.text_input("Phone"); br = st.selectbox("Breed", dog_breeds + ["Other"])
-        with col2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
-        if st.form_submit_button("SAVE"):
-            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
-    pet_df = load_data("PetRecords")
-    if not pet_df.empty: pet_df = pet_df[pet_df.iloc[:, 0] != "Aman"]
-    st.table(pet_df.tail(10))
-    if st.button("❌ DELETE LAST PET"):
-        if delete_data("PetRecords"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
