@@ -3,21 +3,23 @@ import pandas as pd
 import requests
 from datetime import datetime
 
-# --- 1. SETUP & URLS ---
+# --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# ZAROORI: Apna Apps Script URL check karein
+# Apna Apps Script URL yahan check kar lein
 SCRIPT_URL = "YAHAN_APNA_APPS_SCRIPT_URL_PASTE_KAREIN" 
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
 
 def save_to_gsheet(sheet_name, data_list):
-    try: requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list)
-    except: st.error("Data save nahi ho raha!")
+    try: 
+        requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list)
+    except: 
+        st.error("Data save nahi ho raha!")
 
 def load_from_gsheet(sheet_name):
     try:
         df = pd.read_csv(SHEET_LINK + sheet_name)
-        df.columns = df.columns.str.strip() # Column names saaf karna
+        df.columns = df.columns.str.strip()
         return df
     except:
         return pd.DataFrame()
@@ -37,7 +39,7 @@ if not st.session_state.logged_in:
 # --- 3. MENU ---
 menu = st.sidebar.radio("Navigation", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
-# --- 4. DASHBOARD ---
+# --- 4. DASHBOARD (Total Sale, Purchase, Expense, Profit) ---
 if menu == "📊 Dashboard":
     st.title("📊 Business Performance")
     s_df = load_from_gsheet("Sales")
@@ -88,13 +90,11 @@ elif menu == "📦 Purchase":
             st.success("Stock Added!"); st.rerun()
     st.table(inv_df.tail(10))
 
-# --- 7. PET REGISTER (FIXED: Weight, Age, Vaccine Date) ---
+# --- 7. PET REGISTER (Weight, Age, Next Vaccine Fixed) ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
     p_df = load_from_gsheet("PetRecords")
-    
-    # Dog/Cat Breed Dropdown
-    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Pug", "Beagle", "Persian Cat", "Indie Dog", "Indie Cat", "Other"]
+    breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Pug", "Beagle", "Persian Cat", "Siamese Cat", "Indie Dog/Cat", "Other"]
     
     with st.form("pet_form"):
         c1, c2 = st.columns(2)
@@ -103,17 +103,15 @@ elif menu == "🐾 Pet Register":
             ph = st.text_input("Phone Number")
             br = st.selectbox("Breed", breeds)
         with c2:
-            age = st.text_input("Pet Age (e.g. 2 Years)") # Age input
-            wt = st.text_input("Pet Weight (Kg)") # Weight input
-            vax = st.date_input("Next Vaccine Date") # Next vaccine date
+            age = st.text_input("Pet Age (Ex: 2 Years)")
+            wt = st.text_input("Pet Weight (Kg)")
+            vax = st.date_input("Next Vaccine Date")
             
         if st.form_submit_button("SAVE PET RECORD"):
             save_to_gsheet("PetRecords", [cn, ph, br, age, wt, str(vax)])
-            st.success("Pet Record Saved Successfully!")
+            st.success("Pet Record Saved!")
             st.rerun()
-            
-    st.subheader("📋 Recent Registrations")
-    st.table(p_df.tail(10)) # Niche history dikhayega
+    st.table(p_df.tail(10))
 
 # --- 8. EXPENSES ---
 elif menu == "💰 Expenses":
@@ -132,14 +130,13 @@ elif menu == "📋 Live Stock":
     st.header("📋 Current Shop Stock")
     st.table(load_from_gsheet("Inventory"))
 
-# --- 10. ADMIN SETTINGS (Dues & New ID) ---
+# --- 10. ADMIN SETTINGS ---
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
     st.subheader("🏢 Company Dues")
     st.text_input("Company Name")
     st.number_input("Due Amount")
     if st.button("Save Due"): st.success("Saved!")
-    
     st.divider()
     st.subheader("👤 Create Staff ID")
     st.text_input("New Username")
