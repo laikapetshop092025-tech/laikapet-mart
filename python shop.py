@@ -50,7 +50,7 @@ st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3048/3048122.png", use_
 
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
-# --- 4. DASHBOARD (TODAY & MONTHLY SUMMARY) ---
+# --- 4. DASHBOARD ---
 if menu == "📊 Dashboard":
     today_str = datetime.now().strftime('%d %B, %Y')
     month_name = datetime.now().strftime('%B %Y')
@@ -59,7 +59,7 @@ if menu == "📊 Dashboard":
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
 
-    # Cash & Bank Balance Logic
+    # Money Balance Calculation
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -82,7 +82,6 @@ if menu == "📊 Dashboard":
         else:
             s_sub = sales_df[sales_df['Date'].dt.month == curr_m] if not sales_df.empty else pd.DataFrame()
             e_sub = exp_df[exp_df['Date'].dt.month == curr_m] if not exp_df.empty else pd.DataFrame()
-        
         t_sale = pd.to_numeric(s_sub.iloc[:, 3], errors='coerce').sum() if not s_sub.empty else 0
         t_exp = pd.to_numeric(e_sub.iloc[:, 2], errors='coerce').sum() if not e_sub.empty else 0
         t_margin = 0
@@ -98,14 +97,11 @@ if menu == "📊 Dashboard":
     ts, tm, te = get_stats(s_df, i_df, e_df, "today")
     ms, mm, me = get_stats(s_df, i_df, e_df, "month")
     
-    st.markdown(f"#### 📅 Date: <span style='color: #FF4B4B;'>{today_str}</span>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
+    st.markdown(f"#### 📅 Date: {today_str}"); c1, c2, c3 = st.columns(3)
     c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Margin Profit", f"₹{tm:,.2f}"); c3.metric("Today Expense", f"₹{te:,.2f}")
-
     st.divider()
-    st.markdown(f"#### 🗓️ Month: <span style='color: #1E88E5;'>{month_name}</span>", unsafe_allow_html=True)
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Net Profit", f"₹{mm:,.2f}"); m3.metric("Total Monthly Expense", f"₹{me:,.2f}")
+    st.markdown(f"#### 🗓️ Month: {month_name}"); m1, m2, m3 = st.columns(3)
+    m1.metric("Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Profit", f"₹{mm:,.2f}"); m3.metric("Monthly Expense", f"₹{me:,.2f}")
 
 # --- 5. BILLING ---
 elif menu == "🧾 Billing":
@@ -130,57 +126,43 @@ elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
         n = st.text_input("Item Name"); c1, c2, c3 = st.columns(3)
-        with c1: q = st.number_input("Quantity", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
-        with c3: p = st.number_input("Purchase Rate")
+        with c1: q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
+        with c3: p = st.number_input("Rate")
         if st.form_submit_button("ADD STOCK"):
             save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
     st.table(load_data("Inventory").tail(10))
     if st.button("❌ DELETE LAST PURCHASE"):
         if delete_data("Inventory"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
-# --- 7. PET REGISTER ---
-elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration")
-    dog_breeds = ["Labrador", "German Shepherd", "Beagle", "Pug", "Indie Dog", "Shih Tzu"]
-    with st.form("pet"):
-        c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone Number"); br = st.selectbox("Breed", dog_breeds + ["Other"])
-        with c2: age = st.text_input("Pet Age"); wt = st.text_input("Weight (Kg)"); vax = st.date_input("Next Vaccine Date")
-        if st.form_submit_button("SAVE PET RECORD"):
-            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
-    pet_df = load_data("PetRecords")
-    if not pet_df.empty: pet_df = pet_df[pet_df.iloc[:, 0] != "Aman"]
-    st.table(pet_df.tail(10))
-    if st.button("❌ DELETE LAST PET ENTRY"):
-        if delete_data("PetRecords"): st.success("Deleted!"); time.sleep(1); st.rerun()
+# --- 7. EXPENSES (DELETE ADDED) ---
+elif menu == "💰 Expenses":
+    st.header("💰 Expenses")
+    with st.form("exp"):
+        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Other"]); amt = st.number_input("Amount")
+        if st.form_submit_button("Save Expense"):
+            save_data("Expenses", [str(datetime.now().date()), cat, amt]); time.sleep(1); st.rerun()
+    st.table(load_data("Expenses").tail(10))
+    if st.button("❌ DELETE LAST EXPENSE"): # Yeh raha naya button
+        if delete_data("Expenses"): st.success("Expense Deleted!"); time.sleep(1); st.rerun()
 
 # --- 8. ADMIN SETTINGS ---
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
-    st.subheader("🏁 Opening Balance")
     with st.form("opening_bal"):
         b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
         if st.form_submit_button("SET BALANCE"):
             save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
-    
     st.divider()
-    st.subheader("🏢 Company Hisab-Kitab")
     with st.form("due"):
-        comp = st.text_input("Company Name")
-        type = st.selectbox("Transaction Type", ["Stock Udhaar Liya (+)", "Company ko Payment Diya (-)"])
-        amt = st.number_input("Amount")
+        comp = st.text_input("Company Name"); type = st.selectbox("Type", ["Udhaar Liya (+)", "Payment Diya (-)"]); amt = st.number_input("Amount")
         if st.form_submit_button("SAVE ENTRY"):
-            final_amt = amt if "Udhaar" in type else -amt
-            save_data("Dues", [comp, final_amt, str(datetime.now().date())])
-            time.sleep(1); st.rerun()
-    
-    dues_df = load_data("Dues")
-    if not dues_df.empty: dues_df = dues_df[dues_df.iloc[:, 0] != "Baba Pet Shop"]
-    st.table(dues_df.tail(10))
+            final_amt = amt if "+" in type else -amt
+            save_data("Dues", [comp, final_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    st.table(load_data("Dues").tail(10))
     if st.button("❌ DELETE LAST COMPANY ENTRY"):
-        if delete_data("Dues"): st.success("Entry Deleted!"); time.sleep(1); st.rerun()
+        if delete_data("Dues"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
-# --- LIVE STOCK & EXPENSES ---
+# --- BAAKI TABS (SAME) ---
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -197,9 +179,17 @@ elif menu == "📋 Live Stock":
             stock_list.append({"Product": item, "Available": t_p - t_s, "Unit": i_df[i_df.iloc[:, 0] == item].iloc[:, 2].iloc[-1]})
         st.table(pd.DataFrame(stock_list))
 
-elif menu == "💰 Expenses":
-    st.header("💰 Expenses")
-    cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Other"]); amt = st.number_input("Amount")
-    if st.button("Save Expense"):
-        save_data("Expenses", [str(datetime.now().date()), cat, amt]); time.sleep(1); st.rerun()
-    st.table(load_data("Expenses").tail(5))
+elif menu == "🐾 Pet Register":
+    st.header("🐾 Pet Registration")
+    dog_breeds = ["Labrador", "German Shepherd", "Beagle", "Pug", "Indie Dog", "Shih Tzu"]
+    with st.form("pet"):
+        c1, c2 = st.columns(2)
+        with c1: cn = st.text_input("Name"); ph = st.text_input("Phone"); br = st.selectbox("Breed", dog_breeds + ["Other"])
+        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+        if st.form_submit_button("SAVE"):
+            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
+    pet_df = load_data("PetRecords")
+    if not pet_df.empty: pet_df = pet_df[pet_df.iloc[:, 0] != "Aman"]
+    st.table(pet_df.tail(10))
+    if st.button("❌ DELETE LAST PET"):
+        if delete_data("PetRecords"): st.success("Deleted!"); time.sleep(1); st.rerun()
