@@ -50,31 +50,30 @@ st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3048/3048122.png", use_
 
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
-# --- 4. DASHBOARD (CASH/ONLINE MINUS LOGIC) ---
+# --- 4. DASHBOARD (CASH + ONLINE = TOTAL) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
 
-    # Balances
+    # Balances calculation
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
-    
-    # Sales Addition
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
     sale_online = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Online"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
-    
-    # Expenses Subtraction (NEW LOGIC)
     exp_cash = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Cash"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
     exp_online = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Online"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
     
     curr_cash = (op_cash + sale_cash) - exp_cash
     curr_online = (op_online + sale_online) - exp_online
+    total_net_balance = curr_cash + curr_online # TOTAL BALANCE
 
     st.markdown("### 💰 Real-Time Money Status")
-    col_c, col_o = st.columns(2)
+    col_c, col_o, col_t = st.columns(3) # Tinch column kar diye
     with col_c: st.success(f"*Galla (Cash in Hand)*\n## ₹{curr_cash:,.2f}")
     with col_o: st.info(f"*Bank (Online Balance)*\n## ₹{curr_online:,.2f}")
+    with col_t: st.markdown(f"<div style='background-color:#E3F2FD; padding:15px; border-radius:10px; border-left: 5px solid #1E88E5;'><b>Total Balance (Net)</b><br><h2 style='color:#1E88E5; margin:0;'>₹{total_net_balance:,.2f}</h2></div>", unsafe_allow_html=True)
+    
     st.divider()
 
     def get_stats(sales_df, inv_df, exp_df, filter_type="today"):
@@ -97,22 +96,7 @@ if menu == "📊 Dashboard":
     st.markdown(f"#### 🗓️ Month: {datetime.now().strftime('%B %Y')}")
     m1, m2 = st.columns(2); m1.metric("Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Expense", f"₹{me:,.2f}")
 
-# --- 5. EXPENSES (NEW OPTIONS ADDED) ---
-elif menu == "💰 Expenses":
-    st.header("💰 Expenses")
-    with st.form("exp"):
-        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
-        amt = st.number_input("Amount", min_value=0.0)
-        mode = st.selectbox("Paid From", ["Cash", "Online"])
-        if st.form_submit_button("Save Expense"):
-            save_data("Expenses", [str(datetime.now().date()), cat, amt, mode])
-            time.sleep(1); st.rerun()
-    st.subheader("Recent Expenses List")
-    st.table(load_data("Expenses").tail(10))
-    if st.button("❌ DELETE LAST EXPENSE"):
-        if delete_data("Expenses"): st.success("Deleted!"); time.sleep(1); st.rerun()
-
-# --- BAAKI CODE (BILKUL SAME) ---
+# --- BAAKI TABS (SAME AS BEFORE) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -120,7 +104,7 @@ elif menu == "🧾 Billing":
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
         c1, c2, c3 = st.columns(3)
         with c1: q = st.number_input("Quantity", 0.1)
-        with c2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
+        with col2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
         with c3: mode = st.selectbox("Payment Mode", ["Cash", "Online"])
         pr = st.number_input("Selling Price")
         if st.form_submit_button("SAVE BILL"):
@@ -139,8 +123,6 @@ elif menu == "📦 Purchase":
         if st.form_submit_button("ADD STOCK"):
             save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
     st.table(load_data("Inventory").tail(10))
-    if st.button("❌ DELETE LAST PURCHASE"):
-        if delete_data("Inventory"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
@@ -157,6 +139,17 @@ elif menu == "📋 Live Stock":
                     except: continue
             stock_list.append({"Product": item, "Available": t_p - t_s, "Unit": i_df[i_df.iloc[:, 0] == item].iloc[:, 2].iloc[-1]})
         st.table(pd.DataFrame(stock_list))
+
+elif menu == "💰 Expenses":
+    st.header("💰 Expenses")
+    with st.form("exp"):
+        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
+        amt = st.number_input("Amount", min_value=0.0); mode = st.selectbox("Paid From", ["Cash", "Online"])
+        if st.form_submit_button("Save Expense"):
+            save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
+    st.table(load_data("Expenses").tail(10))
+    if st.button("❌ DELETE LAST EXPENSE"):
+        if delete_data("Expenses"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
