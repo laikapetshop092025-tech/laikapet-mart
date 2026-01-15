@@ -45,8 +45,9 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- 3. SIDEBAR (LOGO & WELCOME MESSAGE) ---
+# --- 3. SIDEBAR (LOGO & WELCOME) ---
 st.sidebar.markdown("<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>", unsafe_allow_html=True)
+# Boy with Pet Icon
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3048/3048122.png", use_container_width=True)
 
 if os.path.exists("logo.png"):
@@ -58,11 +59,12 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD ---
+# --- 4. DASHBOARD (SALE, PURCHASE, PROFIT, EXPENSE) ---
 if menu == "📊 Dashboard":
     today_str = datetime.now().strftime('%d %B, %Y')
     month_name = datetime.now().strftime('%B %Y')
-    st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Overview</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
+    
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
 
@@ -81,34 +83,33 @@ if menu == "📊 Dashboard":
         t_exp = pd.to_numeric(e_sub.iloc[:, 2], errors='coerce').sum() if not e_sub.empty else 0
         
         t_margin = 0
-        for _, row in s_sub.iterrows():
-            item = row.iloc[1]; q = pd.to_numeric(row.iloc[2], errors='coerce'); s_val = pd.to_numeric(row.iloc[3], errors='coerce')
-            item_stock = inv_df[inv_df.iloc[:, 0] == item]
-            if not item_stock.empty:
-                p_rate = pd.to_numeric(item_stock.iloc[-1, 3], errors='coerce')
-                t_margin += (s_val - (p_rate * q))
+        if not s_sub.empty and not inv_df.empty:
+            for _, row in s_sub.iterrows():
+                item = row.iloc[1]
+                try:
+                    q_val = float(str(row.iloc[2]).split()[0])
+                    s_val = float(row.iloc[3])
+                    item_stock = inv_df[inv_df.iloc[:, 0] == item]
+                    if not item_stock.empty:
+                        p_rate = float(item_stock.iloc[-1, 3])
+                        t_margin += (s_val - (p_rate * q_val))
+                except: continue
         return t_sale, t_pur, t_margin, t_exp
 
     ts, tp, tm, te = get_stats(s_df, i_df, e_df, "today")
     ms, mp, mm, me = get_stats(s_df, i_df, e_df, "month")
 
-    st.markdown(f"### 📅 Today's Report: <span style='color: #FF4B4B;'>{today_str}</span>", unsafe_allow_html=True)
+    st.markdown(f"#### 📅 Today's Report: <span style='color: #FF4B4B;'>{today_str}</span>", unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"*Today Sale*\n### ₹{int(ts)}")
-    with c2: st.warning(f"*Today Purchase*\n### ₹{int(tp)}")
-    with c3: st.success(f"*Margin Profit*\n### ₹{int(tm)}")
-    with c4: st.error(f"*Today Expense*\n### ₹{int(te)}")
+    c1.metric("Today Sale", f"₹{int(ts)}"); c2.metric("Today Purchase", f"₹{int(tp)}"); c3.metric("Margin Profit", f"₹{int(tm)}"); c4.metric("Today Expense", f"₹{int(te)}")
 
     st.divider()
 
-    st.markdown(f"### 🗓️ Monthly Summary: <span style='color: #1E88E5;'>{month_name}</span>", unsafe_allow_html=True)
+    st.markdown(f"#### 🗓️ Monthly Summary: <span style='color: #1E88E5;'>{month_name}</span>", unsafe_allow_html=True)
     m1, m2, m3, m4 = st.columns(4)
-    with m1: st.info(f"*Total Sale*\n### ₹{int(ms)}")
-    with m2: st.warning(f"*Total Purchase*\n### ₹{int(mp)}")
-    with m3: st.success(f"*Net Margin*\n### ₹{int(mm)}")
-    with m4: st.error(f"*Total Expense*\n### ₹{int(me)}")
+    m1.metric("Total Sale", f"₹{int(ms)}"); m2.metric("Total Purchase", f"₹{int(mp)}"); m3.metric("Net Margin", f"₹{int(mm)}"); m4.metric("Total Expense", f"₹{int(me)}")
 
-# --- 5. BILLING (KG/PCS ADDED) ---
+# --- 5. BILLING ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -116,23 +117,22 @@ elif menu == "🧾 Billing":
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
         col1, col2 = st.columns(2)
         with col1: q = st.number_input("Quantity", 0.1)
-        with col2: unit = st.selectbox("Unit", ["Pcs", "Kg"]) # Unit Selector
+        with col2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
         pr = st.number_input("Selling Price")
         if st.form_submit_button("SAVE BILL"):
-            # Sales sheet mein unit bhi jayegi
             save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, "Paid"]); time.sleep(1); st.rerun()
     st.table(load_data("Sales").tail(5))
     if st.button("❌ DELETE LAST SALE"):
         if delete_data("Sales"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
-# --- 6. PURCHASE (KG/PCS ADDED) ---
+# --- 6. PURCHASE ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
         n = st.text_input("Item Name")
         col1, col2 = st.columns(2)
         with col1: q = st.number_input("Quantity", 1)
-        with col2: unit = st.selectbox("Unit", ["Pcs", "Kg"]) # Unit Selector
+        with col2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
         p = st.number_input("Purchase Rate")
         if st.form_submit_button("ADD STOCK"):
             save_data("Inventory", [n, q, unit, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
@@ -140,22 +140,34 @@ elif menu == "📦 Purchase":
     if st.button("❌ DELETE LAST PURCHASE"):
         if delete_data("Inventory"): st.success("Deleted!"); time.sleep(1); st.rerun()
 
-# --- BAAKI CODE (BILKUL SAME) ---
+# --- 7. LIVE STOCK (AUTO MINUS LOGIC) ---
 elif menu == "📋 Live Stock":
-    st.header("📋 Live Stock")
+    st.header("📋 Live Stock (Available Inventory)")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
-    st.table(i_df)
+    if not i_df.empty:
+        stock_list = []
+        for item in i_df.iloc[:, 0].unique():
+            t_purchased = pd.to_numeric(i_df[i_df.iloc[:, 0] == item].iloc[:, 1], errors='coerce').sum()
+            unit = i_df[i_df.iloc[:, 0] == item].iloc[:, 2].iloc[-1]
+            t_sold = 0
+            if not s_df.empty:
+                sold_data = s_df[s_df.iloc[:, 1] == item]
+                for val in sold_data.iloc[:, 2]:
+                    try: t_sold += float(str(val).split()[0])
+                    except: continue
+            stock_list.append({"Product": item, "Purchased": t_purchased, "Sold": t_sold, "Available": t_purchased - t_sold, "Unit": unit})
+        st.table(pd.DataFrame(stock_list))
 
+# --- 8. PET REGISTER ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
-    dog_breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Indie Dog", "Husky", "Boxer"]
-    cat_breeds = ["Persian Cat", "Siamese Cat", "Indie Cat", "Bengal Cat"]
-    all_breeds = dog_breeds + cat_breeds + ["Other"]
+    dog_breeds = ["Labrador", "German Shepherd", "Golden Retriever", "Beagle", "Pug", "Indie Dog", "Husky", "Boxer", "Pitbull", "Shih Tzu"]
+    cat_breeds = ["Persian Cat", "Siamese Cat", "Indie Cat", "Bengal Cat", "Maine Coon"]
     with st.form("pet"):
         c1, c2 = st.columns(2)
         with c1: 
             cn = st.text_input("Customer Name"); ph = st.text_input("Phone Number")
-            br = st.selectbox("Select Breed", all_breeds)
+            br = st.selectbox("Select Breed", dog_breeds + cat_breeds + ["Other"])
         with c2: 
             age = st.text_input("Pet Age"); wt = st.text_input("Weight (Kg)")
             vax = st.date_input("Next Vaccine Date")
@@ -163,6 +175,7 @@ elif menu == "🐾 Pet Register":
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
     st.table(load_data("PetRecords").tail(5))
 
+# --- 9. EXPENSES & ADMIN ---
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
     cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Pet Food", "Other"]); amt = st.number_input("Amount")
@@ -172,7 +185,7 @@ elif menu == "💰 Expenses":
 
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
-    st.subheader("🏢 Company Dues")
+    st.subheader("🏢 Company Dues (Udhaar)")
     with st.form("due"):
         comp = st.text_input("Company Name"); amt = st.number_input("Due Amount")
         if st.form_submit_button("SAVE DUE"):
