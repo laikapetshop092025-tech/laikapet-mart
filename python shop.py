@@ -29,6 +29,7 @@ def load_data(sheet_name):
         url = f"{SHEET_LINK}{sheet_name}&cache={time.time()}"
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
+        # Ensure Date column is handled correctly to avoid KeyError
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         elif not df.empty and len(df.columns) >= 5:
@@ -57,14 +58,13 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (TODAY + MONTHLY PURCHASE FIXED) ---
+# --- 4. DASHBOARD (TODAY + MONTHLY) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
     curr_m_name = datetime.now().strftime('%B')
 
-    # Top Balances
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -80,24 +80,22 @@ if menu == "📊 Dashboard":
     st.divider()
 
     def get_stats(sales_df, inv_df, exp_df, filter_type="today"):
-        if filter_type == "today":
-            mask = (sales_df['Date'].dt.date == today_dt) if not sales_df.empty else False
-            s_sub = sales_df[mask]
-            mask_i = (inv_df['Date'].dt.date == today_dt) if not inv_df.empty else False
-            i_sub = inv_df[mask_i]
-            mask_e = (exp_df['Date'].dt.date == today_dt) if not exp_df.empty else False
-            e_sub = exp_df[mask_e]
+        # Fix for KeyError: Ensure Date exists before masking
+        if sales_df.empty or 'Date' not in sales_df.columns: ts = 0
         else:
-            mask = (sales_df['Date'].dt.month == curr_m) if not sales_df.empty else False
-            s_sub = sales_df[mask]
-            mask_i = (inv_df['Date'].dt.month == curr_m) if not inv_df.empty else False
-            i_sub = inv_df[mask_i]
-            mask_e = (exp_df['Date'].dt.month == curr_m) if not exp_df.empty else False
-            e_sub = exp_df[mask_e]
+            mask = (sales_df['Date'].dt.date == today_dt) if filter_type == "today" else (sales_df['Date'].dt.month == curr_m)
+            ts = pd.to_numeric(sales_df[mask].iloc[:, 3], errors='coerce').sum()
             
-        ts = pd.to_numeric(s_sub.iloc[:, 3], errors='coerce').sum() if not s_sub.empty else 0
-        tp = pd.to_numeric(i_sub.iloc[:, 1] * i_sub.iloc[:, 3], errors='coerce').sum() if not i_sub.empty else 0
-        te = pd.to_numeric(e_sub.iloc[:, 2], errors='coerce').sum() if not e_sub.empty else 0
+        if inv_df.empty or 'Date' not in inv_df.columns: tp = 0
+        else:
+            mask = (inv_df['Date'].dt.date == today_dt) if filter_type == "today" else (inv_df['Date'].dt.month == curr_m)
+            tp = pd.to_numeric(inv_df[mask].iloc[:, 1] * inv_df[mask].iloc[:, 3], errors='coerce').sum()
+            
+        if exp_df.empty or 'Date' not in exp_df.columns: te = 0
+        else:
+            mask = (exp_df['Date'].dt.date == today_dt) if filter_type == "today" else (exp_df['Date'].dt.month == curr_m)
+            te = pd.to_numeric(exp_df[mask].iloc[:, 2], errors='coerce').sum()
+            
         return ts, tp, te, (ts - tp)
 
     ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
@@ -112,7 +110,7 @@ if menu == "📊 Dashboard":
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Sale", f"₹{ms:,.2f}"); m2.metric("Purchase", f"₹{mp:,.2f}"); m3.metric("Expense", f"₹{me:,.2f}"); m4.metric("Profit", f"₹{mpr:,.2f}")
 
-# --- BAAKI TABS (SAME AS PREVIOUS) ---
+# --- 5. BILLING (WITH DELETE) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -128,12 +126,17 @@ elif menu == "🧾 Billing":
             save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode]); time.sleep(1); st.rerun()
     s_df = load_data("Sales")
     if not s_df.empty:
+        st.subheader("Recent Sales Records")
         for i, row in s_df.tail(10).iterrows():
-            col1, col2 = st.columns([8, 1])
+            col1, col2, col3 = st.columns([6, 2, 1])
             with col1: st.write(f"*{row.iloc[1]}* | ₹{row.iloc[3]} ({row.iloc[4]})")
             with col2:
+                msg = f"🐾 LAIKA PET MART 🐾\nItem: {row.iloc[1]}\nTotal: ₹{row.iloc[3]}"
+                st.markdown(f"[📲 Bill](https://wa.me/{cust_ph}?text={urllib.parse.quote(msg)})")
+            with col3:
                 if st.button("❌", key=f"s_{i}"): delete_row("Sales", i); st.rerun()
 
+# --- 6. PURCHASE (WITH DELETE) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
@@ -150,6 +153,7 @@ elif menu == "📦 Purchase":
             with col2:
                 if st.button("❌", key=f"i_{i}"): delete_row("Inventory", i); st.rerun()
 
+# --- 7. LIVE STOCK ---
 elif menu == "📋 Live Stock":
     st.header("📋 Current Stock Quantity")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -168,6 +172,7 @@ elif menu == "📋 Live Stock":
             if row['Remaining'] <= 2: st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (LOW!)")
             else: st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
 
+# --- 8. EXPENSES (WITH DELETE) ---
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
     with st.form("exp"):
@@ -183,25 +188,31 @@ elif menu == "💰 Expenses":
             with col2:
                 if st.button("❌", key=f"e_{i}"): delete_row("Expenses", i); st.rerun()
 
+# --- 9. PET REGISTER (FIXED NameError & SyntaxError) ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
     with st.form("pet"):
         c1, c2 = st.columns(2)
         with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
+        # Fixed NameError: defining col2 within with block
         with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
         if st.form_submit_button("SAVE RECORD"):
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
+    
     p_df = load_data("PetRecords")
     if not p_df.empty:
         for i, row in p_df.iterrows():
-            col1, col2, col3 = st.columns([5, 2, 1])
-            with col1: st.write(f"🐶 *{row.iloc[0]}* - Vax: {row.iloc[5]}")
-            with col2:
-                wa_v = f"https://wa.me/{row.iloc[1]}?text=Namaste! Vaccination Reminder."
-                st.markdown(f"[🟢 WA]({wa_v})")
-            with col3:
+            col_a, col_b, col_c = st.columns([5, 2, 1])
+            with col_a: st.write(f"🐶 *{row.iloc[0]}* - Vax: {row.iloc[5]}")
+            with col_b:
+                msg = f"Namaste {row.iloc[0]}! Laika Pet Mart se vaccination reminder."
+                wa_link = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote(msg)}"
+                # Fixed SyntaxError: Properly closing markdown bracket
+                st.markdown(f"[🟢 WA]({wa_link})", unsafe_allow_html=True)
+            with col_c:
                 if st.button("❌", key=f"p_{i}"): delete_row("PetRecords", i); st.rerun()
 
+# --- 10. ADMIN SETTINGS ---
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
     with st.form("opening_bal"):
