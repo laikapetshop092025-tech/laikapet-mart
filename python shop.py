@@ -57,7 +57,7 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (AS IS) ---
+# --- 4. DASHBOARD ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
@@ -110,37 +110,47 @@ if menu == "📊 Dashboard":
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Purchase", f"₹{mp:,.2f}"); m3.metric("Monthly Expense", f"₹{me:,.2f}"); m4.metric("Monthly Profit (S-P)", f"₹{mpr:,.2f}")
 
-# --- 5. LIVE STOCK (QUANTITY ONLY VIEW) ---
+# --- 5. LIVE STOCK ---
 elif menu == "📋 Live Stock":
     st.header("📋 Current Stock Quantity")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
-    
     if not i_df.empty:
-        # Step 1: Total Maal jo aaya (Purchase)
         purchased = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
         purchased.columns = ['Item', 'Qty_In', 'Unit']
-        
-        # Step 2: Total Maal jo gaya (Sales)
         if not s_df.empty:
-            # Sales wale column se number nikalna (e.g., '2.0 Pcs' -> 2.0)
             s_df['Sold_Qty'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
             sold = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
             sold.columns = ['Item', 'Qty_Out']
-            
-            # Stock Calculate karna
             stock_df = pd.merge(purchased, sold, on='Item', how='left').fillna(0)
             stock_df['Remaining'] = stock_df['Qty_In'] - stock_df['Qty_Out']
         else:
             stock_df = purchased
             stock_df['Remaining'] = stock_df['Qty_In']
-
-        # Sunder tareeke se display karna
         for _, row in stock_df.iterrows():
             st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
-    else:
-        st.warning("Abhi tak koi Purchase nahi kari hai!")
 
-# --- BAAKI CODE (BILKUL SAME) ---
+# --- 6. ADMIN SETTINGS (DUES FIXED) ---
+elif menu == "⚙️ Admin Settings":
+    st.header("⚙️ Admin Settings")
+    with st.form("opening_bal"):
+        b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
+        if st.form_submit_button("SET BALANCE"):
+            save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    st.divider()
+    st.subheader("Udhaar (Dues) Management")
+    with st.form("due"):
+        comp = st.text_input("Company/Person Name"); type = st.selectbox("Type", ["Udhaar Liya (+)", "Payment Diya (-)"]); amt = st.number_input("Amount")
+        if st.form_submit_button("SAVE UDHAAR ENTRY"):
+            final_amt = amt if "+" in type else -amt
+            save_data("Dues", [comp, final_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    
+    dues_df = load_data("Dues")
+    if not dues_df.empty:
+        st.table(dues_df.tail(10))
+        if st.button("❌ DELETE LAST UDHAAR ENTRY"):
+            if delete_data("Dues"): st.success("Deleted!"); time.sleep(1); st.rerun()
+
+# --- BAAKI TABS (SAB FIXED) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -182,22 +192,12 @@ elif menu == "🐾 Pet Register":
         with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
         if st.form_submit_button("SAVE"):
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
-    
     pet_df = load_data("PetRecords")
     if not pet_df.empty:
         for index, row in pet_df.iterrows():
-            col1, col2, col3 = st.columns([3, 2, 1])
+            col1, col2 = st.columns([4, 1])
             with col1: st.write(f"*{row.iloc[0]}* - {row.iloc[5]}")
             with col2:
                 msg = f"Namaste {row.iloc[0]}! Laika Pet Mart se yaad dila rahe hain ki aapke dog ki vaccination date {row.iloc[5]} hai."
                 wa_link = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote(msg)}"
-                st.markdown(f"[🟢 WhatsApp Reminder]({wa_link})", unsafe_allow_html=True)
-            with col3:
-                if st.button("❌", key=f"p_{index}"): delete_data("PetRecords"); st.rerun()
-
-elif menu == "⚙️ Admin Settings":
-    st.header("⚙️ Admin Settings")
-    with st.form("opening_bal"):
-        b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
-        if st.form_submit_button("SET BALANCE"):
-            save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+                st.markdown(f"[🟢 WA]({wa_link})", unsafe_allow_html=True
