@@ -4,8 +4,7 @@ import requests
 from datetime import datetime, timedelta
 import time
 import urllib.parse
-# Naya feature: Graph ke liye
-import plotly.express as px 
+import plotly.express as px
 
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
@@ -51,21 +50,21 @@ if not st.session_state.logged_in:
 
 # --- 3. SIDEBAR ---
 st.sidebar.markdown(f"<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>", unsafe_allow_html=True)
-menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
+menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "📒 Customer Khata", "⚙️ Admin Settings"])
 
 st.sidebar.divider()
 if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (TODAY + MONTHLY + NEW GRAPH) ---
+# --- 4. DASHBOARD (ANALYTICS) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
     curr_m_name = datetime.now().strftime('%B')
 
-    # Top Balances (As is)
+    # Cash/Online Logic
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -78,175 +77,152 @@ if menu == "📊 Dashboard":
     with col_o: st.info(f"*Bank (Online)*\n## ₹{(op_online + sale_online) - exp_online:,.2f}")
     with col_t: st.info(f"*Total Balance*\n## ₹{(op_cash + sale_cash - exp_cash) + (op_online + sale_online - exp_online):,.2f}")
 
-    st.divider()
-
     def get_stats(sales_df, inv_df, exp_df, filter_type="today"):
-        if sales_df.empty or 'Date' not in sales_df.columns: ts = 0
-        else:
-            mask = (sales_df['Date'].dt.date == today_dt) if filter_type == "today" else (sales_df['Date'].dt.month == curr_m)
-            ts = pd.to_numeric(sales_df[mask].iloc[:, 3], errors='coerce').sum()
-        if inv_df.empty or 'Date' not in inv_df.columns: tp = 0
-        else:
-            mask = (inv_df['Date'].dt.date == today_dt) if filter_type == "today" else (inv_df['Date'].dt.month == curr_m)
-            tp = pd.to_numeric(inv_df[mask].iloc[:, 1] * inv_df[mask].iloc[:, 3], errors='coerce').sum()
-        if exp_df.empty or 'Date' not in exp_df.columns: te = 0
-        else:
-            mask = (exp_df['Date'].dt.date == today_dt) if filter_type == "today" else (exp_df['Date'].dt.month == curr_m)
-            te = pd.to_numeric(exp_df[mask].iloc[:, 2], errors='coerce').sum()
-        return ts, tp, te, (ts - tp)
+        mask_s = (sales_df['Date'].dt.date == today_dt) if filter_type == "today" else (sales_df['Date'].dt.month == curr_m)
+        mask_i = (inv_df['Date'].dt.date == today_dt) if filter_type == "today" else (inv_df['Date'].dt.month == curr_m)
+        ts = pd.to_numeric(sales_df[mask_s].iloc[:, 3], errors='coerce').sum() if not sales_df.empty else 0
+        tp = pd.to_numeric(inv_df[mask_i].iloc[:, 1] * inv_df[mask_i].iloc[:, 3], errors='coerce').sum() if not inv_df.empty else 0
+        return ts, tp, (ts - tp)
 
-    ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
-    ms, mp, me, mpr = get_stats(s_df, i_df, e_df, "month")
-    
-    st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B, %Y')}")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Profit", f"₹{tpr:,.2f}")
-    
+    ts, tp, tpr = get_stats(s_df, i_df, e_df, "today")
     st.divider()
-    st.markdown(f"#### 🗓️ Month: {curr_m_name}")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Sale", f"₹{ms:,.2f}"); m2.metric("Purchase", f"₹{mp:,.2f}"); m3.metric("Expense", f"₹{me:,.2f}"); m4.metric("Profit", f"₹{mpr:,.2f}")
+    st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B')}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Today Purchase", f"₹{tp:,.2f}"); c3.metric("Today Profit", f"₹{tpr:,.2f}")
 
-    # ADVANCED FEATURE: Sales Graph (Last 7 Days)
+    # Feature 3: Analytics Graph
+    st.divider()
+    st.markdown("#### 📊 Sales Trend (Last 7 Days)")
     if not s_df.empty:
-        st.divider()
-        st.markdown("#### 📈 Sales Trend (Last 7 Days)")
         last_7 = s_df[s_df['Date'] >= pd.to_datetime(today_dt - timedelta(days=7))]
         chart_data = last_7.groupby(last_7['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index()
-        chart_data.columns = ['Date', 'Sale Amount']
-        fig = px.line(chart_data, x='Date', y='Sale Amount', markers=True, template="plotly_white")
+        chart_data.columns = ['Date', 'Sale']
+        fig = px.line(chart_data, x='Date', y='Sale', markers=True, template="plotly_white")
         st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. BILLING (WITH DELETE & WA) ---
+# --- 5. BILLING (LOYALTY POINTS) ---
 elif menu == "🧾 Billing":
-    st.header("🧾 Billing")
+    st.header("🧾 Billing & Loyalty Points")
     inv_df = load_data("Inventory")
     with st.form("bill"):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
         c1, c2, c3 = st.columns(3)
-        with c1: q = st.number_input("Quantity", 0.1)
-        with c2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
-        with c3: mode = st.selectbox("Payment Mode", ["Cash", "Online"])
-        pr = st.number_input("Price")
-        cust_ph = st.text_input("Customer Phone (91...)")
+        with c1: q = st.number_input("Quantity", 0.1); unit = st.selectbox("Unit", ["Pcs", "Kg"])
+        with c2: pr = st.number_input("Price"); mode = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar"])
+        with c3: ph = st.text_input("Customer Phone (91...)")
         if st.form_submit_button("SAVE BILL"):
-            save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode]); time.sleep(1); st.rerun()
+            pts = int((q * pr) / 100) # Feature 2: Loyalty
+            save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode, ph, pts])
+            time.sleep(1); st.rerun()
     s_df = load_data("Sales")
     if not s_df.empty:
-        st.subheader("Recent Sales")
         for i, row in s_df.tail(10).iterrows():
             col1, col2, col3 = st.columns([6, 2, 1])
             with col1: st.write(f"*{row.iloc[1]}* | ₹{row.iloc[3]} ({row.iloc[4]})")
             with col2:
-                msg = f"🐾 LAIKA PET MART\nItem: {row.iloc[1]}\nTotal: ₹{row.iloc[3]}"
-                st.markdown(f"[📲 Bill](https://wa.me/{cust_ph}?text={urllib.parse.quote(msg)})")
+                msg = f"🐾 LAIKA PET MART\nBill: ₹{row.iloc[3]}\nPoints: {row.iloc[6]}\nMode: {row.iloc[4]}"
+                st.markdown(f"[📲 Bill](https://wa.me/{row.iloc[5]}?text={urllib.parse.quote(msg)})")
             with col3:
                 if st.button("❌", key=f"s_{i}"): delete_row("Sales", i); st.rerun()
 
-# --- 6. PURCHASE (WITH DELETE) ---
+# --- 6. CUSTOMER KHATA (NEW FEATURE 1) ---
+elif menu == "📒 Customer Khata":
+    st.header("📒 Digital Udhaar Diary")
+    with st.form("cust_khata"):
+        name = st.text_input("Customer Name"); amt = st.number_input("Amount"); k_type = st.selectbox("Type", ["Baki (Udhaar)", "Jama (Payment)"])
+        if st.form_submit_button("SAVE TO KHATA"):
+            f_amt = amt if "Baki" in k_type else -amt
+            save_data("CustomerKhata", [name, f_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    
+    khata_df = load_data("CustomerKhata")
+    if not khata_df.empty:
+        summary = khata_df.groupby(khata_df.columns[0]).agg({khata_df.columns[1]: 'sum'}).reset_index()
+        summary.columns = ['Customer', 'Net Udhaar']
+        st.subheader("Total Pending Payments")
+        for i, row in summary.iterrows():
+            if row['Net Udhaar'] != 0:
+                c1, c2 = st.columns([8, 2])
+                with c1: st.warning(f"👤 *{row['Customer']}*: ₹{row['Net Udhaar']} baki hain")
+                with c2: 
+                    reminder = f"Namaste {row['Customer']}! Laika Pet Mart se reminder: Aapka ₹{row['Net Udhaar']} baki hai. Please pay kardein."
+                    st.markdown(f"[💬 Remind]({urllib.parse.quote(reminder)})")
+        
+        st.divider(); st.subheader("Recent Entries")
+        for i, row in khata_df.tail(10).iterrows():
+            col1, col2 = st.columns([8, 1])
+            with col1: st.write(f"📅 {row.iloc[2]} | {row.iloc[0]}: ₹{row.iloc[1]}")
+            with col2:
+                if st.button("❌", key=f"k_{i}"): delete_row("CustomerKhata", i); st.rerun()
+
+# --- 7. PURCHASE ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
-        n = st.text_input("Item Name"); c1, c2 = st.columns(2)
-        with c1: q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
-        with c2: p = st.number_input("Rate")
+        n = st.text_input("Item Name"); q = st.number_input("Qty", 1.0); p = st.number_input("Rate")
         if st.form_submit_button("ADD STOCK"):
-            save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
+            save_data("Inventory", [n, q, "Pcs", p, str(datetime.now().date())]); time.sleep(1); st.rerun()
     i_df = load_data("Inventory")
     if not i_df.empty:
-        st.subheader("Purchase History")
         for i, row in i_df.tail(10).iterrows():
             col1, col2 = st.columns([8, 1])
-            with col1: st.write(f"📦 *{row.iloc[0]}* - {row.iloc[1]} {row.iloc[2]} @ ₹{row.iloc[3]}")
+            with col1: st.write(f"📦 *{row.iloc[0]}* - {row.iloc[1]} Pcs @ ₹{row.iloc[3]}")
             with col2:
                 if st.button("❌", key=f"i_{i}"): delete_row("Inventory", i); st.rerun()
 
-# --- 7. LIVE STOCK (RED ALERT + RE-ORDER DOWNLOAD) ---
+# --- 8. LIVE STOCK ---
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
     if not i_df.empty:
-        purchased_v = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
-        purchased_v.columns = ['Item', 'Qty_In', 'Unit']
+        purchased = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum'}).reset_index()
         if not s_df.empty:
-            s_df['Sold_Qty'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
-            sold_v = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
-            sold_v.columns = ['Item', 'Qty_Out']
-            stock_v = pd.merge(purchased_v, sold_v, on='Item', how='left').fillna(0)
-            stock_v['Remaining'] = stock_v['Qty_In'] - stock_v['Qty_Out']
-        else: stock_v = purchased_v; stock_v['Remaining'] = stock_v['Qty_In']
+            s_df['Sold'] = s_df.iloc[:, 2].str.extract('(\d+)').astype(float)
+            sold = s_df.groupby(s_df.columns[1])['Sold'].sum().reset_index()
+            stock = pd.merge(purchased, sold, on=i_df.columns[0], how='left').fillna(0)
+            stock['Rem'] = stock.iloc[:, 1] - stock.iloc[:, 2]
+        else: stock = purchased; stock['Rem'] = stock.iloc[:, 1]
+        for _, row in stock.iterrows():
+            if row['Rem'] <= 2: st.error(f"📦 *{row.iloc[0]}*: {row['Rem']} bacha hai (LOW!)")
+            else: st.info(f"📦 *{row.iloc[0]}*: {row['Rem']} bacha hai")
 
-        # ADVANCED FEATURE: Download Re-order List
-        low_stock = stock_v[stock_v['Remaining'] <= 2]
-        if not low_stock.empty:
-            order_text = "Laika Pet Mart Order List:\n" + "\n".join([f"- {r['Item']}" for _, r in low_stock.iterrows()])
-            st.download_button("📥 Download Re-Order List", order_text, file_name="order.txt")
+# --- 9. PET REGISTER (BIRTHDAY BALLOONS) ---
+elif menu == "🐾 Pet Register":
+    st.header("🐾 Pet Register")
+    with st.form("pet"):
+        cn = st.text_input("Customer"); ph = st.text_input("Phone"); vax = st.date_input("Vax/Bday")
+        if st.form_submit_button("SAVE"):
+            save_data("PetRecords", [cn, ph, "Breed", "Age", "Wt", str(vax)]); time.sleep(1); st.rerun()
+    p_df = load_data("PetRecords")
+    if not p_df.empty:
+        p_df['D'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce')
+        if not p_df[p_df['D'].dt.strftime('%m-%d') == datetime.now().strftime('%m-%d')].empty:
+            st.balloons(); st.success("🎉 Special Day Today!")
+        for i, row in p_df.iterrows():
+            col1, col2, col3 = st.columns([6, 2, 1])
+            with col1: st.write(f"🐶 *{row.iloc[0]}* - {row.iloc[5]}")
+            with col2: st.markdown(f"[🟢 WA Reminder](https://wa.me/{row.iloc[1]})")
+            with col3:
+                if st.button("❌", key=f"p_{i}"): delete_row("PetRecords", i); st.rerun()
 
-        for _, row in stock_v.iterrows():
-            if row['Remaining'] <= 2: st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (LOW!)")
-            else: st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
-
-# --- 8. EXPENSES (WITH DELETE) ---
+# --- 10. EXPENSES & ADMIN ---
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
     with st.form("exp"):
-        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
-        amt = st.number_input("Amount", 0.0); mode = st.selectbox("Paid From", ["Cash", "Online"])
-        if st.form_submit_button("Save Expense"):
+        cat = st.selectbox("Cat", ["Rent", "Salary", "Bills"]); amt = st.number_input("Amt")
+        mode = st.selectbox("Mode", ["Cash", "Online"])
+        if st.form_submit_button("SAVE"):
             save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
     e_df = load_data("Expenses")
     if not e_df.empty:
         for i, row in e_df.tail(10).iterrows():
             col1, col2 = st.columns([8, 1])
-            with col1: st.write(f"💸 *{row.iloc[1]}*: ₹{row.iloc[2]} ({row.iloc[3]})")
+            with col1: st.write(f"💸 {row.iloc[1]}: ₹{row.iloc[2]}")
             with col2:
                 if st.button("❌", key=f"e_{i}"): delete_row("Expenses", i); st.rerun()
 
-# --- 9. PET REGISTER (WITH DELETE, WA & BIRTHDAY BALLOONS) ---
-elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Register")
-    with st.form("pet"):
-        c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
-        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vax/Birthday Date")
-        if st.form_submit_button("SAVE RECORD"):
-            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
-    p_df = load_data("PetRecords")
-    if not p_df.empty:
-        # ADVANCED FEATURE: Birthday Check
-        p_df['Date_Obj'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce')
-        bday_pets = p_df[p_df['Date_Obj'].dt.strftime('%m-%d') == datetime.now().strftime('%m-%d')]
-        if not bday_pets.empty:
-            st.balloons()
-            st.success(f"🎉 Aaj {', '.join(bday_pets.iloc[:, 0].tolist())} ka Birthday/Vax Day hai!")
-
-        for i, row in p_df.iterrows():
-            col1, col2, col3 = st.columns([5, 2, 1])
-            with col1: st.write(f"🐶 *{row.iloc[0]}* - Vax: {row.iloc[5]}")
-            with col2:
-                wa_v = f"https://wa.me/{row.iloc[1]}?text=Namaste! Vaccination/Birthday Reminder."
-                st.markdown(f"[🟢 WA]({wa_v})")
-            with col3:
-                if st.button("❌", key=f"p_{i}"): delete_row("PetRecords", i); st.rerun()
-
-# --- 10. ADMIN SETTINGS (WITH UDHAAR) ---
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
-    with st.form("opening_bal"):
-        b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
-        if st.form_submit_button("SET BALANCE"):
-            save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
-    st.divider()
-    st.subheader("Udhaar (Dues) Management")
-    with st.form("due"):
-        comp = st.text_input("Company/Person Name"); type = st.selectbox("Type", ["Udhaar Liya (+)", "Payment Diya (-)"]); amt = st.number_input("Amount")
-        if st.form_submit_button("SAVE UDHAAR"):
-            final_amt = amt if "+" in type else -amt
-            save_data("Dues", [comp, final_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
-    dues_df = load_data("Dues")
-    if not dues_df.empty:
-        for i, row in dues_df.tail(10).iterrows():
-            col1, col2 = st.columns([8, 1])
-            with col1: st.write(f"📝 *{row.iloc[0]}*: ₹{row.iloc[1]}")
-            with col2:
-                if st.button("❌", key=f"d_{i}"): delete_row("Dues", i); st.rerun()
+    with st.form("bal"):
+        b_t = st.selectbox("Update", ["Cash", "Online"]); b_a = st.number_input("Amt")
+        if st.form_submit_button("SET"):
+            save_data("Balances", [b_t, b_a, str(datetime.now().date())]); time.sleep(1); st.rerun()
