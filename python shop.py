@@ -1,11 +1,12 @@
-# --- 1. SETUP & CONNECTION (Same as before) ---
 import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime
 import time
+import os
 import urllib.parse
 
+# --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
@@ -30,6 +31,9 @@ def load_data(sheet_name):
         df.columns = df.columns.str.strip()
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        elif not df.empty and len(df.columns) >= 5:
+            df.rename(columns={df.columns[4]: 'Date'}, inplace=True)
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df
     except: return pd.DataFrame()
 
@@ -53,7 +57,7 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (NO CHANGES) ---
+# --- 4. DASHBOARD (AS IS) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
@@ -106,36 +110,37 @@ if menu == "📊 Dashboard":
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Purchase", f"₹{mp:,.2f}"); m3.metric("Monthly Expense", f"₹{me:,.2f}"); m4.metric("Monthly Profit (S-P)", f"₹{mpr:,.2f}")
 
-# --- 5. LIVE STOCK (UPDATED FOR QUANTITY) ---
+# --- 5. LIVE STOCK (QUANTITY ONLY VIEW) ---
 elif menu == "📋 Live Stock":
-    st.header("📋 Current Stock Inventory")
+    st.header("📋 Current Stock Quantity")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
     
     if not i_df.empty:
-        # Total Purchase Quantity
+        # Step 1: Total Maal jo aaya (Purchase)
         purchased = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
         purchased.columns = ['Item', 'Qty_In', 'Unit']
         
-        # Total Sold Quantity
+        # Step 2: Total Maal jo gaya (Sales)
         if not s_df.empty:
+            # Sales wale column se number nikalna (e.g., '2.0 Pcs' -> 2.0)
             s_df['Sold_Qty'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
             sold = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
             sold.columns = ['Item', 'Qty_Out']
             
-            # Merge Purchase and Sales to find remaining stock
+            # Stock Calculate karna
             stock_df = pd.merge(purchased, sold, on='Item', how='left').fillna(0)
             stock_df['Remaining'] = stock_df['Qty_In'] - stock_df['Qty_Out']
         else:
             stock_df = purchased
             stock_df['Remaining'] = stock_df['Qty_In']
 
-        # Displaying Stock with Units
+        # Sunder tareeke se display karna
         for _, row in stock_df.iterrows():
-            st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} available")
+            st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
     else:
-        st.warning("No inventory records found.")
+        st.warning("Abhi tak koi Purchase nahi kari hai!")
 
-# --- BAAKI TABS (SAME AS BEFORE) ---
+# --- BAAKI CODE (BILKUL SAME) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -148,6 +153,7 @@ elif menu == "🧾 Billing":
         pr = st.number_input("Price")
         if st.form_submit_button("SAVE BILL"):
             save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode]); time.sleep(1); st.rerun()
+    st.table(load_data("Sales").tail(10))
 
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
@@ -157,14 +163,24 @@ elif menu == "📦 Purchase":
         with c2: p = st.number_input("Rate")
         if st.form_submit_button("ADD STOCK"):
             save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    st.table(load_data("Inventory").tail(10))
+
+elif menu == "💰 Expenses":
+    st.header("💰 Expenses")
+    with st.form("exp"):
+        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
+        amt = st.number_input("Amount", min_value=0.0); mode = st.selectbox("Paid From", ["Cash", "Online"])
+        if st.form_submit_button("Save Expense"):
+            save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
+    st.table(load_data("Expenses").tail(10))
 
 elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration & Reminders")
+    st.header("🐾 Pet Registration")
     with st.form("pet"):
         c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone (with 91)"); br = st.text_input("Breed")
+        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
         with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
-        if st.form_submit_button("SAVE RECORD"):
+        if st.form_submit_button("SAVE"):
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
     
     pet_df = load_data("PetRecords")
@@ -177,12 +193,11 @@ elif menu == "🐾 Pet Register":
                 wa_link = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote(msg)}"
                 st.markdown(f"[🟢 WhatsApp Reminder]({wa_link})", unsafe_allow_html=True)
             with col3:
-                if st.button("❌", key=f"del_pet_{index}"): delete_data("PetRecords"); st.rerun()
-
-elif menu == "💰 Expenses":
-    st.header("💰 Expenses")
-    # Same as before... (Expense logic)
+                if st.button("❌", key=f"p_{index}"): delete_data("PetRecords"); st.rerun()
 
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
-    # Same as before... (Admin logic)
+    with st.form("opening_bal"):
+        b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
+        if st.form_submit_button("SET BALANCE"):
+            save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
