@@ -57,7 +57,7 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (TODAY + MONTHLY) ---
+# --- 4. DASHBOARD (AS IS) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
@@ -98,13 +98,50 @@ if menu == "📊 Dashboard":
     st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B')}")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Profit", f"₹{tpr:,.2f}")
-
     st.divider()
     st.markdown(f"#### 🗓️ Month: {curr_m_name}")
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Sale", f"₹{ms:,.2f}"); m2.metric("Purchase", f"₹{mp:,.2f}"); m3.metric("Expense", f"₹{me:,.2f}"); m4.metric("Profit", f"₹{mpr:,.2f}")
 
-# --- 5. LIVE STOCK (RED ALERT FOR <= 2) ---
+# --- 5. BILLING (WITH WHATSAPP BILL) ---
+elif menu == "🧾 Billing":
+    st.header("🧾 Billing")
+    inv_df = load_data("Inventory")
+    with st.form("bill"):
+        it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
+        c1, c2, c3 = st.columns(3)
+        with c1: q = st.number_input("Quantity", 0.1)
+        with c2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
+        with c3: mode = st.selectbox("Payment Mode", ["Cash", "Online"])
+        pr = st.number_input("Price")
+        cust_ph = st.text_input("Customer WhatsApp No. (with 91)")
+        if st.form_submit_button("SAVE BILL"):
+            save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode]); time.sleep(1); st.rerun()
+    
+    s_df = load_data("Sales")
+    if not s_df.empty:
+        last_bill = s_df.iloc[-1]
+        st.subheader("Last Entry Details")
+        st.write(f"Item: {last_bill.iloc[1]} | Total: ₹{last_bill.iloc[3]}")
+        
+        # WhatsApp Bill Logic
+        if cust_ph:
+            bill_msg = f"🐾 LAIKA PET MART 🐾\n\nDhanyawad shopping ke liye!\n\n*Item:* {last_bill.iloc[1]}\n*Quantity:* {last_bill.iloc[2]}\n*Total:* ₹{last_bill.iloc[3]}\n\nVisit Again! ❤️"
+            wa_bill_link = f"https://wa.me/{cust_ph}?text={urllib.parse.quote(bill_msg)}"
+            st.markdown(f"[📲 Send Bill to WhatsApp]({wa_bill_link})")
+        st.table(s_df.tail(5))
+
+# --- BAAKI TABS (SAB ORIGINAL) ---
+elif menu == "📦 Purchase":
+    st.header("📦 Purchase")
+    with st.form("pur"):
+        n = st.text_input("Item Name"); c1, c2 = st.columns(2)
+        with c1: q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
+        with c2: p = st.number_input("Rate")
+        if st.form_submit_button("ADD STOCK"):
+            save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    st.table(load_data("Inventory").tail(10))
+
 elif menu == "📋 Live Stock":
     st.header("📋 Current Stock Quantity")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -119,37 +156,9 @@ elif menu == "📋 Live Stock":
             stock_v['Remaining'] = stock_v['Qty_In'] - stock_v['Qty_Out']
         else:
             stock_v = purchased_v; stock_v['Remaining'] = stock_v['Qty_In']
-        
         for _, row in stock_v.iterrows():
-            if row['Remaining'] <= 2:
-                st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (STOCK BAHUT KAM HAI!)")
-            else:
-                st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
-
-# --- BAAKI TABS (SAB ORIGINAL) ---
-elif menu == "🧾 Billing":
-    st.header("🧾 Billing")
-    inv_df = load_data("Inventory")
-    with st.form("bill"):
-        it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
-        c1, c2, c3 = st.columns(3)
-        with c1: q = st.number_input("Quantity", 0.1)
-        with c2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
-        with c3: mode = st.selectbox("Payment Mode", ["Cash", "Online"])
-        pr = st.number_input("Price")
-        if st.form_submit_button("SAVE BILL"):
-            save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode]); time.sleep(1); st.rerun()
-    st.table(load_data("Sales").tail(10))
-
-elif menu == "📦 Purchase":
-    st.header("📦 Purchase")
-    with st.form("pur"):
-        n = st.text_input("Item Name"); c1, c2 = st.columns(2)
-        with c1: q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
-        with c2: p = st.number_input("Rate")
-        if st.form_submit_button("ADD STOCK"):
-            save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
-    st.table(load_data("Inventory").tail(10))
+            if row['Remaining'] <= 2: st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (STOCK LOW!)")
+            else: st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
 
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
@@ -162,23 +171,11 @@ elif menu == "🐾 Pet Register":
     pet_df = load_data("PetRecords")
     if not pet_df.empty:
         for index, row in pet_df.iterrows():
-            col1, col2, col3 = st.columns([3, 2, 1])
+            col1, col2 = st.columns([4, 1])
             with col1: st.write(f"*{row.iloc[0]}* - {row.iloc[5]}")
             with col2:
-                msg = f"Namaste {row.iloc[0]}! Laika Pet Mart se yaad dila rahe hain ki aapke dog ki vaccination date {row.iloc[5]} hai."
-                wa_link = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote(msg)}"
-                st.markdown(f"[🟢 WA Reminder]({wa_link})", unsafe_allow_html=True)
-            with col3:
-                if st.button("❌", key=f"p_{index}"): delete_data("PetRecords"); st.rerun()
-
-elif menu == "💰 Expenses":
-    st.header("💰 Expenses")
-    with st.form("exp"):
-        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
-        amt = st.number_input("Amount", min_value=0.0); mode = st.selectbox("Paid From", ["Cash", "Online"])
-        if st.form_submit_button("Save Expense"):
-            save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
-    st.table(load_data("Expenses").tail(10))
+                wa_vax = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote('Namaste! Laika Pet Mart se vaccination reminder.')}"
+                st.markdown(f"[🟢 WA]({wa_vax})", unsafe_allow_html=True)
 
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
