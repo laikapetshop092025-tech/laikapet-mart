@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 import time
+import os
 import urllib.parse
 
 # --- 1. SETUP & CONNECTION ---
@@ -28,7 +29,6 @@ def load_data(sheet_name):
         url = f"{SHEET_LINK}{sheet_name}&cache={time.time()}"
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
-        # Ensure Date column is handled correctly to avoid KeyError
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         elif not df.empty and len(df.columns) >= 5:
@@ -83,25 +83,28 @@ if menu == "📊 Dashboard":
         else:
             mask = (sales_df['Date'].dt.date == today_dt) if filter_type == "today" else (sales_df['Date'].dt.month == curr_m)
             ts = pd.to_numeric(sales_df[mask].iloc[:, 3], errors='coerce').sum()
-            
         if inv_df.empty or 'Date' not in inv_df.columns: tp = 0
         else:
             mask = (inv_df['Date'].dt.date == today_dt) if filter_type == "today" else (inv_df['Date'].dt.month == curr_m)
             tp = pd.to_numeric(inv_df[mask].iloc[:, 1] * inv_df[mask].iloc[:, 3], errors='coerce').sum()
-            
         if exp_df.empty or 'Date' not in exp_df.columns: te = 0
         else:
             mask = (exp_df['Date'].dt.date == today_dt) if filter_type == "today" else (exp_df['Date'].dt.month == curr_m)
             te = pd.to_numeric(exp_df[mask].iloc[:, 2], errors='coerce').sum()
-            
         return ts, tp, te, (ts - tp)
 
     ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
+    ms, mp, me, mpr = get_stats(s_df, i_df, e_df, "month")
+    
     st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B, %Y')}")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Profit", f"₹{tpr:,.2f}")
+    st.divider()
+    st.markdown(f"#### 🗓️ Month: {curr_m_name}")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Sale", f"₹{ms:,.2f}"); m2.metric("Purchase", f"₹{mp:,.2f}"); m3.metric("Expense", f"₹{me:,.2f}"); m4.metric("Profit", f"₹{mpr:,.2f}")
 
-# --- 5. BILLING (WITH DELETE) ---
+# --- 5. BILLING ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -112,23 +115,42 @@ elif menu == "🧾 Billing":
         with c2: unit = st.selectbox("Unit", ["Pcs", "Kg"])
         with c3: mode = st.selectbox("Payment Mode", ["Cash", "Online"])
         pr = st.number_input("Price")
-        cust_ph = st.text_input("Customer WhatsApp (91...)")
+        cust_ph = st.text_input("Customer Phone (91...)")
         if st.form_submit_button("SAVE BILL"):
             save_data("Sales", [str(datetime.now().date()), it, f"{q} {unit}", q*pr, mode]); time.sleep(1); st.rerun()
     s_df = load_data("Sales")
     if not s_df.empty:
+        st.subheader("Recent Sales")
         for i, row in s_df.tail(10).iterrows():
             col1, col2, col3 = st.columns([6, 2, 1])
-            with col1: st.write(f"*{row.iloc[1]}* | ₹{row.iloc[3]}")
+            with col1: st.write(f"*{row.iloc[1]}* | ₹{row.iloc[3]} ({row.iloc[4]})")
             with col2:
-                msg = f"🐾 LAIKA PET MART 🐾\nItem: {row.iloc[1]}\nTotal: ₹{row.iloc[3]}"
+                msg = f"🐾 LAIKA PET MART\nItem: {row.iloc[1]}\nTotal: ₹{row.iloc[3]}"
                 st.markdown(f"[📲 Bill](https://wa.me/{cust_ph}?text={urllib.parse.quote(msg)})")
             with col3:
                 if st.button("❌", key=f"s_{i}"): delete_row("Sales", i); st.rerun()
 
-# --- 6. LIVE STOCK (RED ALERT FOR <= 2) ---
+# --- 6. PURCHASE ---
+elif menu == "📦 Purchase":
+    st.header("📦 Purchase")
+    with st.form("pur"):
+        n = st.text_input("Item Name"); c1, c2 = st.columns(2)
+        with c1: q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Pcs", "Kg"])
+        with c2: p = st.number_input("Rate")
+        if st.form_submit_button("ADD STOCK"):
+            save_data("Inventory", [n, q, u, p, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    i_df = load_data("Inventory")
+    if not i_df.empty:
+        st.subheader("Purchase History")
+        for i, row in i_df.tail(10).iterrows():
+            col1, col2 = st.columns([8, 1])
+            with col1: st.write(f"📦 *{row.iloc[0]}* - {row.iloc[1]} {row.iloc[2]} @ ₹{row.iloc[3]}")
+            with col2:
+                if st.button("❌", key=f"i_{i}"): delete_row("Inventory", i); st.rerun()
+
+# --- 7. LIVE STOCK ---
 elif menu == "📋 Live Stock":
-    st.header("📋 Current Stock Quantity")
+    st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
     if not i_df.empty:
         purchased_v = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
@@ -139,38 +161,66 @@ elif menu == "📋 Live Stock":
             sold_v.columns = ['Item', 'Qty_Out']
             stock_v = pd.merge(purchased_v, sold_v, on='Item', how='left').fillna(0)
             stock_v['Remaining'] = stock_v['Qty_In'] - stock_v['Qty_Out']
-            
-            # Re-order logic
-            low_stock = stock_v[stock_v['Remaining'] <= 2]
-            if not low_stock.empty:
-                st.warning("⚠️ Items to Re-order:")
-                order_list = "\n".join([f"- {row['Item']}" for _, row in low_stock.iterrows()])
-                st.download_button("📥 Download Order List", order_list)
-
+        else: stock_v = purchased_v; stock_v['Remaining'] = stock_v['Qty_In']
         for _, row in stock_v.iterrows():
-            if row['Remaining'] <= 2:
-                st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (STOCK BAHUT KAM HAI!)")
-            else:
-                st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
+            if row['Remaining'] <= 2: st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (STOCK LOW!)")
+            else: st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
 
-# --- 7. PET REGISTER (FIXED NameError & SyntaxError) ---
+# --- 8. EXPENSES ---
+elif menu == "💰 Expenses":
+    st.header("💰 Expenses")
+    with st.form("exp"):
+        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
+        amt = st.number_input("Amount", 0.0); mode = st.selectbox("Paid From", ["Cash", "Online"])
+        if st.form_submit_button("Save Expense"):
+            save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
+    e_df = load_data("Expenses")
+    if not e_df.empty:
+        st.subheader("Expense List")
+        for i, row in e_df.tail(10).iterrows():
+            col1, col2 = st.columns([8, 1])
+            with col1: st.write(f"💸 *{row.iloc[1]}*: ₹{row.iloc[2]} ({row.iloc[3]})")
+            with col2:
+                if st.button("❌", key=f"e_{i}"): delete_row("Expenses", i); st.rerun()
+
+# --- 9. PET REGISTER ---
 elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration")
+    st.header("🐾 Pet Register")
     with st.form("pet"):
-        c1_pet, c2_pet = st.columns(2) # Renamed to avoid name conflicts
-        with c1_pet: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
-        with c2_pet: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+        c1, c2 = st.columns(2)
+        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
+        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
         if st.form_submit_button("SAVE RECORD"):
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
-    
-    pet_df = load_data("PetRecords")
-    if not pet_df.empty:
-        for index, row in pet_df.iterrows():
-            col_a, col_b, col_c = st.columns([3, 2, 1])
-            with col_a: st.write(f"*{row.iloc[0]}* - {row.iloc[5]}")
-            with col_b:
-                msg = f"Namaste {row.iloc[0]}! Laika Pet Mart se vaccination reminder."
-                wa_link = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote(msg)}"
-                st.markdown(f"[🟢 WA Reminder]({wa_link})", unsafe_allow_html=True) 
-            with col_c:
-                if st.button("❌", key=f"p_{index}"): delete_row("PetRecords", index); st.rerun()
+    p_df = load_data("PetRecords")
+    if not p_df.empty:
+        for i, row in p_df.iterrows():
+            col1, col2, col3 = st.columns([5, 2, 1])
+            with col1: st.write(f"🐶 *{row.iloc[0]}* - Vax: {row.iloc[5]}")
+            with col2:
+                wa_v = f"https://wa.me/{row.iloc[1]}?text=Namaste! Vaccination Reminder."
+                st.markdown(f"[🟢 WA]({wa_v})")
+            with col3:
+                if st.button("❌", key=f"p_{i}"): delete_row("PetRecords", i); st.rerun()
+
+# --- 10. ADMIN SETTINGS (UDHAAR ADDED) ---
+elif menu == "⚙️ Admin Settings":
+    st.header("⚙️ Admin Settings")
+    with st.form("opening_bal"):
+        b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
+        if st.form_submit_button("SET BALANCE"):
+            save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    st.divider()
+    st.subheader("Udhaar (Dues) Management")
+    with st.form("due"):
+        comp = st.text_input("Company/Person Name"); type = st.selectbox("Type", ["Udhaar Liya (+)", "Payment Diya (-)"]); amt = st.number_input("Amount")
+        if st.form_submit_button("SAVE UDHAAR"):
+            final_amt = amt if "+" in type else -amt
+            save_data("Dues", [comp, final_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    dues_df = load_data("Dues")
+    if not dues_df.empty:
+        for i, row in dues_df.tail(10).iterrows():
+            col1, col2 = st.columns([8, 1])
+            with col1: st.write(f"📝 *{row.iloc[0]}*: ₹{row.iloc[1]}")
+            with col2:
+                if st.button("❌", key=f"d_{i}"): delete_row("Dues", i); st.rerun()
