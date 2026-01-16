@@ -48,33 +48,8 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- 3. SIDEBAR & NOTIFICATION STATION (2 PCS ALERT) ---
+# --- 3. SIDEBAR ---
 st.sidebar.markdown(f"<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>", unsafe_allow_html=True)
-
-# Notification Logic (Only for 2 pcs or less)
-i_df = load_data("Inventory")
-s_df = load_data("Sales")
-if not i_df.empty:
-    purchased = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum'}).reset_index()
-    purchased.columns = ['Item', 'Qty_In']
-    if not s_df.empty:
-        s_df['Sold_Qty'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
-        sold = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
-        sold.columns = ['Item', 'Qty_Out']
-        stock_check = pd.merge(purchased, sold, on='Item', how='left').fillna(0)
-        stock_check['Remaining'] = stock_check['Qty_In'] - stock_check['Qty_Out']
-    else:
-        stock_check = purchased; stock_check['Remaining'] = stock_check['Qty_In']
-
-    # Filter for 2 or less
-    low_items = stock_check[stock_check['Remaining'] <= 2]['Item'].tolist()
-    if low_items:
-        st.sidebar.markdown("---")
-        st.sidebar.error("📢 *NOTIFICATION STATION*")
-        for item in low_items:
-            st.sidebar.warning(f"⚠️ *{item}* is very low (≤ 2 pcs!)")
-        st.sidebar.markdown("---")
-
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
 st.sidebar.divider()
@@ -82,10 +57,10 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD ---
+# --- 4. DASHBOARD (SIMPLE & CLEAN) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
-    b_df = load_data("Balances"); e_df = load_data("Expenses")
+    s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
     curr_m_name = datetime.now().strftime('%B')
 
@@ -118,15 +93,14 @@ if menu == "📊 Dashboard":
         return ts, tp, te, (ts - tp)
 
     ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
-    ms, mp, me, mpr = get_stats(s_df, i_df, e_df, "month")
-    
     st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B')}")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Profit", f"₹{tpr:,.2f}")
 
-# --- BAAKI TABS (SAB ORIGINAL) ---
+# --- 5. LIVE STOCK (ONLY RED FOR LOW STOCK) ---
 elif menu == "📋 Live Stock":
     st.header("📋 Current Stock Quantity")
+    i_df = load_data("Inventory"); s_df = load_data("Sales")
     if not i_df.empty:
         purchased_v = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
         purchased_v.columns = ['Item', 'Qty_In', 'Unit']
@@ -137,10 +111,15 @@ elif menu == "📋 Live Stock":
             stock_v = pd.merge(purchased_v, sold_v, on='Item', how='left').fillna(0)
             stock_v['Remaining'] = stock_v['Qty_In'] - stock_v['Qty_Out']
         else:
-            stock_v = purchased_v; stock_view['Remaining'] = stock_view['Qty_In']
+            stock_v = purchased_v; stock_v['Remaining'] = stock_v['Qty_In']
+        
         for _, row in stock_v.iterrows():
-            st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
+            if row['Remaining'] <= 2:
+                st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (STOCK BAHUT KAM HAI!)")
+            else:
+                st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
 
+# --- BAAKI TABS (SAB ORIGINAL) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
