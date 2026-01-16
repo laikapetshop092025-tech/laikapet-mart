@@ -48,8 +48,33 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- 3. SIDEBAR ---
+# --- 3. SIDEBAR & NOTIFICATION STATION (2 PCS ALERT) ---
 st.sidebar.markdown(f"<h3 style='text-align: center; color: #FF4B4B;'>👋 Welcome <br> Laika Pet Mart</h3>", unsafe_allow_html=True)
+
+# Notification Logic (Only for 2 pcs or less)
+i_df = load_data("Inventory")
+s_df = load_data("Sales")
+if not i_df.empty:
+    purchased = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum'}).reset_index()
+    purchased.columns = ['Item', 'Qty_In']
+    if not s_df.empty:
+        s_df['Sold_Qty'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
+        sold = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
+        sold.columns = ['Item', 'Qty_Out']
+        stock_check = pd.merge(purchased, sold, on='Item', how='left').fillna(0)
+        stock_check['Remaining'] = stock_check['Qty_In'] - stock_check['Qty_Out']
+    else:
+        stock_check = purchased; stock_check['Remaining'] = stock_check['Qty_In']
+
+    # Filter for 2 or less
+    low_items = stock_check[stock_check['Remaining'] <= 2]['Item'].tolist()
+    if low_items:
+        st.sidebar.markdown("---")
+        st.sidebar.error("📢 *NOTIFICATION STATION*")
+        for item in low_items:
+            st.sidebar.warning(f"⚠️ *{item}* is very low (≤ 2 pcs!)")
+        st.sidebar.markdown("---")
+
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "⚙️ Admin Settings"])
 
 st.sidebar.divider()
@@ -57,50 +82,27 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (WITH ADVANCED ALERTS) ---
+# --- 4. DASHBOARD ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
-    s_df = load_data("Sales"); i_df = load_data("Inventory"); e_df = load_data("Expenses"); b_df = load_data("Balances")
+    b_df = load_data("Balances"); e_df = load_data("Expenses")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
     curr_m_name = datetime.now().strftime('%B')
 
-    # Money Balances (Unchanged)
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
     sale_online = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Online"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
     exp_cash = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Cash"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
     exp_online = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Online"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
-    curr_cash = (op_cash + sale_cash) - exp_cash
-    curr_online = (op_online + sale_online) - exp_online
     
     col_c, col_o, col_t = st.columns(3)
-    with col_c: st.success(f"*Galla (Cash)*\n## ₹{curr_cash:,.2f}")
-    with col_o: st.info(f"*Bank (Online)*\n## ₹{curr_online:,.2f}")
-    with col_t: st.info(f"*Total Balance*\n## ₹{curr_cash + curr_online:,.2f}")
+    with col_c: st.success(f"*Galla (Cash)*\n## ₹{(op_cash + sale_cash) - exp_cash:,.2f}")
+    with col_o: st.info(f"*Bank (Online)*\n## ₹{(op_online + sale_online) - exp_online:,.2f}")
+    with col_t: st.info(f"*Total Balance*\n## ₹{(op_cash + sale_cash - exp_cash) + (op_online + sale_online - exp_online):,.2f}")
 
     st.divider()
 
-    # --- ADVANCED STOCK ALERT LOGIC ---
-    if not i_df.empty:
-        purchased = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum'}).reset_index()
-        purchased.columns = ['Item', 'Qty_In']
-        if not s_df.empty:
-            s_df['Sold_Qty'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
-            sold = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
-            sold.columns = ['Item', 'Qty_Out']
-            stock_check = pd.merge(purchased, sold, on='Item', how='left').fillna(0)
-            stock_check['Remaining'] = stock_check['Qty_In'] - stock_check['Qty_Out']
-        else:
-            stock_check = purchased; stock_check['Remaining'] = stock_check['Qty_In']
-
-        low_stock = stock_check[stock_check['Remaining'] <= 5]
-        if not low_stock.empty:
-            st.error(f"⚠️ *Low Stock Alert:* {', '.join(low_stock['Item'].tolist())} khatam hone wala hai!")
-    
-    st.divider()
-    
-    # Daily & Monthly Stats
     def get_stats(sales_df, inv_df, exp_df, filter_type="today"):
         if filter_type == "today":
             s_sub = sales_df[sales_df['Date'].dt.date == today_dt] if not sales_df.empty and 'Date' in sales_df.columns else pd.DataFrame()
@@ -118,31 +120,25 @@ if menu == "📊 Dashboard":
     ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
     ms, mp, me, mpr = get_stats(s_df, i_df, e_df, "month")
     
-    st.markdown(f"#### 📅 Date: {today_dt.strftime('%d %B, %Y')}")
+    st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B')}")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Today Purchase", f"₹{tp:,.2f}"); c3.metric("Today Expense", f"₹{te:,.2f}"); c4.metric("Profit (S-P)", f"₹{tpr:,.2f}")
+    c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Profit", f"₹{tpr:,.2f}")
 
-    st.divider()
-    st.markdown(f"#### 🗓️ Month: {curr_m_name} {datetime.now().year}")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Purchase", f"₹{mp:,.2f}"); m3.metric("Monthly Expense", f"₹{me:,.2f}"); m4.metric("Monthly Profit (S-P)", f"₹{mpr:,.2f}")
-
-# --- BAAKI TABS (SAB ORIGINAL NO CHHEDA CHHEDI) ---
+# --- BAAKI TABS (SAB ORIGINAL) ---
 elif menu == "📋 Live Stock":
     st.header("📋 Current Stock Quantity")
-    i_df = load_data("Inventory"); s_df = load_data("Sales")
     if not i_df.empty:
-        purchased = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
-        purchased.columns = ['Item', 'Qty_In', 'Unit']
+        purchased_v = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
+        purchased_v.columns = ['Item', 'Qty_In', 'Unit']
         if not s_df.empty:
             s_df['Sold_Qty'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
-            sold = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
-            sold.columns = ['Item', 'Qty_Out']
-            stock_df = pd.merge(purchased, sold, on='Item', how='left').fillna(0)
-            stock_df['Remaining'] = stock_df['Qty_In'] - stock_df['Qty_Out']
+            sold_v = s_df.groupby(s_df.columns[1])['Sold_Qty'].sum().reset_index()
+            sold_v.columns = ['Item', 'Qty_Out']
+            stock_v = pd.merge(purchased_v, sold_v, on='Item', how='left').fillna(0)
+            stock_v['Remaining'] = stock_v['Qty_In'] - stock_v['Qty_Out']
         else:
-            stock_df = purchased; stock_df['Remaining'] = stock_df['Qty_In']
-        for _, row in stock_df.iterrows():
+            stock_v = purchased_v; stock_view['Remaining'] = stock_view['Qty_In']
+        for _, row in stock_v.iterrows():
             st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
 
 elif menu == "🧾 Billing":
