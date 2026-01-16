@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
-import os
 import urllib.parse
+# Naya feature: Graph ke liye
+import plotly.express as px 
 
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
@@ -57,13 +58,14 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (TODAY + MONTHLY) ---
+# --- 4. DASHBOARD (TODAY + MONTHLY + NEW GRAPH) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
     today_dt = datetime.now().date(); curr_m = datetime.now().month
     curr_m_name = datetime.now().strftime('%B')
 
+    # Top Balances (As is)
     op_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     op_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -99,12 +101,23 @@ if menu == "📊 Dashboard":
     st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B, %Y')}")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Profit", f"₹{tpr:,.2f}")
+    
     st.divider()
     st.markdown(f"#### 🗓️ Month: {curr_m_name}")
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Sale", f"₹{ms:,.2f}"); m2.metric("Purchase", f"₹{mp:,.2f}"); m3.metric("Expense", f"₹{me:,.2f}"); m4.metric("Profit", f"₹{mpr:,.2f}")
 
-# --- 5. BILLING ---
+    # ADVANCED FEATURE: Sales Graph (Last 7 Days)
+    if not s_df.empty:
+        st.divider()
+        st.markdown("#### 📈 Sales Trend (Last 7 Days)")
+        last_7 = s_df[s_df['Date'] >= pd.to_datetime(today_dt - timedelta(days=7))]
+        chart_data = last_7.groupby(last_7['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index()
+        chart_data.columns = ['Date', 'Sale Amount']
+        fig = px.line(chart_data, x='Date', y='Sale Amount', markers=True, template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
+
+# --- 5. BILLING (WITH DELETE & WA) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Billing")
     inv_df = load_data("Inventory")
@@ -130,7 +143,7 @@ elif menu == "🧾 Billing":
             with col3:
                 if st.button("❌", key=f"s_{i}"): delete_row("Sales", i); st.rerun()
 
-# --- 6. PURCHASE ---
+# --- 6. PURCHASE (WITH DELETE) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
@@ -148,7 +161,7 @@ elif menu == "📦 Purchase":
             with col2:
                 if st.button("❌", key=f"i_{i}"): delete_row("Inventory", i); st.rerun()
 
-# --- 7. LIVE STOCK ---
+# --- 7. LIVE STOCK (RED ALERT + RE-ORDER DOWNLOAD) ---
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -162,11 +175,18 @@ elif menu == "📋 Live Stock":
             stock_v = pd.merge(purchased_v, sold_v, on='Item', how='left').fillna(0)
             stock_v['Remaining'] = stock_v['Qty_In'] - stock_v['Qty_Out']
         else: stock_v = purchased_v; stock_v['Remaining'] = stock_v['Qty_In']
+
+        # ADVANCED FEATURE: Download Re-order List
+        low_stock = stock_v[stock_v['Remaining'] <= 2]
+        if not low_stock.empty:
+            order_text = "Laika Pet Mart Order List:\n" + "\n".join([f"- {r['Item']}" for _, r in low_stock.iterrows()])
+            st.download_button("📥 Download Re-Order List", order_text, file_name="order.txt")
+
         for _, row in stock_v.iterrows():
-            if row['Remaining'] <= 2: st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (STOCK LOW!)")
+            if row['Remaining'] <= 2: st.error(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} (LOW!)")
             else: st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
 
-# --- 8. EXPENSES ---
+# --- 8. EXPENSES (WITH DELETE) ---
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
     with st.form("exp"):
@@ -176,34 +196,40 @@ elif menu == "💰 Expenses":
             save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
     e_df = load_data("Expenses")
     if not e_df.empty:
-        st.subheader("Expense List")
         for i, row in e_df.tail(10).iterrows():
             col1, col2 = st.columns([8, 1])
             with col1: st.write(f"💸 *{row.iloc[1]}*: ₹{row.iloc[2]} ({row.iloc[3]})")
             with col2:
                 if st.button("❌", key=f"e_{i}"): delete_row("Expenses", i); st.rerun()
 
-# --- 9. PET REGISTER ---
+# --- 9. PET REGISTER (WITH DELETE, WA & BIRTHDAY BALLOONS) ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Register")
     with st.form("pet"):
         c1, c2 = st.columns(2)
         with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
-        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vax/Birthday Date")
         if st.form_submit_button("SAVE RECORD"):
             save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
     p_df = load_data("PetRecords")
     if not p_df.empty:
+        # ADVANCED FEATURE: Birthday Check
+        p_df['Date_Obj'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce')
+        bday_pets = p_df[p_df['Date_Obj'].dt.strftime('%m-%d') == datetime.now().strftime('%m-%d')]
+        if not bday_pets.empty:
+            st.balloons()
+            st.success(f"🎉 Aaj {', '.join(bday_pets.iloc[:, 0].tolist())} ka Birthday/Vax Day hai!")
+
         for i, row in p_df.iterrows():
             col1, col2, col3 = st.columns([5, 2, 1])
             with col1: st.write(f"🐶 *{row.iloc[0]}* - Vax: {row.iloc[5]}")
             with col2:
-                wa_v = f"https://wa.me/{row.iloc[1]}?text=Namaste! Vaccination Reminder."
+                wa_v = f"https://wa.me/{row.iloc[1]}?text=Namaste! Vaccination/Birthday Reminder."
                 st.markdown(f"[🟢 WA]({wa_v})")
             with col3:
                 if st.button("❌", key=f"p_{i}"): delete_row("PetRecords", i); st.rerun()
 
-# --- 10. ADMIN SETTINGS (UDHAAR ADDED) ---
+# --- 10. ADMIN SETTINGS (WITH UDHAAR) ---
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
     with st.form("opening_bal"):
