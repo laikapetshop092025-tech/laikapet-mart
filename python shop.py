@@ -57,7 +57,7 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-# --- 4. DASHBOARD (SIMPLE & CLEAN) ---
+# --- 4. DASHBOARD (TODAY + MONTHLY) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>📈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
@@ -93,11 +93,18 @@ if menu == "📊 Dashboard":
         return ts, tp, te, (ts - tp)
 
     ts, tp, te, tpr = get_stats(s_df, i_df, e_df, "today")
+    ms, mp, me, mpr = get_stats(s_df, i_df, e_df, "month")
+    
     st.markdown(f"#### 📅 Today: {today_dt.strftime('%d %B')}")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Sale", f"₹{ts:,.2f}"); c2.metric("Purchase", f"₹{tp:,.2f}"); c3.metric("Expense", f"₹{te:,.2f}"); c4.metric("Profit", f"₹{tpr:,.2f}")
 
-# --- 5. LIVE STOCK (ONLY RED FOR LOW STOCK) ---
+    st.divider()
+    st.markdown(f"#### 🗓️ Month: {curr_m_name}")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Sale", f"₹{ms:,.2f}"); m2.metric("Purchase", f"₹{mp:,.2f}"); m3.metric("Expense", f"₹{me:,.2f}"); m4.metric("Profit", f"₹{mpr:,.2f}")
+
+# --- 5. LIVE STOCK (RED ALERT FOR <= 2) ---
 elif menu == "📋 Live Stock":
     st.header("📋 Current Stock Quantity")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
