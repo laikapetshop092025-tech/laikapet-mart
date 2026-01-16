@@ -110,7 +110,7 @@ if menu == "📊 Dashboard":
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Monthly Sale", f"₹{ms:,.2f}"); m2.metric("Monthly Purchase", f"₹{mp:,.2f}"); m3.metric("Monthly Expense", f"₹{me:,.2f}"); m4.metric("Monthly Profit (S-P)", f"₹{mpr:,.2f}")
 
-# --- 5. LIVE STOCK ---
+# --- 5. LIVE STOCK (QUANTITY ONLY) ---
 elif menu == "📋 Live Stock":
     st.header("📋 Current Stock Quantity")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -129,26 +129,27 @@ elif menu == "📋 Live Stock":
         for _, row in stock_df.iterrows():
             st.info(f"📦 *{row['Item']}*: {row['Remaining']} {row['Unit']} bacha hai")
 
-# --- 6. ADMIN SETTINGS (DUES FIXED) ---
-elif menu == "⚙️ Admin Settings":
-    st.header("⚙️ Admin Settings")
-    with st.form("opening_bal"):
-        b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
-        if st.form_submit_button("SET BALANCE"):
-            save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
-    st.divider()
-    st.subheader("Udhaar (Dues) Management")
-    with st.form("due"):
-        comp = st.text_input("Company/Person Name"); type = st.selectbox("Type", ["Udhaar Liya (+)", "Payment Diya (-)"]); amt = st.number_input("Amount")
-        if st.form_submit_button("SAVE UDHAAR ENTRY"):
-            final_amt = amt if "+" in type else -amt
-            save_data("Dues", [comp, final_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+# --- 6. PET REGISTER (FIXED NameError) ---
+elif menu == "🐾 Pet Register":
+    st.header("🐾 Pet Registration")
+    with st.form("pet"):
+        c1, c2 = st.columns(2)
+        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
+        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+        if st.form_submit_button("SAVE RECORD"):
+            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
     
-    dues_df = load_data("Dues")
-    if not dues_df.empty:
-        st.table(dues_df.tail(10))
-        if st.button("❌ DELETE LAST UDHAAR ENTRY"):
-            if delete_data("Dues"): st.success("Deleted!"); time.sleep(1); st.rerun()
+    pet_df = load_data("PetRecords")
+    if not pet_df.empty:
+        for index, row in pet_df.iterrows():
+            col1, col2, col3 = st.columns([3, 2, 1])
+            with col1: st.write(f"*{row.iloc[0]}* - {row.iloc[5]}")
+            with col2:
+                msg = f"Namaste {row.iloc[0]}! Laika Pet Mart se yaad dila rahe hain ki aapke dog ki vaccination date {row.iloc[5]} hai."
+                wa_link = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote(msg)}"
+                st.markdown(f"[🟢 WA]({wa_link})", unsafe_allow_html=True) # Fixed Bracket
+            with col3:
+                if st.button("❌", key=f"p_{index}"): delete_data("PetRecords"); st.rerun()
 
 # --- BAAKI TABS (SAB FIXED) ---
 elif menu == "🧾 Billing":
@@ -184,20 +185,18 @@ elif menu == "💰 Expenses":
             save_data("Expenses", [str(datetime.now().date()), cat, amt, mode]); time.sleep(1); st.rerun()
     st.table(load_data("Expenses").tail(10))
 
-elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration")
-    with st.form("pet"):
-        c1, c2 = st.columns(2)
-        with c1: cn = st.text_input("Customer Name"); ph = st.text_input("Phone"); br = st.text_input("Breed")
-        with c2: age = st.text_input("Age"); wt = st.text_input("Weight"); vax = st.date_input("Vaccine Date")
+elif menu == "⚙️ Admin Settings":
+    st.header("⚙️ Admin Settings")
+    with st.form("opening_bal"):
+        b_type = st.selectbox("Update Balance", ["Cash", "Online"]); b_amt = st.number_input("Enter Amount")
+        if st.form_submit_button("SET BALANCE"):
+            save_data("Balances", [b_type, b_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    st.divider()
+    with st.form("due"):
+        comp = st.text_input("Company Name"); type = st.selectbox("Type", ["Udhaar Liya (+)", "Payment Diya (-)"]); amt = st.number_input("Amount")
         if st.form_submit_button("SAVE"):
-            save_data("PetRecords", [cn, ph, br, age, wt, str(vax)]); time.sleep(1); st.rerun()
-    pet_df = load_data("PetRecords")
-    if not pet_df.empty:
-        for index, row in pet_df.iterrows():
-            col1, col2 = st.columns([4, 1])
-            with col1: st.write(f"*{row.iloc[0]}* - {row.iloc[5]}")
-            with col2:
-                msg = f"Namaste {row.iloc[0]}! Laika Pet Mart se yaad dila rahe hain ki aapke dog ki vaccination date {row.iloc[5]} hai."
-                wa_link = f"https://wa.me/{row.iloc[1]}?text={urllib.parse.quote(msg)}"
-                st.markdown(f"[🟢 WA]({wa_link})", unsafe_allow_html=True
+            final_amt = amt if "+" in type else -amt
+            save_data("Dues", [comp, final_amt, str(datetime.now().date())]); time.sleep(1); st.rerun()
+    dues_df = load_data("Dues")
+    if not dues_df.empty:
+        st.table(dues_df.tail(10))
