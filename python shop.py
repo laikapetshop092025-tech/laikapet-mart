@@ -57,8 +57,9 @@ if st.sidebar.button("🚪 LOGOUT", use_container_width=True):
 
 today_dt = datetime.now().date()
 curr_m = datetime.now().month
+curr_m_name = datetime.now().strftime('%B')
 
-# --- 4. DASHBOARD (COLOURFUL & STABLE) ---
+# --- 4. COLOURFUL DASHBOARD (TODAY + MONTHLY) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>🌈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
@@ -97,13 +98,20 @@ if menu == "📊 Dashboard":
     c1, c2, c3 = st.columns(3)
     c1.metric("Today Sale", f"₹{ts:,.2f}"); c2.metric("Today Purchase", f"₹{tp:,.2f}"); c3.metric("Today Profit", f"₹{tpr:,.2f}")
 
+    # MONTHLY STATS RESTORED
+    st.divider()
+    ms, mp, mpr = get_stats(s_df, i_df, e_df, "month")
+    st.subheader(f"🗓️ Monthly Stats: {curr_m_name}")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Month Sale", f"₹{ms:,.2f}"); m2.metric("Month Purchase", f"₹{mp:,.2f}"); m3.metric("Month Profit", f"₹{mpr:,.2f}")
+
     if not s_df.empty and 'Date' in s_df.columns:
         st.divider(); st.subheader("📈 7 Days Sale Trend")
         last_7 = s_df[s_df['Date'] >= pd.to_datetime(today_dt - timedelta(days=7))]
         chart = last_7.groupby(last_7['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index()
         st.plotly_chart(px.line(chart, x='Date', y=s_df.columns[3], markers=True), use_container_width=True)
 
-# --- 5. BILLING (WITH AUTO-POINTS) ---
+# --- 5. BILLING (WITH UNIT & POINTS) ---
 elif menu == "🧾 Billing":
     st.header("🧾 New Bill")
     inv_df = load_data("Inventory")
@@ -121,29 +129,19 @@ elif menu == "🧾 Billing":
     if not s_df.empty:
         for i, row in s_df.tail(10).iterrows():
             col1, col2, col3 = st.columns([6, 2, 1])
-            with col1: st.write(f"*{row.iloc[1]}* | ₹{row.iloc[3]} - {row.iloc[5]}")
-            with col2: st.markdown(f"[📲 WA Bill](https://wa.me/{ph}?text=Bill)")
+            with col1: st.write(f"*{row.iloc[1]}* | ₹{row.iloc[3]} ({row.iloc[2]})")
+            with col2: st.markdown(f"[📲 Bill](https://wa.me/{ph}?text=Bill)")
             if col3.button("❌", key=f"s_{i}"): delete_row("Sales", i); st.rerun()
 
-# --- 6. LOYALTY CLUB (NEW FEATURE) ---
+# --- 6. LOYALTY CLUB ---
 elif menu == "🎖️ Loyalty Club":
-    st.header("🎖️ Customer Loyalty Points")
+    st.header("🎖️ Loyalty Club")
     s_df = load_data("Sales")
     if not s_df.empty:
-        search_ph = st.text_input("Enter Customer Phone to check total points")
-        if search_ph:
-            # Filtering points based on phone number provided in Billing
-            cust_data = s_df[s_df.iloc[:, 5].str.contains(search_ph, na=False)]
-            total_pts = pd.to_numeric(cust_data.iloc[:, 6], errors='coerce').sum()
-            st.success(f"Customer {search_ph} has total *{total_pts} Points*")
-        
-        st.divider()
-        st.subheader("Leaderboard (Top Customers)")
         loyalty = s_df.groupby(s_df.iloc[:, 5]).agg({s_df.columns[6]: 'sum'}).reset_index()
-        loyalty.columns = ['Customer Detail', 'Total Points']
-        st.dataframe(loyalty.sort_values(by='Total Points', ascending=False), use_container_width=True)
+        loyalty.columns = ['Customer', 'Points']; st.dataframe(loyalty, use_container_width=True)
 
-# --- 7. PET REGISTER (RESTORED LIST) ---
+# --- ALL OTHER SECTIONS KEPT ORIGINAL ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Registration")
     with st.form("pet"):
@@ -160,7 +158,20 @@ elif menu == "🐾 Pet Register":
             with col2: st.markdown(f"[🟢 WA Reminder](https://wa.me/{row.iloc[1]})")
             if col3.button("❌", key=f"p_{i}"): delete_row("PetRecords", i); st.rerun()
 
-# --- 8. LIVE STOCK (RESTORED LIST) ---
+elif menu == "💰 Expenses":
+    st.header("💰 Expenses")
+    with st.form("exp"):
+        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Other"])
+        amt = st.number_input("Amount", 0.0); mode = st.selectbox("Mode", ["Cash", "Online"])
+        if st.form_submit_button("Save"):
+            save_data("Expenses", [str(today_dt), cat, amt, mode]); st.rerun()
+    e_df = load_data("Expenses")
+    if not e_df.empty:
+        for i, row in e_df.tail(10).iterrows():
+            c1, c2 = st.columns([8, 1])
+            c1.write(f"💸 {row.iloc[1]}: ₹{row.iloc[2]} ({row.iloc[3]})")
+            if c2.button("❌", key=f"e_{i}"): delete_row("Expenses", i); st.rerun()
+
 elif menu == "📋 Live Stock":
     st.header("📋 Stock Status")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -180,22 +191,6 @@ elif menu == "📋 Live Stock":
             if r['Rem'] <= 2: st.error(f"📦 {r['Item']}: {r['Rem']} {r['Unit']} left!")
             else: st.info(f"📦 {r['Item']}: {r['Rem']} {r['Unit']} left")
 
-# --- 9. EXPENSES (RESTORED LIST) ---
-elif menu == "💰 Expenses":
-    st.header("💰 Expenses")
-    with st.form("exp"):
-        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Other"])
-        amt = st.number_input("Amount", 0.0); mode = st.selectbox("Mode", ["Cash", "Online"])
-        if st.form_submit_button("Save"):
-            save_data("Expenses", [str(today_dt), cat, amt, mode]); st.rerun()
-    e_df = load_data("Expenses")
-    if not e_df.empty:
-        for i, row in e_df.tail(10).iterrows():
-            c1, c2 = st.columns([8, 1])
-            c1.write(f"💸 {row.iloc[1]}: ₹{row.iloc[2]} ({row.iloc[3]})")
-            if c2.button("❌", key=f"e_{i}"): delete_row("Expenses", i); st.rerun()
-
-# --- 10. CUSTOMER KHATA (RESTORED LIST) ---
 elif menu == "📒 Customer Khata":
     st.header("📒 Customer Khata")
     with st.form("kh"):
@@ -213,7 +208,6 @@ elif menu == "📒 Customer Khata":
             with col1: st.write(f"📅 {row.iloc[2]} | {row.iloc[0]}: ₹{row.iloc[1]}")
             if col2.button("❌", key=f"k_{i}"): delete_row("CustomerKhata", i); st.rerun()
 
-# --- 11. PURCHASE & ADMIN ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
