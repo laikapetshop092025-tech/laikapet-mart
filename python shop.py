@@ -53,8 +53,11 @@ menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Pu
 
 today_dt = datetime.now().date()
 curr_m = datetime.now().month
+# Naya Logic: Day check for points
+day_of_week = datetime.now().weekday() # 0-4 (Mon-Fri), 5-6 (Sat-Sun)
+is_weekend = day_of_week >= 5
 
-# --- 4. DASHBOARD (TODAY + MONTHLY + ALL STATS RESTORED) ---
+# --- 4. DASHBOARD (ALL STATS RESTORED) ---
 if menu == "📊 Dashboard":
     st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>🌈 Business Dashboard</h2>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
@@ -102,9 +105,9 @@ if menu == "📊 Dashboard":
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Sale", f"₹{ms}"); m2.metric("Purchase", f"₹{mp}"); m3.metric("Expense", f"₹{me}"); m4.metric("Profit", f"₹{mpr}")
 
-# --- 5. BILLING (REDEEM & PROFIT) ---
+# --- 5. BILLING (NEW POINTS LOGIC) ---
 elif menu == "🧾 Billing":
-    st.header("🧾 New Bill")
+    st.header("🧾 Generate Bill")
     inv_df = load_data("Inventory"); s_df = load_data("Sales")
     with st.form("bill"):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
@@ -113,18 +116,33 @@ elif menu == "🧾 Billing":
         with c1: q = st.number_input("Qty", 0.1); unit = st.selectbox("Unit", ["Kg", "Pcs", "Packet"])
         with c2: pr = st.number_input("Selling Price", 1.0); mode = st.selectbox("Mode", ["Cash", "Online", "Udhaar"])
         with c3: ph = st.text_input("Customer Phone")
+        
         pts_bal = pd.to_numeric(s_df[s_df.iloc[:, 5].str.contains(ph, na=False)].iloc[:, 6], errors='coerce').sum() if (ph and not s_df.empty) else 0
         st.write(f"🌟 Available Points: *{pts_bal}*")
-        redeem = st.checkbox(f"Redeem {pts_bal} Points?")
-        if st.form_submit_button("Generate Bill"):
-            total = q * pr; profit = (pr - pur_rate) * q
-            is_we = datetime.now().date().weekday() >= 5
-            pts_add = int((total/100) * (5 if is_we else 2))
-            if redeem: pts_add = -pts_bal
-            save_data("Sales", [str(today_dt), it, f"{q} {unit}", total, mode, ph, pts_add, profit])
-            st.success("Bill Saved!"); time.sleep(1); st.rerun()
+        
+        # New Logic: Points Calculation based on Day
+        pts_label = "5 Points per ₹100" if is_weekend else "2 Points per ₹100"
+        st.info(f"Today's Rate: {pts_label}")
+        
+        c4, c5 = st.columns(2)
+        with c4: redeem = st.checkbox(f"Redeem {pts_bal} Points?")
+        with c5: is_referral = st.checkbox("Referral Bonus? (+10 Points)")
 
-# --- 6. PURCHASE (RESTORED LIST) ---
+        if st.form_submit_button("SAVE BILL"):
+            total = q * pr; profit = (pr - pur_rate) * q
+            # Calculation: Weekend (Sat-Sun) = 5 pts, Weekdays (Mon-Fri) = 2 pts
+            pts_add = int((total/100) * (5 if is_weekend else 2))
+            
+            # Referral Bonus Logic
+            if is_referral: pts_add += 10
+            
+            # Redeem Logic
+            if redeem: pts_add = -pts_bal
+            
+            save_data("Sales", [str(today_dt), it, f"{q} {unit}", total, mode, ph, pts_add, profit])
+            st.success("Bill Saved Successfully!"); time.sleep(1); st.rerun()
+
+# --- PURANA CODE (NO CHANGES BELOW) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase Entry")
     with st.form("pur"):
@@ -138,7 +156,6 @@ elif menu == "📦 Purchase":
             c1.write(f"📦 {row.iloc[0]} - {row.iloc[1]} {row.iloc[2]} @ ₹{row.iloc[3]}")
             if c2.button("❌", key=f"i_{i}"): delete_row("Inventory", i); st.rerun()
 
-# --- 7. LIVE STOCK (RESTORED ALERTS & DOWNLOAD) ---
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -160,7 +177,6 @@ elif menu == "📋 Live Stock":
             if r['Rem'] <= 2: st.error(f"📦 {r['Item']}: {r['Rem']} {r['Unit']} Left")
             else: st.info(f"✅ {r['Item']}: {r['Rem']} {r['Unit']} Left")
 
-# --- 8. EXPENSES (RESTORED LIST) ---
 elif menu == "💰 Expenses":
     st.header("💰 Expenses")
     with st.form("exp"):
@@ -175,7 +191,6 @@ elif menu == "💰 Expenses":
             c1.write(f"💸 {row.iloc[1]}: ₹{row.iloc[2]} ({row.iloc[3]})")
             if c2.button("❌", key=f"e_{i}"): delete_row("Expenses", i); st.rerun()
 
-# --- 9. PET REGISTER (RESTORED LIST) ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Register")
     with st.form("pet"):
@@ -190,7 +205,6 @@ elif menu == "🐾 Pet Register":
             c1.write(f"🐶 *{row.iloc[0]}* ({row.iloc[2]}) - {row.iloc[3]}")
             if c2.button("❌", key=f"pr_{i}"): delete_row("PetRecords", i); st.rerun()
 
-# --- 10. CUSTOMER KHATA (RESTORED LIST) ---
 elif menu == "📒 Customer Khata":
     st.header("📒 Customer Khata")
     with st.form("kh"):
@@ -203,7 +217,6 @@ elif menu == "📒 Customer Khata":
         for i, row in summary.iterrows():
             if row.iloc[1] != 0: st.warning(f"👤 {row.iloc[0]}: ₹{row.iloc[1]} Balance")
 
-# --- 11. LOYALTY CLUB & ADMIN SETTINGS ---
 elif menu == "🎖️ Loyalty Club":
     st.header("🎖️ Loyalty Club Leaderboard")
     s_df = load_data("Sales")
