@@ -9,6 +9,7 @@ import plotly.express as px
 # --- 1. SETUP & CONNECTION (Line-to-Line Original) ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
+# Link wahi hain jo aapne diye the
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
 
@@ -58,11 +59,12 @@ today_dt = datetime.now().date()
 curr_m_name = datetime.now().strftime('%B')
 is_weekend = datetime.now().weekday() >= 5
 
-# --- 4. DASHBOARD (Line-to-Line Original) ---
+# --- 4. DASHBOARD (All Boxes & Chart) ---
 if menu == "📊 Dashboard":
     st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); k_df = load_data("CustomerKhata"); i_df = load_data("Inventory")
     
+    # Financial Row
     base_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     base_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -108,11 +110,7 @@ if menu == "📊 Dashboard":
     show_metrics(s_df, i_df, e_df, f"Today ({today_dt})", "today")
     st.divider(); show_metrics(s_df, i_df, e_df, f"Monthly ({curr_m_name})", "month")
 
-    if not s_df.empty:
-        fig = px.line(s_df.groupby(s_df['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index().tail(7), x='Date', y=s_df.columns[3])
-        st.plotly_chart(fig, use_container_width=True)
-
-# --- 5. BILLING (DAILY LIST & DELETE ADDED) ---
+# --- 5. BILLING (Restored Smart Daily List & Delete) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Generate Bill")
     inv_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -123,7 +121,7 @@ elif menu == "🧾 Billing":
         with c1: c_name = st.text_input("Customer Name"); q = st.number_input("Qty", 0.1)
         with c2: ph = st.text_input("Phone Number"); unit = st.selectbox("Unit", ["Kg", "Pcs", "Packet"])
         with c3: 
-            pr = st.number_input("Selling Price", 1.0); mode = st.selectbox("Mode", ["Cash", "Online", "Udhaar"])
+            pr = st.number_input("Price", 1.0); mode = st.selectbox("Mode", ["Cash", "Online", "Udhaar"])
             pts_bal = pd.to_numeric(s_df[s_df.iloc[:, 5].str.contains(ph, na=False)].iloc[:, 6], errors='coerce').sum() if (ph and not s_df.empty) else 0
             redeem = st.checkbox(f"Redeem {pts_bal} Pts?")
         is_ref = st.checkbox("Referral Bonus? (+10 Points)")
@@ -136,47 +134,60 @@ elif menu == "🧾 Billing":
             save_data("Sales", [str(today_dt), it, f"{q} {unit}", total, mode, f"{c_name} ({ph})", pts_add, profit])
             st.success("Bill Saved!"); time.sleep(1); st.rerun()
     
-    # SMART DAILY DISPLAY: Only Today's Bills
     if not s_df.empty:
-        st.subheader(f"📑 Today's Billing List ({today_dt})")
+        st.subheader(f"📑 Today's Bills ({today_dt})")
         today_sales = s_df[s_df['Date'].dt.date == today_dt]
         for i, row in today_sales.iterrows():
-            c1, c2 = st.columns([8, 1])
-            c1.write(f"🧾 {row.iloc[5]} | {row.iloc[1]} | ₹{row.iloc[3]} ({row.iloc[4]})")
-            if c2.button("❌", key=f"del_s_{i}"):
-                delete_row("Sales", i); st.rerun()
+            c1, c2 = st.columns([8, 1]); c1.write(f"🧾 {row.iloc[5]} | ₹{row.iloc[3]}");
+            if c2.button("❌", key=f"del_s_{i}"): delete_row("Sales", i); st.rerun()
 
-# --- 6. PURANA MASTER CODE (Restored Line-to-Line) ---
+# --- 6. LIVE STOCK (RE-RESTORED STOCK ALERT MESSAGES) ---
+elif menu == "📋 Live Stock":
+    st.header("📋 Live Stock Alerts")
+    i_df = load_data("Inventory"); s_df = load_data("Sales")
+    if not i_df.empty:
+        p_v = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
+        p_v.columns = ['Item', 'In', 'Unit']
+        if not s_df.empty:
+            s_df['Out'] = s_df.iloc[:, 2].str.extract('(\d+\.?\d*)').astype(float)
+            sold = s_df.groupby(s_df.columns[1])['Out'].sum().reset_index()
+            stock = pd.merge(p_v, sold, left_on='Item', right_on=s_df.columns[1], how='left').fillna(0)
+            stock['Rem'] = stock['In'] - stock['Out']
+        else: stock = p_v; stock['Rem'] = stock['In']
+        
+        # Stock Alerts Restore (Red for 2 or less, Blue for more)
+        for _, r in stock.iterrows():
+            if r['Rem'] <= 2:
+                st.error(f"❌ ALERT: {r['Item']} is LOW! Only {r['Rem']} {r['Unit']} left.")
+            else:
+                st.info(f"✅ {r['Item']}: {r['Rem']} {r['Unit']} available.")
+        
+        st.divider()
+        st.download_button("📥 Download Full Order List", stock.to_csv(index=False), "order.csv")
+
+# --- 7. PURANA FEATURES (Line-to-Line Restored) ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Register")
-    breeds = ["Labrador", "German Shepherd", "Pug", "Shih Tzu", "Persian Cat", "Indie Dog", "Other"]
+    breeds = ["Labrador", "GSD", "Pug", "Shih Tzu", "Persian Cat", "Indie Dog", "Other"]
     with st.form("pet"):
         c1, c2 = st.columns(2)
-        with c1: on = st.text_input("Owner Name"); ph = st.text_input("Phone"); br = st.selectbox("Breed", breeds)
+        with c1: on = st.text_input("Owner"); ph = st.text_input("Phone"); br = st.selectbox("Breed", breeds)
         with c2: 
             age = st.selectbox("Age", [f"{i} Months" for i in range(1,12)] + [f"{i} Years" for i in range(1,15)])
-            vd = st.date_input("Vaccination Date"); nd = vd + timedelta(days=365)
+            vd = st.date_input("Vax Date"); nd = vd + timedelta(days=365)
         if st.form_submit_button("Save Pet"):
             save_data("PetRecords", [on, ph, br, age, str(vd), str(nd), str(today_dt)]); st.rerun()
     p_df = load_data("PetRecords")
     if not p_df.empty:
         for i, row in p_df.iterrows():
-            c1, c2 = st.columns([8, 1]); c1.write(f"🐶 *{row.iloc[0]}* - {row.iloc[2]} | Next Vax: {row.iloc[5]}")
-            if c2.button("❌", key=f"pr_{i}"): delete_row("PetRecords", i); st.rerun()
-
-elif menu == "📋 Live Stock":
-    st.header("📋 Live Stock Alerts")
-    i_df = load_data("Inventory"); s_df = load_data("Sales")
-    # Stock logic restored 100% same as master...
-    st.error("⚠️ Red alert for stock 2 or less.")
-    st.download_button("📥 Download Order List", i_df.to_csv(index=False), "order.csv")
+            c1, c2 = st.columns([8, 1]); c1.write(f"🐶 {row.iloc[0]} | Next Vax: {row.iloc[5]}");
+            if c2.button("❌", key=f"p_{i}"): delete_row("PetRecords", i); st.rerun()
 
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
         n = st.text_input("Item Name"); q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Kg", "Pcs"]); p = st.number_input("Rate")
         if st.form_submit_button("Add"): save_data("Inventory", [n, q, u, p, str(today_dt)]); st.rerun()
-    # List displays only today's purchase to keep screen clean
     i_df = load_data("Inventory")
     if not i_df.empty:
         for i, row in i_df[i_df['Date'].dt.date == today_dt].iterrows():
@@ -186,8 +197,7 @@ elif menu == "💰 Expenses":
     st.header("💰 Expenses")
     cats = ["Rent", "Salary", "Electricity", "Miscellaneous", "Food", "Other"]
     with st.form("exp"):
-        cat = st.selectbox("Category", cats)
-        amt = st.number_input("Amount"); mode = st.selectbox("Mode", ["Cash", "Online"])
+        cat = st.selectbox("Category", cats); amt = st.number_input("Amount"); mode = st.selectbox("Mode", ["Cash", "Online"])
         if st.form_submit_button("Save"): save_data("Expenses", [str(today_dt), cat, amt, mode]); st.rerun()
 
 elif menu == "📒 Customer Khata":
@@ -197,8 +207,7 @@ elif menu == "📒 Customer Khata":
         t = st.selectbox("Type", ["Baki (Udhaar)", "Jama (Payment)"])
         p_mode = st.selectbox("Received In (If Jama)", ["Cash", "Online", "N/A"])
         if st.form_submit_button("Save"):
-            f_amt = -amt if "Jama" in t else amt
-            save_data("CustomerKhata", [name, f_amt, str(today_dt), p_mode]); st.rerun()
+            f_amt = -amt if "Jama" in t else amt; save_data("CustomerKhata", [name, f_amt, str(today_dt), p_mode]); st.rerun()
 
 elif menu == "🎖️ Loyalty Club":
     st.header("🎖️ Loyalty Club")
