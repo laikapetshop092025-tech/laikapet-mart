@@ -6,7 +6,7 @@ import time
 import urllib.parse
 import plotly.express as px
 
-# --- 1. SETUP & CONNECTION ---
+# --- 1. SETUP & CONNECTION (Unchanged) ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
@@ -29,7 +29,6 @@ def load_data(sheet_name):
         url = f"{SHEET_LINK}{sheet_name}&cache={time.time()}"
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
-        # FIX: Agar column ka naam Date nahi hai, toh last column ko Date maan lo
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         elif not df.empty:
@@ -48,16 +47,23 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- 3. SIDEBAR ---
+# --- 3. SIDEBAR (LOGOUT RESTORED) ---
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "📒 Customer Khata", "🎖️ Loyalty Club", "⚙️ Admin Settings"])
+
+st.sidebar.divider()
+if st.sidebar.button("🚪 Logout", use_container_width=True):
+    st.session_state.logged_in = False
+    st.rerun()
 
 today_dt = datetime.now().date()
 curr_m_name = datetime.now().strftime('%B')
 is_weekend = datetime.now().weekday() >= 5
 
-# --- 4. DASHBOARD (FIXED ERROR LINE) ---
+# --- 4. DASHBOARD (WELCOME MESSAGE & ALL STATS) ---
 if menu == "📊 Dashboard":
-    st.markdown(f"<h2 style='text-align: center; color: #1E88E5;'>🌈 Business Dashboard</h2>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='text-align: center;'>Hisaab-Kitaab Dashboard</h4>", unsafe_allow_html=True)
+    
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); i_df = load_data("Inventory")
     
     base_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
@@ -82,11 +88,9 @@ if menu == "📊 Dashboard":
     """, unsafe_allow_html=True)
 
     def get_stats(df_s, df_i, df_e, f_type="today"):
-        # Error yahan tha, maine column check add kar diya hai
         m_s = (df_s['Date'].dt.date == today_dt) if (not df_s.empty and f_type == "today") else (df_s['Date'].dt.month == datetime.now().month if not df_s.empty else False)
         m_i = (df_i['Date'].dt.date == today_dt) if (not df_i.empty and f_type == "today") else (df_i['Date'].dt.month == datetime.now().month if not df_i.empty else False)
         m_e = (df_e['Date'].dt.date == today_dt) if (not df_e.empty and f_type == "today") else (df_e['Date'].dt.month == datetime.now().month if not df_e.empty else False)
-        
         ts = pd.to_numeric(df_s[m_s].iloc[:, 3], errors='coerce').sum() if not df_s.empty else 0
         tp = pd.to_numeric(df_i[m_i].iloc[:, 1] * df_i[m_i].iloc[:, 3], errors='coerce').sum() if not df_i.empty else 0
         te = pd.to_numeric(df_e[m_e].iloc[:, 2], errors='coerce').sum() if not df_e.empty else 0
@@ -104,11 +108,11 @@ if menu == "📊 Dashboard":
     m1.metric("Sale", f"₹{ms}"); m2.metric("Purchase", f"₹{mp}"); m3.metric("Expense", f"₹{me}"); m4.metric("Profit", f"₹{mpr}")
 
     if not s_df.empty:
-        st.divider(); st.subheader("📈 Weekly Sales Trend")
+        st.divider(); st.subheader("📈 Weekly Sales Analysis")
         fig = px.line(s_df.groupby(s_df['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index(), x='Date', y=s_df.columns[3])
         st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. BILLING (RESTORED DROPDOWNS) ---
+# --- 5. BILLING (WHATSAPP FEATURE RESTORED) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Generate Bill")
     inv_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -120,16 +124,22 @@ elif menu == "🧾 Billing":
         with c2: pr = st.number_input("Selling Price", 1.0); mode = st.selectbox("Mode", ["Cash", "Online", "Udhaar"])
         with c3: ph = st.text_input("Customer Phone")
         pts_bal = pd.to_numeric(s_df[s_df.iloc[:, 5].str.contains(ph, na=False)].iloc[:, 6], errors='coerce').sum() if (ph and not s_df.empty) else 0
-        st.write(f"🌟 Points: *{pts_bal}*")
+        st.write(f"🌟 Available Points: *{pts_bal}*")
         redeem = st.checkbox(f"Redeem {pts_bal} Points?")
         is_ref = st.checkbox("Referral Bonus (+10 Points)")
+        
         if st.form_submit_button("SAVE BILL"):
             total = q * pr; profit = (pr - pur_rate) * q
             pts_add = int((total/100) * (5 if is_weekend else 2))
             if is_ref: pts_add += 10
             if redeem: pts_add = -pts_bal
-            save_data("Sales", [str(today_dt), it, f"{q} {unit}", total, mode, ph, pts_add, profit])
-            st.success("Success!"); time.sleep(1); st.rerun()
+            if save_data("Sales", [str(today_dt), it, f"{q} {unit}", total, mode, ph, pts_add, profit]):
+                st.success("Bill Saved!")
+                # WhatsApp Link Generation
+                msg = f"🐾 LAIKA PET MART 🐾\nNamaste! Dhanyavad shopping ke liye.\nItem: {it}\nTotal: ₹{total}\nPoints Added: {pts_add}\nVisit Again! ❤️"
+                wa_url = f"https://wa.me/91{ph}?text={urllib.parse.quote(msg)}"
+                st.markdown(f"[📲 Send WhatsApp Bill to Customer]({wa_url})")
+                time.sleep(2); st.rerun()
 
 # --- 6. LIVE STOCK (DOWNLOAD BUTTON RESTORED) ---
 elif menu == "📋 Live Stock":
@@ -183,7 +193,7 @@ elif menu == "📒 Customer Khata":
             if row.iloc[1] > 0: st.warning(f"👤 {row.iloc[0]}: ₹{row.iloc[1]} Baki")
             elif row.iloc[1] < 0: st.success(f"👤 {row.iloc[0]}: ₹{abs(row.iloc[1])} Advance")
 
-# --- 9. PURANA LISTS (PURCHASE, EXPENSE, LOYALTY, ADMIN) ---
+# --- PURANA LISTS (PURCHASE, EXPENSE, LOYALTY, ADMIN) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase")
     with st.form("pur"):
