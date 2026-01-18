@@ -32,8 +32,12 @@ def load_data(sheet_name):
         url = f"{SHEET_LINK}{sheet_name}&cache={time.time()}"
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
+        # Date column ko sahi se identify karna
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        elif not df.empty:
+            # Agar naam 'Date' nahi hai toh aakhri column ko date maan lega (Aapki sheet ke hisaab se)
+            df['Date'] = pd.to_datetime(df.iloc[:, -1], errors='coerce')
         return df
     except: return pd.DataFrame()
 
@@ -60,12 +64,11 @@ curr_m = datetime.now().month
 curr_m_name = datetime.now().strftime('%B')
 is_weekend = datetime.now().weekday() >= 5
 
-# --- 4. DASHBOARD (ALL 4 BOXES & FULL REPORTS) ---
+# --- 4. DASHBOARD (FIXED ERROR) ---
 if menu == "📊 Dashboard":
     st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); k_df = load_data("CustomerKhata"); i_df = load_data("Inventory"); d_df = load_data("Dues")
     
-    # Financial Row Logic
     bc = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     bo = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sc = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -98,13 +101,20 @@ if menu == "📊 Dashboard":
     """, unsafe_allow_html=True)
 
     def show_metrics(df_s, df_e, df_i, title, p_type="today"):
+        # Fix: 'Date' check direct column name ki bajaye logic se
+        if 'Date' not in df_s.columns and not df_s.empty: df_s['Date'] = pd.to_datetime(df_s.iloc[:, 0], errors='coerce')
+        if 'Date' not in df_e.columns and not df_e.empty: df_e['Date'] = pd.to_datetime(df_e.iloc[:, 0], errors='coerce')
+        if 'Date' not in df_i.columns and not df_i.empty: df_i['Date'] = pd.to_datetime(df_i.iloc[:, -1], errors='coerce')
+
         m = (df_s['Date'].dt.date == today_dt) if (not df_s.empty and p_type == "today") else (df_s['Date'].dt.month == curr_m if not df_s.empty else False)
         mi = (df_i['Date'].dt.date == today_dt) if (not df_i.empty and p_type == "today") else (df_i['Date'].dt.month == curr_m if not df_i.empty else False)
         me = (df_e['Date'].dt.date == today_dt) if (not df_e.empty and p_type == "today") else (df_e['Date'].dt.month == curr_m if not df_e.empty else False)
+        
         ts = pd.to_numeric(df_s[m].iloc[:, 3], errors='coerce').sum() if not df_s.empty else 0
         tp = pd.to_numeric(df_i[mi].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not df_i.empty else 0
         te = pd.to_numeric(df_e[me].iloc[:, 2], errors='coerce').sum() if not df_e.empty else 0
         tprof = pd.to_numeric(df_s[m].iloc[:, 7], errors='coerce').sum() if not df_s.empty and len(df_s.columns)>7 else 0
+        
         st.subheader(f"📈 {title} Report"); c1, c2, c3, c4 = st.columns(4)
         c1.metric("Sale", f"₹{ts}"); c2.metric("Purchase", f"₹{tp}"); c3.metric("Expense", f"₹{te}"); c4.metric("Profit", f"₹{tprof}")
 
@@ -115,7 +125,7 @@ if menu == "📊 Dashboard":
         fig = px.line(s_df.groupby(s_df['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index().tail(7), x='Date', y=s_df.columns[3])
         st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. BILLING (MULTI-ITEM CART RESTORED) ---
+# --- 5. BILLING (MULTI-ITEM CART) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Generate Multi-Item Bill")
     inv_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -144,7 +154,7 @@ elif menu == "🧾 Billing":
             st.session_state.bill_cart = []; st.success("Bill Saved!"); st.rerun()
         if st.button("🗑️ Clear Cart"): st.session_state.bill_cart = []; st.rerun()
 
-# --- 6. PURCHASE (MULTI-ITEM CART RESTORED) ---
+# --- 6. PURCHASE ---
 elif menu == "📦 Purchase":
     st.header("📦 Bulk Purchase Entry")
     p_from = st.selectbox("Paid From", ["Cash", "Online", "Pocket"])
@@ -161,7 +171,7 @@ elif menu == "📦 Purchase":
                 save_data("Inventory", [item['Item'], item['Qty'], item['Unit'], item['Rate'], str(today_dt), p_from])
             st.session_state.pur_cart = []; st.success("Stock Updated!"); st.rerun()
 
-# --- 7. LIVE STOCK (RED ALERT & DOWNLOAD RESTORED) ---
+# --- 7. LIVE STOCK ---
 elif menu == "📋 Live Stock":
     st.header("📋 Live Stock Alerts")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -180,7 +190,7 @@ elif menu == "📋 Live Stock":
             else: st.info(f"✅ {r['Item']}: {r['Rem']} {r['Unit']}")
         st.divider(); st.download_button("📥 Download Stock", stock.to_csv(index=False), "stock.csv")
 
-# --- 8. ADMIN SETTINGS (SUPPLIER LIST RESTORED) ---
+# --- 8. ADMIN SETTINGS ---
 elif menu == "⚙️ Admin Settings":
     st.header("⚙️ Admin Settings")
     with st.form("bal"):
@@ -197,7 +207,7 @@ elif menu == "⚙️ Admin Settings":
         for i, row in summary.iterrows():
             if row.iloc[1] != 0: st.error(f"🏢 {row.iloc[0]}: ₹{row.iloc[1]} Pending")
 
-# --- 9. PET & EXPENSE (DELETE RESTORED) ---
+# --- 9. PET & EXPENSE ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Register")
     breeds = ["Labrador", "GSD", "Pug", "Shih Tzu", "Persian Cat", "Other"]
@@ -225,7 +235,7 @@ elif menu == "💰 Expenses":
             c1, c2 = st.columns([8, 1]); c1.write(f"💸 {row.iloc[1]}: ₹{row.iloc[2]}");
             if c2.button("❌", key=f"ex_{i}"): delete_row("Expenses", i); st.rerun()
 
-# --- 10. KHATA & LOYALTY (RESTORED) ---
+# --- 10. KHATA & LOYALTY ---
 elif menu == "📒 Customer Khata":
     st.header("📒 Customer Khata")
     with st.form("kh"):
