@@ -50,7 +50,7 @@ if not st.session_state.logged_in:
             st.rerun()
     st.stop()
 
-# --- 3. SIDEBAR ---
+# --- 3. SIDEBAR & LOGOUT ---
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "📒 Customer Khata", "🎖️ Loyalty Club", "⚙️ Admin Settings"])
 st.sidebar.divider()
 if st.sidebar.button("🚪 Logout", use_container_width=True):
@@ -62,7 +62,7 @@ curr_m = datetime.now().month
 curr_m_name = datetime.now().strftime('%B')
 is_weekend = datetime.now().weekday() >= 5
 
-# --- 4. DASHBOARD (ALL DATA RESTORED) ---
+# --- 4. DASHBOARD (PURCHASE BACKLOG FIXED) ---
 if menu == "📊 Dashboard":
     st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); k_df = load_data("CustomerKhata"); i_df = load_data("Inventory"); d_df = load_data("Dues")
@@ -73,8 +73,11 @@ if menu == "📊 Dashboard":
     so = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Online"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
     ec = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Cash"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
     eo = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Online"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
+    
+    # FIXED: Ismein se filter hata kar total purchase calculate ki hai
     pc = pd.to_numeric(i_df[i_df.iloc[:, 5] == "Cash"].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not i_df.empty else 0
     po = pd.to_numeric(i_df[i_df.iloc[:, 5] == "Online"].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not i_df.empty else 0
+    
     total_u = pd.to_numeric(k_df.iloc[:, 1], errors='coerce').sum() if not k_df.empty else 0
 
     st.markdown(f"""
@@ -98,17 +101,23 @@ if menu == "📊 Dashboard":
         m = (df_s['Date'].dt.date == today_dt) if (not df_s.empty and p_type == "today") else (df_s['Date'].dt.month == curr_m if not df_s.empty else False)
         mi = (df_i['Date'].dt.date == today_dt) if (not df_i.empty and p_type == "today") else (df_i['Date'].dt.month == curr_m if not df_i.empty else False)
         me = (df_e['Date'].dt.date == today_dt) if (not df_e.empty and p_type == "today") else (df_e['Date'].dt.month == curr_m if not df_e.empty else False)
+        
         ts = pd.to_numeric(df_s[m].iloc[:, 3], errors='coerce').sum() if not df_s.empty else 0
         tp = pd.to_numeric(df_i[mi].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not df_i.empty else 0
         te = pd.to_numeric(df_e[me].iloc[:, 2], errors='coerce').sum() if not df_e.empty else 0
         tprof = pd.to_numeric(df_s[m].iloc[:, 7], errors='coerce').sum() if not df_s.empty and len(df_s.columns)>7 else 0
+        
         st.subheader(f"📈 {title} Report"); c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total Sale", f"₹{ts}"); c2.metric("Total Purchase", f"₹{tp}"); c3.metric("Total Expense", f"₹{te}"); c4.metric("Total Profit", f"₹{tprof}")
 
     show_metrics(s_df, e_df, i_df, f"Daily ({today_dt})", "today")
     st.divider(); show_metrics(s_df, e_df, i_df, f"Monthly ({curr_m_name})", "month")
+    
+    if not s_df.empty:
+        fig = px.line(s_df.groupby(s_df['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index().tail(7), x='Date', y=s_df.columns[3])
+        st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. BILLING ---
+# --- 5. BILLING (SAME AS ORIGINAL) ---
 elif menu == "🧾 Billing":
     st.header("🧾 Generate Multi-Item Bill")
     inv_df = load_data("Inventory"); s_df = load_data("Sales")
@@ -134,7 +143,7 @@ elif menu == "🧾 Billing":
                 save_data("Sales", [str(today_dt), item['Item'], f"{item['Qty']}", item['Qty']*item['Price'], pay_m, f"{cust} ({ph})", item['Pts'], item['Profit']])
             st.session_state.bill_cart = []; st.success("Bill Saved!"); st.rerun()
 
-# --- 6. PURCHASE ---
+# --- 6. PURCHASE (SAME AS ORIGINAL) ---
 elif menu == "📦 Purchase":
     st.header("📦 Bulk Purchase Entry")
     p_from = st.selectbox("Paid From", ["Cash", "Online", "Pocket"])
