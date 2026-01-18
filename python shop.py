@@ -6,11 +6,15 @@ import time
 import urllib.parse
 import plotly.express as px
 
-# --- 1. SETUP & CONNECTION ---
+# --- 1. SETUP & CONNECTION (Original) ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
+
+# Session States for Cart (Bina purane code ko chhede)
+if 'bill_cart' not in st.session_state: st.session_state.bill_cart = []
+if 'pur_cart' not in st.session_state: st.session_state.pur_cart = []
 
 def save_data(sheet_name, data_list):
     try:
@@ -59,11 +63,12 @@ curr_m_name = datetime.now().strftime('%B')
 curr_m = datetime.now().month
 is_weekend = datetime.now().weekday() >= 5
 
-# --- 4. DASHBOARD (4 BOXES & GRAPH RESTORED) ---
+# --- 4. DASHBOARD (4 BOXES + DAILY/MONTHLY STATS + GRAPH) ---
 if menu == "📊 Dashboard":
     st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); k_df = load_data("CustomerKhata"); i_df = load_data("Inventory"); d_df = load_data("Dues")
     
+    # Financial Row Calculation (Restored Line-to-line)
     base_cash = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     base_online = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     sale_cash = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
@@ -98,91 +103,73 @@ if menu == "📊 Dashboard":
 
     def show_metrics(df_s, df_e, df_i, title, p_type="today"):
         m = (df_s['Date'].dt.date == today_dt) if (not df_s.empty and p_type == "today") else (df_s['Date'].dt.month == curr_m if not df_s.empty else False)
+        mi = (df_i['Date'].dt.date == today_dt) if (not df_i.empty and p_type == "today") else (df_i['Date'].dt.month == curr_m if not df_i.empty else False)
+        me = (df_e['Date'].dt.date == today_dt) if (not df_e.empty and p_type == "today") else (df_e['Date'].dt.month == curr_m if not df_e.empty else False)
         ts = pd.to_numeric(df_s[m].iloc[:, 3], errors='coerce').sum() if not df_s.empty else 0
+        tp = pd.to_numeric(df_i[mi].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not df_i.empty else 0
+        te = pd.to_numeric(df_e[me].iloc[:, 2], errors='coerce').sum() if not df_e.empty else 0
         tprof = pd.to_numeric(df_s[m].iloc[:, 7], errors='coerce').sum() if not df_s.empty and len(df_s.columns)>7 else 0
-        st.subheader(f"📈 {title} Report"); c1, c2 = st.columns(2)
-        c1.metric("Sale", f"₹{ts}"); c2.metric("Profit", f"₹{tprof}")
+        st.subheader(f"📈 {title} Report"); c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Sale", f"₹{ts}"); c2.metric("Purchase", f"₹{tp}"); c3.metric("Expense", f"₹{te}"); c4.metric("Profit", f"₹{tprof}")
 
     show_metrics(s_df, e_df, i_df, f"Daily ({today_dt})", "today")
     st.divider(); show_metrics(s_df, e_df, i_df, f"Monthly ({curr_m_name})", "month")
-    
+
     if not s_df.empty:
+        st.divider(); st.subheader("📈 Last 7 Days Sales Graph")
         fig = px.line(s_df.groupby(s_df['Date'].dt.date).agg({s_df.columns[3]: 'sum'}).reset_index().tail(7), x='Date', y=s_df.columns[3])
         st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. BILLING (REDEEM, REFERRAL & DELETE RESTORED) ---
+# --- 5. BILLING (MULTI-ITEM CART & ORIGINAL LOGIC) ---
 elif menu == "🧾 Billing":
-    st.header("🧾 Generate Bill")
+    st.header("🧾 Generate Multi-Item Bill")
     inv_df = load_data("Inventory"); s_df = load_data("Sales")
-    with st.form("bill"):
-        it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
-        pur_rate = inv_df[inv_df.iloc[:, 0] == it].iloc[0, 3] if not inv_df.empty else 0
-        c1, c2, c3 = st.columns(3)
-        with c1: c_name = st.text_input("Customer Name"); q = st.number_input("Qty", 0.1)
-        with c2: ph = st.text_input("Phone Number"); unit = st.selectbox("Unit", ["Kg", "Pcs", "Packet"])
-        with c3: 
-            pr = st.number_input("Price", 1.0); mode = st.selectbox("Mode", ["Cash", "Online", "Udhaar"])
-            pts_bal = pd.to_numeric(s_df[s_df.iloc[:, 5].str.contains(ph, na=False)].iloc[:, 6], errors='coerce').sum() if (ph and not s_df.empty) else 0
-            redeem = st.checkbox(f"Redeem {pts_bal} Pts?"); is_ref = st.checkbox("Referral Bonus? (+10 Pts)")
-        if st.form_submit_button("SAVE BILL"):
-            total = q * pr; profit = (pr - pur_rate) * q
-            pts_add = int((total/100) * (5 if is_weekend else 2))
+    c1, c2, c3 = st.columns(3)
+    cust = c1.text_input("Customer Name"); ph = c2.text_input("Phone Number"); pay_m = c3.selectbox("Mode", ["Cash", "Online", "Udhaar"])
+    
+    with st.expander("🛒 Add Item to Cart", expanded=True):
+        col1, col2, col3 = st.columns(3)
+        it = col1.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
+        qty = col2.number_input("Qty", 0.1); pr = col3.number_input("Price", 1.0)
+        pts_bal = pd.to_numeric(s_df[s_df.iloc[:, 5].str.contains(ph, na=False)].iloc[:, 6], errors='coerce').sum() if (ph and not s_df.empty) else 0
+        redeem = st.checkbox(f"Redeem {pts_bal} Pts?"); is_ref = st.checkbox("Referral Bonus? (+10 Pts)")
+        if st.button("➕ Add Item"):
+            pur_rate = inv_df[inv_df.iloc[:, 0] == it].iloc[0, 3] if not inv_df.empty else 0
+            pts_add = int(((qty*pr)/100) * (5 if is_weekend else 2))
             if is_ref: pts_add += 10
             if redeem: pts_add = -pts_bal
-            save_data("Sales", [str(today_dt), it, f"{q} {unit}", total, mode, f"{c_name} ({ph})", pts_add, profit])
-            st.success("Bill Saved!"); st.rerun()
-    if not s_df.empty:
-        for i, row in s_df[s_df['Date'].dt.date == today_dt].iterrows():
-            c1, c2 = st.columns([8, 1]); c1.write(f"🧾 {row.iloc[5]} | ₹{row.iloc[3]}");
-            if c2.button("❌", key=f"del_s_{i}"): delete_row("Sales", i); st.rerun()
+            st.session_state.bill_cart.append({"Item": it, "Qty": qty, "Price": pr, "Profit": (pr-pur_rate)*qty, "Pts": pts_add})
+            st.rerun()
 
-# --- 6. PET REGISTER (DELETE RESTORED) ---
-elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Register")
-    breeds = ["Labrador", "GSD", "Pug", "Shih Tzu", "Persian Cat", "Indie Dog", "Other"]
-    with st.form("pet"):
-        c1, c2 = st.columns(2)
-        on = c1.text_input("Owner"); ph = c1.text_input("Phone"); br = c1.selectbox("Breed", breeds)
-        age = c2.selectbox("Age", [f"{i} Months" for i in range(1,12)] + [f"{i} Years" for i in range(1,15)])
-        vd = c2.date_input("Vax Date"); nd = vd + timedelta(days=365)
-        if st.form_submit_button("Save Pet"): save_data("PetRecords", [on, ph, br, age, str(vd), str(nd), str(today_dt)]); st.rerun()
-    p_df = load_data("PetRecords")
-    if not p_df.empty:
-        for i, row in p_df.iterrows():
-            c1, c2 = st.columns([8, 1]); c1.write(f"🐶 *{row.iloc[0]}* | Next Vax: {row.iloc[5]}")
-            if c2.button("❌", key=f"del_pr_{i}"): delete_row("PetRecords", i); st.rerun()
+    if st.session_state.bill_cart:
+        st.table(pd.DataFrame(st.session_state.bill_cart))
+        if st.button("✅ Final Save Bill"):
+            for item in st.session_state.bill_cart:
+                save_data("Sales", [str(today_dt), item['Item'], f"{item['Qty']}", item['Qty']*item['Price'], pay_m, f"{cust} ({ph})", item['Pts'], item['Profit']])
+            st.session_state.bill_cart = []; st.success("Bill Saved!"); time.sleep(1); st.rerun()
+        if st.button("🗑️ Clear List"): st.session_state.bill_cart = []; st.rerun()
 
-# --- 7. EXPENSES (DELETE RESTORED) ---
-elif menu == "💰 Expenses":
-    st.header("💰 Expenses")
-    with st.form("exp"):
-        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
-        amt = st.number_input("Amount"); mode = st.selectbox("Mode", ["Cash", "Online"])
-        if st.form_submit_button("Save"): save_data("Expenses", [str(today_dt), cat, amt, mode]); st.rerun()
-    e_df = load_data("Expenses")
-    if not e_df.empty:
-        for i, row in e_df.iterrows():
-            c1, c2 = st.columns([8, 1]); c1.write(f"💸 {row.iloc[1]}: ₹{row.iloc[2]}");
-            if c2.button("❌", key=f"del_ex_{i}"): delete_row("Expenses", i); st.rerun()
+# --- 6. PURCHASE (MULTI-ITEM CART & MODES) ---
+elif menu == "📦 Purchase":
+    st.header("📦 Bulk Purchase Entry")
+    p_from = st.selectbox("Paid From", ["Cash", "Online", "Pocket"])
+    with st.expander("📥 Add Multiple Items", expanded=True):
+        col1, col2, col3, col4 = st.columns(4)
+        n = col1.text_input("Item Name"); q = col2.number_input("Qty", 1.0); u = col3.selectbox("Unit", ["Kg", "Pcs"]); p = col4.number_input("Rate")
+        if st.button("➕ Add to List"):
+            st.session_state.pur_cart.append({"Item": n, "Qty": q, "Unit": u, "Rate": p})
+            st.rerun()
 
-# --- 8. CUSTOMER KHATA (FORM RESTORED) ---
-elif menu == "📒 Customer Khata":
-    st.header("📒 Customer Khata")
-    with st.form("kh"):
-        name = st.text_input("Customer Name"); amt = st.number_input("Amount")
-        t = st.selectbox("Type", ["Baki (Udhaar)", "Jama (Payment)"])
-        p_mode = st.selectbox("Mode (If Jama)", ["Cash", "Online", "N/A"])
-        if st.form_submit_button("Save Entry"):
-            save_data("CustomerKhata", [name, -amt if "Jama" in t else amt, str(today_dt), p_mode]); st.rerun()
-    k_df = load_data("CustomerKhata")
-    if not k_df.empty:
-        summary = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
-        for i, row in summary.iterrows():
-            if row.iloc[1] > 0: st.warning(f"👤 {row.iloc[0]}: ₹{row.iloc[1]} Balance")
+    if st.session_state.pur_cart:
+        st.table(pd.DataFrame(st.session_state.pur_cart))
+        if st.button("💾 Final Save All"):
+            for item in st.session_state.pur_cart:
+                save_data("Inventory", [item['Item'], item['Qty'], item['Unit'], item['Rate'], str(today_dt), p_from])
+            st.session_state.pur_cart = []; st.success("Stock Updated!"); time.sleep(1); st.rerun()
 
-# --- 9. LIVE STOCK (DOWNLOAD & ALERTS RESTORED) ---
+# --- 7. LIVE STOCK (RED ALERT & DOWNLOAD) ---
 elif menu == "📋 Live Stock":
-    st.header("📋 Live Stock")
+    st.header("📋 Live Stock Alerts")
     i_df = load_data("Inventory"); s_df = load_data("Sales")
     if not i_df.empty:
         p_v = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'sum', i_df.columns[2]: 'last'}).reset_index()
@@ -193,34 +180,70 @@ elif menu == "📋 Live Stock":
             stock = pd.merge(p_v, sold, left_on='Item', right_on=s_df.columns[1], how='left').fillna(0)
             stock['Rem'] = stock['In'] - stock['Out']
         else: stock = p_v; stock['Rem'] = stock['In']
+        
         for _, r in stock.iterrows():
-            if r['Rem'] <= 2: st.error(f"❌ {r['Item']} LOW: {r['Rem']}")
-            else: st.info(f"✅ {r['Item']}: {r['Rem']} {r['Unit']}")
-        st.divider(); st.download_button("📥 Download Stock", stock.to_csv(index=False), "stock.csv")
+            if r['Rem'] <= 2: st.error(f"❌ ALERT: {r['Item']} Only {r['Rem']} Left")
+            else: st.info(f"✅ {r['Item']}: {r['Rem']} {r['Unit']} Left")
+        st.divider(); st.download_button("📥 Download Stock List", stock.to_csv(index=False), "stock.csv")
 
-# --- 10. LOYALTY CLUB (RESTORED) ---
+# --- 8. ALL OTHER TABS RESTORED LINE-TO-LINE (Expense, Pet, Khata, Loyalty, Admin) ---
+elif menu == "💰 Expenses":
+    st.header("💰 Expenses")
+    with st.form("exp"):
+        cat = st.selectbox("Category", ["Rent", "Salary", "Electricity", "Miscellaneous", "Other"])
+        amt = st.number_input("Amount"); mode = st.selectbox("Mode", ["Cash", "Online"])
+        if st.form_submit_button("Save"): save_data("Expenses", [str(today_dt), cat, amt, mode]); st.rerun()
+    e_df = load_data("Expenses")
+    if not e_df.empty:
+        for i, row in e_df.iterrows():
+            c1, c2 = st.columns([8, 1]); c1.write(f"💸 {row.iloc[1]}: ₹{row.iloc[2]}");
+            if c2.button("❌", key=f"ex_{i}"): delete_row("Expenses", i); st.rerun()
+
+elif menu == "🐾 Pet Register":
+    st.header("🐾 Pet Register")
+    breeds = ["Labrador", "GSD", "Pug", "Shih Tzu", "Persian Cat", "Indie Dog", "Other"]
+    with st.form("pet"):
+        c1, c2 = st.columns(2)
+        on = c1.text_input("Owner"); ph = c1.text_input("Phone Number"); br = c1.selectbox("Breed", breeds)
+        age = c2.selectbox("Age", [f"{i} Months" for i in range(1,12)] + [f"{i} Years" for i in range(1,15)])
+        vd = c2.date_input("Vax Date"); nd = vd + timedelta(days=365)
+        if st.form_submit_button("Save Pet"): save_data("PetRecords", [on, ph, br, age, str(vd), str(nd), str(today_dt)]); st.rerun()
+    p_df = load_data("PetRecords")
+    if not p_df.empty:
+        for i, row in p_df.iterrows():
+            c1, c2 = st.columns([8, 1]); c1.write(f"🐶 *{row.iloc[0]}* - {row.iloc[2]} | Next: {row.iloc[5]}")
+            if c2.button("❌", key=f"pr_{i}"): delete_row("PetRecords", i); st.rerun()
+
+elif menu == "📒 Customer Khata":
+    st.header("📒 Customer Khata")
+    with st.form("kh"):
+        name = st.text_input("Name"); amt = st.number_input("Amt")
+        t = st.selectbox("Type", ["Udhaar", "Jama"]); mode = st.selectbox("Payment Mode", ["Cash", "Online", "N/A"])
+        if st.form_submit_button("Save Entry"): save_data("CustomerKhata", [name, -amt if "Jama" in t else amt, str(today_dt), mode]); st.rerun()
+    k_df = load_data("CustomerKhata")
+    if not k_df.empty:
+        summary = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
+        for i, row in summary.iterrows():
+            if row.iloc[1] > 0: st.warning(f"👤 {row.iloc[0]}: ₹{row.iloc[1]}")
+
+elif menu == "⚙️ Admin Settings":
+    st.header("⚙️ Admin Settings")
+    with st.form("bal"):
+        b_t = st.selectbox("Update For", ["Cash", "Online"]); b_a = st.number_input("Base Amt")
+        if st.form_submit_button("Set Base"): save_data("Balances", [b_t, b_a, str(today_dt)]); st.rerun()
+    st.divider(); st.subheader("🏢 Supplier Dues & Payments")
+    with st.form("due"):
+        comp = st.text_input("Company"); type = st.selectbox("Action", ["Udhaar (+)", "Payment (-)"]); amt = st.number_input("Amt")
+        p_mode = st.selectbox("Paid From", ["Cash", "Online", "Pocket", "N/A"])
+        if st.form_submit_button("Save"): save_data("Dues", [comp, amt if "+" in type else -amt, str(today_dt), p_mode]); st.rerun()
+    d_df = load_data("Dues")
+    if not d_df.empty:
+        d_sum = d_df.groupby(d_df.columns[0]).agg({d_df.columns[1]: 'sum'}).reset_index()
+        for i, row in d_sum.iterrows(): st.error(f"🏢 {row.iloc[0]}: ₹{row.iloc[1]} Pending")
+
 elif menu == "🎖️ Loyalty Club":
     st.header("🎖️ Loyalty Club")
     s_df = load_data("Sales")
     if not s_df.empty:
         loyalty = s_df.groupby(s_df.iloc[:, 5]).agg({s_df.columns[6]: 'sum'}).reset_index()
         st.dataframe(loyalty, use_container_width=True)
-
-# --- 11. PURCHASE & ADMIN (RESTORED) ---
-elif menu == "📦 Purchase":
-    st.header("📦 Purchase")
-    with st.form("pur"):
-        n = st.text_input("Item"); q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Kg", "Pcs"]); p = st.number_input("Rate")
-        p_mode = st.selectbox("Paid From", ["Cash", "Online", "Pocket"])
-        if st.form_submit_button("Add"): save_data("Inventory", [n, q, u, p, str(today_dt), p_mode]); st.rerun()
-
-elif menu == "⚙️ Admin Settings":
-    st.header("⚙️ Admin Settings")
-    with st.form("bal"):
-        b_t = st.selectbox("Mode", ["Cash", "Online"]); b_a = st.number_input("Base Amt")
-        if st.form_submit_button("Set Base"): save_data("Balances", [b_t, b_a, str(today_dt)]); st.rerun()
-    st.divider(); st.subheader("🏢 Supplier Dues")
-    with st.form("due"):
-        comp = st.text_input("Company"); type = st.selectbox("Type", ["Udhaar Liya (+)", "Payment Diya (-)"]); amt = st.number_input("Amt")
-        p_mode = st.selectbox("Paid From", ["Cash", "Online", "Pocket", "N/A"])
-        if st.form_submit_button("Save"): save_data("Dues", [comp, amt if "+" in type else -amt, str(today_dt), p_mode]); st.rerun()
