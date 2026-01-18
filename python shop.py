@@ -60,28 +60,34 @@ today_dt = datetime.now().date()
 curr_m = datetime.now().month
 curr_m_name = datetime.now().strftime('%B')
 
-# --- 4. DASHBOARD (REPORTS & BACKLOG FIXED) ---
+# --- 4. DASHBOARD (PURCHASE BACKLOG & MONTHLY TEXT REPORT FIXED) ---
 if menu == "📊 Dashboard":
     st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances"); k_df = load_data("CustomerKhata"); i_df = load_data("Inventory"); d_df = load_data("Dues")
     
-    # --- GALLA & BANK BOXES CALCULATION ---
+    # 1. Base Balances
     bc = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Cash"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
     bo = pd.to_numeric(b_df[b_df.iloc[:, 0] == "Online"].iloc[:, 1], errors='coerce').sum() if not b_df.empty else 0
+    
+    # 2. Sales (+)
     sc = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
     so = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Online"].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
+    
+    # 3. Expenses (-)
     ec = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Cash"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
     eo = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Online"].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
     
-    # Purana aur Naya Saara Purchase Total
+    # 4. PURANA PURCHASE (+) NAYA PURCHASE [FIXED]
     pc = 0; po = 0
     if not i_df.empty:
-        i_df.iloc[:, 1] = pd.to_numeric(i_df.iloc[:, 1], errors='coerce').fillna(0)
-        i_df.iloc[:, 3] = pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)
-        pc = (i_df[i_df.iloc[:, 5] == "Cash"].iloc[:, 1] * i_df[i_df.iloc[:, 5] == "Cash"].iloc[:, 3]).sum()
-        po = (i_df[i_df.iloc[:, 5] == "Online"].iloc[:, 1] * i_df[i_df.iloc[:, 5] == "Online"].iloc[:, 3]).sum()
+        # Pura data load karke multiply karna bina kisi filter ke
+        temp_inv = i_df.copy()
+        temp_inv.iloc[:, 1] = pd.to_numeric(temp_inv.iloc[:, 1], errors='coerce').fillna(0)
+        temp_inv.iloc[:, 3] = pd.to_numeric(temp_inv.iloc[:, 3], errors='coerce').fillna(0)
+        pc = (temp_inv[temp_inv.iloc[:, 5] == "Cash"].iloc[:, 1] * temp_inv[temp_inv.iloc[:, 5] == "Cash"].iloc[:, 3]).sum()
+        po = (temp_inv[temp_inv.iloc[:, 5] == "Online"].iloc[:, 1] * temp_inv[temp_inv.iloc[:, 5] == "Online"].iloc[:, 3]).sum()
     
-    # Supplier Payments Deduction
+    # 5. Supplier Payments (-)
     dpc = abs(pd.to_numeric(d_df[(d_df.iloc[:, 1] < 0) & (d_df.iloc[:, 3] == "Cash")].iloc[:, 1], errors='coerce').sum()) if not d_df.empty and len(d_df.columns)>3 else 0
     dpo = abs(pd.to_numeric(d_df[(d_df.iloc[:, 1] < 0) & (d_df.iloc[:, 3] == "Online")].iloc[:, 1], errors='coerce').sum()) if not d_df.empty and len(d_df.columns)>3 else 0
     total_u = pd.to_numeric(k_df.iloc[:, 1], errors='coerce').sum() if not k_df.empty else 0
@@ -103,28 +109,37 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
 
-    # --- DAILY & MONTHLY METRICS SECTION ---
-    def show_metrics(df_s, df_e, df_i, title, p_type="today"):
-        # Fix Date Column in DataFrames
-        for df in [df_s, df_e, df_i]:
-            if not df.empty and 'Date' not in df.columns: 
-                df['Date'] = pd.to_datetime(df.iloc[:, -1], errors='coerce')
-        
-        m = (df_s['Date'].dt.date == today_dt) if (not df_s.empty and p_type == "today") else (df_s['Date'].dt.month == curr_m if not df_s.empty else False)
-        mi = (df_i['Date'].dt.date == today_dt) if (not df_i.empty and p_type == "today") else (df_i['Date'].dt.month == curr_m if not df_i.empty else False)
-        me = (df_e['Date'].dt.date == today_dt) if (not df_e.empty and p_type == "today") else (df_e['Date'].dt.month == curr_m if not df_e.empty else False)
-        
-        ts = pd.to_numeric(df_s[m].iloc[:, 3], errors='coerce').sum() if not df_s.empty else 0
-        tp = pd.to_numeric(df_i[mi].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not df_i.empty else 0
-        te = pd.to_numeric(df_e[me].iloc[:, 2], errors='coerce').sum() if not df_e.empty else 0
-        tprof = pd.to_numeric(df_s[m].iloc[:, 7], errors='coerce').sum() if not df_s.empty and len(df_s.columns)>7 else 0
-        
-        st.subheader(f"📈 {title} Report"); c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Sale", f"₹{ts}"); c2.metric("Total Purchase", f"₹{tp}"); c3.metric("Total Expense", f"₹{te}"); c4.metric("Total Profit", f"₹{tprof}")
-
-    show_metrics(s_df, e_df, i_df, f"Daily ({today_dt})", "today")
-    st.divider(); show_metrics(s_df, e_df, i_df, f"Monthly ({curr_m_name})", "month")
+    # --- DAILY METRICS (BOXES) ---
+    st.divider()
+    st.subheader(f"📈 Daily Report ({today_dt})")
+    m_day = (s_df['Date'].dt.date == today_dt) if not s_df.empty else False
+    mi_day = (i_df['Date'].dt.date == today_dt) if not i_df.empty else False
+    me_day = (e_df['Date'].dt.date == today_dt) if not e_df.empty else False
     
+    ts_d = pd.to_numeric(s_df[m_day].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
+    tp_d = pd.to_numeric(i_df[mi_day].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not i_df.empty else 0
+    te_d = pd.to_numeric(e_df[me_day].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
+    tp_prof = pd.to_numeric(s_df[m_day].iloc[:, 7], errors='coerce').sum() if not s_df.empty and len(s_df.columns)>7 else 0
+    
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Today Sale", f"₹{ts_d}"); c2.metric("Today Purchase", f"₹{tp_d}"); c3.metric("Today Expense", f"₹{te_d}"); c4.metric("Today Profit", f"₹{tp_prof}")
+
+    # --- MONTHLY REPORT (TEXT/LIST ONLY - NO BOXES) ---
+    st.divider()
+    st.subheader(f"🗓️ Monthly Summary ({curr_m_name})")
+    m_mon = (s_df['Date'].dt.month == curr_m) if not s_df.empty else False
+    mi_mon = (i_df['Date'].dt.month == curr_m) if not i_df.empty else False
+    me_mon = (e_df['Date'].dt.month == curr_m) if not e_df.empty else False
+    
+    ts_m = pd.to_numeric(s_df[m_mon].iloc[:, 3], errors='coerce').sum() if not s_df.empty else 0
+    tp_m = pd.to_numeric(i_df[mi_mon].apply(lambda x: pd.to_numeric(x.iloc[1])*pd.to_numeric(x.iloc[3]), axis=1), errors='coerce').sum() if not i_df.empty else 0
+    te_m = pd.to_numeric(e_df[me_mon].iloc[:, 2], errors='coerce').sum() if not e_df.empty else 0
+    tp_prof_m = pd.to_numeric(s_df[m_mon].iloc[:, 7], errors='coerce').sum() if not s_df.empty and len(s_df.columns)>7 else 0
+    
+    st.write(f"🔹 *Total Monthly Sale:* ₹{ts_m}")
+    st.write(f"🔹 *Total Monthly Purchase:* ₹{tp_m}")
+    st.write(f"🔹 *Total Monthly Expense:* ₹{te_m}")
+    st.write(f"✅ *Net Monthly Profit:* ₹{tp_prof_m}")    
     # 5. Supplier Payments (-)
     dpc = abs(pd.to_numeric(d_df[(d_df.iloc[:, 1] < 0) & (d_df.iloc[:, 3] == "Cash")].iloc[:, 1], errors='coerce').sum()) if not d_df.empty and len(d_df.columns)>3 else 0
     dpo = abs(pd.to_numeric(d_df[(d_df.iloc[:, 1] < 0) & (d_df.iloc[:, 3] == "Online")].iloc[:, 1], errors='coerce').sum()) if not d_df.empty and len(d_df.columns)>3 else 0
@@ -231,6 +246,7 @@ elif menu == "⚙️ Admin Settings":
         st.subheader("📑 History"); st.dataframe(d_df[d_df['Date'].dt.date == today_dt])
         summary = d_df.groupby(d_df.columns[0]).agg({d_df.columns[1]: 'sum'}).reset_index()
         for i, row in summary.iterrows(): st.error(f"🏢 {row.iloc[0]}: ₹{row.iloc[1]} Pending")
+
 
 
 
