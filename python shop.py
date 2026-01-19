@@ -233,7 +233,11 @@ if menu == "📊 Dashboard":
                 st.rerun()
     
     st.divider()
-    st.subheader("📈 Today's Report")
+    col_header1, col_header2 = st.columns(2)
+    with col_header1:
+        st.subheader(f"📈 Today's Report - {today_dt.strftime('%d %b %Y')}")
+    with col_header2:
+        st.subheader(f"🗓️ {curr_m_name} Report")
     
     s_today = s_df[s_df['Date'] == today_dt] if not s_df.empty and 'Date' in s_df.columns else pd.DataFrame()
     i_today = i_df[i_df['Date'] == today_dt] if not i_df.empty and 'Date' in i_df.columns else pd.DataFrame()
@@ -250,11 +254,53 @@ if menu == "📊 Dashboard":
     today_exp = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty and len(e_today.columns) > 2 else 0
     today_profit = pd.to_numeric(s_today.iloc[:, 7], errors='coerce').sum() if not s_today.empty and len(s_today.columns) > 7 else 0
     
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("💰 Sale", f"₹{today_sale:,.2f}")
-    c2.metric("📦 Purchase", f"₹{today_pur:,.2f}")
-    c3.metric("💸 Expense", f"₹{today_exp:,.2f}")
-    c4.metric("📈 Profit", f"₹{today_profit:,.2f}")
+    # Calculate monthly data
+    s_month = pd.DataFrame()
+    i_month = pd.DataFrame()
+    e_month = pd.DataFrame()
+    
+    if not s_df.empty and 'Date' in s_df.columns:
+        s_df['Month'] = pd.to_datetime(s_df['Date'], errors='coerce').dt.month
+        s_df['Year'] = pd.to_datetime(s_df['Date'], errors='coerce').dt.year
+        s_month = s_df[(s_df['Month'] == curr_m) & (s_df['Year'] == today_dt.year)]
+    
+    if not i_df.empty and 'Date' in i_df.columns:
+        i_df['Month'] = pd.to_datetime(i_df['Date'], errors='coerce').dt.month
+        i_df['Year'] = pd.to_datetime(i_df['Date'], errors='coerce').dt.year
+        i_month = i_df[(i_df['Month'] == curr_m) & (i_df['Year'] == today_dt.year)]
+    
+    if not e_df.empty and 'Date' in e_df.columns:
+        e_df['Month'] = pd.to_datetime(e_df['Date'], errors='coerce').dt.month
+        e_df['Year'] = pd.to_datetime(e_df['Date'], errors='coerce').dt.year
+        e_month = e_df[(e_df['Month'] == curr_m) & (e_df['Year'] == today_dt.year)]
+    
+    month_sale = pd.to_numeric(s_month.iloc[:, 3], errors='coerce').sum() if not s_month.empty and len(s_month.columns) > 3 else 0
+    
+    month_pur = 0
+    if not i_month.empty and len(i_month.columns) > 3:
+        qty_vals = pd.to_numeric(i_month.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
+        rate_vals = pd.to_numeric(i_month.iloc[:, 3], errors='coerce').fillna(0)
+        month_pur = (qty_vals * rate_vals).sum()
+    
+    month_exp = pd.to_numeric(e_month.iloc[:, 2], errors='coerce').sum() if not e_month.empty and len(e_month.columns) > 2 else 0
+    month_profit = pd.to_numeric(s_month.iloc[:, 7], errors='coerce').sum() if not s_month.empty and len(s_month.columns) > 7 else 0
+    
+    # Display both reports side by side
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        c1, c2 = st.columns(2)
+        c1.metric("💰 Sale", f"₹{today_sale:,.2f}")
+        c2.metric("📦 Purchase", f"₹{today_pur:,.2f}")
+        c1.metric("💸 Expense", f"₹{today_exp:,.2f}")
+        c2.metric("📈 Profit", f"₹{today_profit:,.2f}")
+    
+    with col2:
+        c1, c2 = st.columns(2)
+        c1.metric("💰 Sale", f"₹{month_sale:,.2f}")
+        c2.metric("📦 Purchase", f"₹{month_pur:,.2f}")
+        c1.metric("💸 Expense", f"₹{month_exp:,.2f}")
+        c2.metric("📈 Profit", f"₹{month_profit:,.2f}")
 
 # --- 6. BILLING ---
 elif menu == "🧾 Billing":
@@ -488,24 +534,72 @@ elif menu == "📋 Live Stock":
     if not i_df.empty and len(i_df.columns) > 3:
         i_df['qty_v'] = pd.to_numeric(i_df.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
         i_df['rate_v'] = pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)
-        t_v = (i_df['qty_v'] * i_df['rate_v']).sum()
+        i_df['value'] = i_df['qty_v'] * i_df['rate_v']
+        t_v = i_df['value'].sum()
+        
         st.subheader(f"💰 Total Stock Value: ₹{t_v:,.2f}")
         
-        stock_summary = i_df.groupby(i_df.columns[0]).agg({i_df.columns[1]: 'last', i_df.columns[3]: 'last'}).reset_index()
+        stock_summary = i_df.groupby(i_df.columns[0]).agg({
+            i_df.columns[1]: 'last',
+            i_df.columns[3]: 'last',
+            'qty_v': 'last',
+            'value': 'last'
+        }).reset_index()
+        stock_summary.columns = ['Item', 'Quantity', 'Rate', 'Qty_Numeric', 'Value']
+        
+        # Separate low stock items
+        low_stock_items = []
+        normal_stock_items = []
         
         for _, row in stock_summary.iterrows():
-            qv = float(str(row.iloc[1]).split()[0]) if len(str(row.iloc[1]).split()) > 0 else 0
-            if qv < 2: 
-                st.error(f"🚨 LOW STOCK: {row.iloc[0]} ({row.iloc[1]})")
-            else: 
-                st.info(f"✅ {row.iloc[0]}: {row.iloc[1]}")
+            item_dict = {
+                'Item': row['Item'],
+                'Quantity': row['Quantity'],
+                'Rate': f"₹{row['Rate']:.2f}",
+                'Stock Value': f"₹{row['Value']:.2f}",
+                'Qty_Numeric': row['Qty_Numeric']
+            }
+            
+            if row['Qty_Numeric'] < 2:
+                low_stock_items.append(item_dict)
+            else:
+                normal_stock_items.append(item_dict)
+        
+        # Display LOW STOCK section
+        if low_stock_items:
+            st.divider()
+            st.subheader("🚨 LOW STOCK ALERT")
+            
+            low_stock_df = pd.DataFrame(low_stock_items)
+            low_stock_df = low_stock_df.drop('Qty_Numeric', axis=1)
+            
+            for _, row in low_stock_df.iterrows():
+                st.error(f"🚨 **{row['Item']}** - {row['Quantity']} - Rate: {row['Rate']} - Value: {row['Stock Value']}")
+            
+            # Download button for low stock
+            st.divider()
+            csv = low_stock_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Low Stock Report",
+                data=csv,
+                file_name=f"low_stock_report_{today_dt}.csv",
+                mime="text/csv",
+                type="primary"
+            )
+        
+        # Display NORMAL STOCK
+        if normal_stock_items:
+            st.divider()
+            st.subheader("✅ Available Stock")
+            for item in normal_stock_items:
+                st.info(f"✅ **{item['Item']}** - {item['Quantity']} - Rate: {item['Rate']} - Value: {item['Stock Value']}")
 
 # --- 9. EXPENSES ---
 elif menu == "💰 Expenses":
     st.header("💰 Expense Entry")
     
     with st.form("ex"):
-        cat = st.selectbox("Category", ["Rent", "Salary", "Food", "Transport", "Utilities", "Other"])
+        cat = st.selectbox("Category", ["Rent", "Salary", "Food", "Transport", "Utilities", "Miscellaneous", "Other"])
         amt = st.number_input("Amount", min_value=0.0)
         m = st.selectbox("Mode", ["Cash", "Online"])
         note = st.text_input("Note (Optional)")
@@ -602,11 +696,40 @@ elif menu == "🏢 Supplier Dues":
     
     d_df = load_data("Dues")
     if not d_df.empty and len(d_df.columns) > 1:
-        st.subheader("📊 Supplier Dues Summary")
+        st.divider()
+        st.subheader("📊 Supplier Balance Summary")
+        
+        # Calculate balance per supplier
         sum_df = d_df.groupby(d_df.columns[0]).agg({d_df.columns[1]: 'sum'}).reset_index()
-        sum_df.columns = ['Supplier', 'Due Amount']
-        sum_df = sum_df[sum_df['Due Amount'] != 0].sort_values('Due Amount', ascending=False)
-        st.table(sum_df)
+        sum_df.columns = ['Supplier', 'Balance']
+        
+        # Separate those who owe money (positive balance) and those we owe (negative)
+        suppliers_owe_us = sum_df[sum_df['Balance'] < 0].copy()
+        suppliers_owe_us['Balance'] = -suppliers_owe_us['Balance']
+        suppliers_owe_us = suppliers_owe_us.sort_values('Balance', ascending=False)
+        
+        we_owe_suppliers = sum_df[sum_df['Balance'] > 0].copy()
+        we_owe_suppliers = we_owe_suppliers.sort_values('Balance', ascending=False)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 💰 We Paid Less (We Owe)")
+            if not we_owe_suppliers.empty:
+                for _, row in we_owe_suppliers.iterrows():
+                    st.error(f"📤 **{row['Supplier']}**: ₹{row['Balance']:,.2f}")
+                st.metric("Total We Owe", f"₹{we_owe_suppliers['Balance'].sum():,.2f}")
+            else:
+                st.success("✅ No pending dues!")
+        
+        with col2:
+            st.markdown("### 💵 They Paid Less (They Owe)")
+            if not suppliers_owe_us.empty:
+                for _, row in suppliers_owe_us.iterrows():
+                    st.info(f"📥 **{row['Supplier']}**: ₹{row['Balance']:,.2f}")
+                st.metric("Total They Owe", f"₹{suppliers_owe_us['Balance'].sum():,.2f}")
+            else:
+                st.info("No receivables")
         
         st.divider()
         st.subheader("📋 All Transactions")
