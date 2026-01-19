@@ -150,6 +150,27 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
     
+    # BALANCE CORRECTION TOOL
+    with st.expander("🔧 Balance Correction (Admin Only)"):
+        st.warning("⚠️ Use only if balance is incorrect!")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Cash Balance")
+            new_cash = st.number_input("Set Cash Balance", value=float(cash_bal), step=1.0)
+            if st.button("Update Cash"):
+                save_data("Balances", ["Cash", new_cash])
+                st.success(f"✅ Cash balance set to ₹{new_cash:,.2f}")
+                time.sleep(1)
+                st.rerun()
+        with col2:
+            st.subheader("Online Balance")
+            new_online = st.number_input("Set Online Balance", value=float(online_bal), step=1.0)
+            if st.button("Update Online"):
+                save_data("Balances", ["Online", new_online])
+                st.success(f"✅ Online balance set to ₹{new_online:,.2f}")
+                time.sleep(1)
+                st.rerun()
+    
     # TODAY'S REPORT
     st.divider()
     st.subheader("📈 Today's Report")
