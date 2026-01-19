@@ -32,33 +32,42 @@ def load_data(sheet_name):
         return df
     except: return pd.DataFrame()
 
-def update_balance(amount, mode, operation='add'):
-    """Update Galla or Online balance"""
+def get_current_balance(mode):
+    """Get current balance from Balances sheet"""
     try:
         b_df = load_data("Balances")
+        if b_df.empty or len(b_df.columns) < 2:
+            return 0.0
         
-        if b_df.empty:
-            save_data("Balances", ["Cash", 0])
-            save_data("Balances", ["Online", 0])
-            b_df = load_data("Balances")
+        rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
+        if len(rows) > 0:
+            return float(pd.to_numeric(rows.iloc[0, 1], errors='coerce'))
+        return 0.0
+    except:
+        return 0.0
+
+def update_balance(amount, mode, operation='add'):
+    """Update Galla or Online balance - returns True if successful"""
+    if mode not in ["Cash", "Online"]:
+        return True  # For Pocket/Hand/Udhaar, no balance update needed
+    
+    try:
+        current_bal = get_current_balance(mode)
         
-        if mode == "Cash":
-            idx = b_df[b_df.iloc[:, 0] == "Cash"].index
-            if len(idx) > 0:
-                current = pd.to_numeric(b_df.loc[idx[0], b_df.columns[1]], errors='coerce')
-                new_bal = current + amount if operation == 'add' else current - amount
-                # Note: This assumes your Google Apps Script can handle updates
-                save_data("Balances", ["Cash", new_bal])
-                return True
-        elif mode == "Online":
-            idx = b_df[b_df.iloc[:, 0] == "Online"].index
-            if len(idx) > 0:
-                current = pd.to_numeric(b_df.loc[idx[0], b_df.columns[1]], errors='coerce')
-                new_bal = current + amount if operation == 'add' else current - amount
-                save_data("Balances", ["Online", new_bal])
-                return True
+        if operation == 'add':
+            new_bal = current_bal + amount
+        else:  # subtract
+            new_bal = current_bal - amount
+        
+        # Update in Google Sheets
+        success = save_data("Balances", [mode, new_bal])
+        
+        if success:
+            st.success(f"✅ {mode} Balance: ₹{current_bal:,.2f} → ₹{new_bal:,.2f} ({'+' if operation=='add' else '-'}₹{amount:,.2f})")
+        
+        return success
     except Exception as e:
-        st.error(f"Balance update error: {str(e)}")
+        st.error(f"⚠️ Balance update error: {str(e)}")
         return False
 
 def archive_daily_data():
@@ -107,18 +116,12 @@ is_weekend = datetime.now().weekday() >= 5
 # --- 5. DASHBOARD ---
 if menu == "📊 Dashboard":
     st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
-    s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances")
-    k_df = load_data("CustomerKhata"); i_df = load_data("Inventory"); d_df = load_data("Dues")
+    s_df = load_data("Sales"); e_df = load_data("Expenses"); k_df = load_data("CustomerKhata"); i_df = load_data("Inventory")
     
-    # Get current balances
-    cash_bal = 0; online_bal = 0
-    if not b_df.empty and len(b_df.columns) > 1:
-        cash_rows = b_df[b_df.iloc[:, 0] == "Cash"]
-        online_rows = b_df[b_df.iloc[:, 0] == "Online"]
-        if len(cash_rows) > 0:
-            cash_bal = pd.to_numeric(cash_rows.iloc[0, 1], errors='coerce')
-        if len(online_rows) > 0:
-            online_bal = pd.to_numeric(online_rows.iloc[0, 1], errors='coerce')
+    # Get CURRENT balances from Balances sheet
+    cash_bal = get_current_balance("Cash")
+    online_bal = get_current_balance("Online")
+    total_bal = cash_bal + online_bal
     
     # Calculate stock value
     total_stock_val = 0
@@ -139,7 +142,7 @@ if menu == "📊 Dashboard":
             <p style="color: #1976D2; margin: 0;">🏦 Online</p> <h3 style="margin: 0;">₹{online_bal:,.2f}</h3>
         </div>
         <div style="background-color: #F3E5F5; padding: 15px; border-radius: 10px; border-left: 8px solid #7B1FA2; width: 19%;">
-            <p style="color: #7B1FA2; margin: 0;">⚡ Total Balance</p> <h3 style="margin: 0;">₹{cash_bal + online_bal:,.2f}</h3>
+            <p style="color: #7B1FA2; margin: 0;">⚡ Total Balance</p> <h3 style="margin: 0;">₹{total_bal:,.2f}</h3>
         </div>
         <div style="background-color: #FFF3E0; padding: 15px; border-radius: 10px; border-left: 8px solid #F57C00; width: 19%;">
             <p style="color: #F57C00; margin: 0;">📒 Udhaar</p> <h3 style="margin: 0;">₹{total_u:,.2f}</h3>
@@ -156,16 +159,16 @@ if menu == "📊 Dashboard":
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Cash Balance")
-            new_cash = st.number_input("Set Cash Balance", value=float(cash_bal), step=1.0)
-            if st.button("Update Cash"):
+            new_cash = st.number_input("Set Cash Balance", value=float(cash_bal), step=1.0, key="cash_corr")
+            if st.button("Update Cash", key="update_cash"):
                 save_data("Balances", ["Cash", new_cash])
                 st.success(f"✅ Cash balance set to ₹{new_cash:,.2f}")
                 time.sleep(1)
                 st.rerun()
         with col2:
             st.subheader("Online Balance")
-            new_online = st.number_input("Set Online Balance", value=float(online_bal), step=1.0)
-            if st.button("Update Online"):
+            new_online = st.number_input("Set Online Balance", value=float(online_bal), step=1.0, key="online_corr")
+            if st.button("Update Online", key="update_online"):
                 save_data("Balances", ["Online", new_online])
                 st.success(f"✅ Online balance set to ₹{new_online:,.2f}")
                 time.sleep(1)
@@ -206,9 +209,7 @@ if menu == "📊 Dashboard":
     st.divider()
     st.subheader(f"🗓️ {curr_m_name} Summary")
     
-    s_month = pd.DataFrame()
-    i_month = pd.DataFrame()
-    e_month = pd.DataFrame()
+    s_month = pd.DataFrame(); i_month = pd.DataFrame(); e_month = pd.DataFrame()
     
     if not s_df.empty and 'Date' in s_df.columns:
         s_df['Month'] = pd.to_datetime(s_df['Date'], errors='coerce').dt.month
@@ -273,16 +274,14 @@ elif menu == "🧾 Billing":
             for item in st.session_state.bill_cart:
                 save_data("Sales", [str(today_dt), item['Item'], item['Qty'], item['Price'], pay_m, f"{c_name}({c_ph})", item['Pts'], item['Profit']])
             
+            # Update balance for Cash/Online
             if pay_m in ["Cash", "Online"]:
-                if update_balance(total_amt, pay_m, 'add'):
-                    st.success(f"✅ Bill saved! {pay_m} balance updated by +₹{total_amt:,.2f}")
-                else:
-                    st.warning("⚠️ Bill saved but balance update failed. Please check manually.")
+                update_balance(total_amt, pay_m, 'add')
             else:
                 st.success("✅ Bill saved as Udhaar!")
             
             st.session_state.bill_cart = []
-            time.sleep(1)
+            time.sleep(1.5)
             st.rerun()
 
 # --- 7. PURCHASE ---
@@ -300,15 +299,13 @@ elif menu == "📦 Purchase":
                 total_cost = q * r
                 save_data("Inventory", [n, f"{q} {u}", "Stock", r, str(today_dt), m])
                 
+                # Update balance for Cash/Online
                 if m in ["Cash", "Online"]:
-                    if update_balance(total_cost, m, 'subtract'):
-                        st.success(f"✅ Stock added! {m} balance deducted by -₹{total_cost:,.2f}")
-                    else:
-                        st.warning("⚠️ Stock added but balance update failed. Please check manually.")
+                    update_balance(total_cost, m, 'subtract')
                 else:
                     st.success(f"✅ Stock added! (Paid from {m})")
                 
-                time.sleep(1)
+                time.sleep(1.5)
                 st.rerun()
             else:
                 st.error("❌ Please enter valid item name, quantity and rate!")
@@ -353,11 +350,10 @@ elif menu == "💰 Expenses":
             if amt > 0:
                 save_data("Expenses", [str(today_dt), cat, amt, m, note])
                 
-                if update_balance(amt, m, 'subtract'):
-                    st.success(f"✅ Expense saved! {m} balance deducted by -₹{amt:,.2f}")
-                else:
-                    st.warning("⚠️ Expense saved but balance update failed. Please check manually.")
-                time.sleep(1)
+                # Update balance for Cash/Online
+                update_balance(amt, m, 'subtract')
+                
+                time.sleep(1.5)
                 st.rerun()
     
     e_df = load_data("Expenses")
@@ -397,14 +393,13 @@ elif menu == "📒 Customer Khata":
                 final_amt = a if "+" in t else -a
                 save_data("CustomerKhata", [n, final_amt, str(today_dt), m])
                 
+                # If payment received (Jama), update balance
                 if "-" in t and m in ["Cash", "Online"]:
-                    if update_balance(a, m, 'add'):
-                        st.success(f"✅ Payment received! {m} balance increased by +₹{a:,.2f}")
-                    else:
-                        st.warning("⚠️ Entry saved but balance update failed. Please check manually.")
+                    update_balance(a, m, 'add')
                 else:
                     st.success("✅ Entry saved!")
-                time.sleep(1)
+                
+                time.sleep(1.5)
                 st.rerun()
     
     k_df = load_data("CustomerKhata")
@@ -428,14 +423,13 @@ elif menu == "🏢 Supplier Dues":
                 final_amt = a if "+" in t else -a
                 save_data("Dues", [s, final_amt, str(today_dt), m])
                 
+                # If payment made, update balance
                 if "-" in t and m in ["Cash", "Online"]:
-                    if update_balance(a, m, 'subtract'):
-                        st.success(f"✅ Payment made! {m} balance deducted by -₹{a:,.2f}")
-                    else:
-                        st.warning("⚠️ Entry saved but balance update failed. Please check manually.")
+                    update_balance(a, m, 'subtract')
                 else:
                     st.success("✅ Entry saved!")
-                time.sleep(1)
+                
+                time.sleep(1.5)
                 st.rerun()
     
     d_df = load_data("Dues")
