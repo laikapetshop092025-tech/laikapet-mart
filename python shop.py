@@ -64,12 +64,18 @@ def get_balance_from_sheet(mode):
         return 0.0
 
 def get_current_balance(mode):
-    """Get current balance - use manual override if set"""
-    if mode == "Cash" and st.session_state.manual_cash is not None:
+    """Get current balance - only from session state"""
+    if mode == "Cash":
+        if st.session_state.manual_cash is None:
+            # Initialize from sheets only once
+            st.session_state.manual_cash = get_balance_from_sheet("Cash")
         return st.session_state.manual_cash
-    if mode == "Online" and st.session_state.manual_online is not None:
+    elif mode == "Online":
+        if st.session_state.manual_online is None:
+            # Initialize from sheets only once
+            st.session_state.manual_online = get_balance_from_sheet("Online")
         return st.session_state.manual_online
-    return get_balance_from_sheet(mode)
+    return 0.0
 
 def set_balance(mode, amount):
     """Set balance manually and save to sheets"""
@@ -157,20 +163,16 @@ if st.session_state.last_check_date != today_dt:
 menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "📒 Customer Khata", "🏢 Supplier Dues", "👑 Royalty Points"])
 st.sidebar.divider()
 
-# Sync button
-if st.sidebar.button("🔄 Sync with Sheets", use_container_width=True):
-    # Clear manual overrides and load fresh from sheets
-    st.session_state.manual_cash = None
-    st.session_state.manual_online = None
-    
-    # Force reload
+# Sync button - Only use if you want to RESET to sheet values
+if st.sidebar.button("⚠️ Reset from Sheets", use_container_width=True, help="Warning: This will overwrite current balance with sheet values"):
+    # Force reload from sheets
     cash_from_sheet = get_balance_from_sheet("Cash")
     online_from_sheet = get_balance_from_sheet("Online")
     
     st.session_state.manual_cash = cash_from_sheet
     st.session_state.manual_online = online_from_sheet
     
-    st.sidebar.success(f"✅ Synced! Cash: ₹{cash_from_sheet:.2f}, Online: ₹{online_from_sheet:.2f}")
+    st.sidebar.warning(f"⚠️ Reset! Cash: ₹{cash_from_sheet:.2f}, Online: ₹{online_from_sheet:.2f}")
     time.sleep(1)
     st.rerun()
 
@@ -224,7 +226,7 @@ if menu == "📊 Dashboard":
     """, unsafe_allow_html=True)
     
     with st.expander("🔧 Balance Settings"):
-        st.warning("⚠️ Manual balance tracking - Use Sync button in sidebar to sync with sheets")
+        st.info("💡 Balance is tracked locally. Transactions will update automatically. Use 'Reset from Sheets' button in sidebar only if needed.")
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Cash Balance")
@@ -708,3 +710,4 @@ elif menu == "👑 Royalty Points":
             st.info("No points data available yet. Start billing to earn points!")
     else:
         st.info("No sales data found. Start billing to track royalty points!")
+
