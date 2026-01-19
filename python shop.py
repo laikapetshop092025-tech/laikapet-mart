@@ -16,10 +16,19 @@ if 'last_check_date' not in st.session_state: st.session_state.last_check_date =
 
 def save_data(sheet_name, data_list):
     try:
-        response = requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list, timeout=10)
-        return response.text == "Success"
+        url = f"{SCRIPT_URL}?sheet={sheet_name}"
+        st.info(f"🔄 Saving to {sheet_name}... Data: {data_list}")
+        response = requests.post(url, json=data_list, timeout=15)
+        st.info(f"📥 Response: {response.text}")
+        
+        if response.text == "Success":
+            st.success(f"✅ Successfully saved to {sheet_name}!")
+            return True
+        else:
+            st.error(f"❌ Unexpected response: {response.text}")
+            return False
     except Exception as e:
-        st.error(f"Save error: {str(e)}")
+        st.error(f"💥 Save error for {sheet_name}: {str(e)}")
         return False
 
 def load_data(sheet_name):
@@ -55,21 +64,28 @@ def update_balance(amount, mode, operation='add'):
         return True  # For Pocket/Hand/Udhaar, no balance update needed
     
     try:
+        st.info(f"🔍 Getting current {mode} balance...")
         current_bal = get_current_balance(mode)
+        st.info(f"💰 Current {mode} balance: ₹{current_bal:,.2f}")
         
         if operation == 'add':
             new_bal = current_bal + amount
+            st.info(f"➕ Adding ₹{amount:,.2f}")
         else:  # subtract
             new_bal = current_bal - amount
+            st.info(f"➖ Subtracting ₹{amount:,.2f}")
+        
+        st.info(f"🎯 New balance will be: ₹{new_bal:,.2f}")
         
         # Update in Google Sheets - WAIT for confirmation
+        st.info(f"📤 Updating {mode} balance in Google Sheets...")
         success = save_data("Balances", [mode, new_bal])
         
         if success:
             st.success(f"✅ {mode} Balance Updated: ₹{current_bal:,.2f} → ₹{new_bal:,.2f}")
             return True
         else:
-            st.error(f"❌ Failed to update {mode} balance!")
+            st.error(f"❌ Failed to update {mode} balance in Google Sheets!")
             return False
     except Exception as e:
         st.error(f"⚠️ Balance update error: {str(e)}")
