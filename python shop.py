@@ -204,6 +204,29 @@ if menu == "📊 Dashboard":
     c2.metric("📦 Purchase", f"₹{today_pur:,.2f}")
     c3.metric("💸 Expense", f"₹{today_exp:,.2f}")
     c4.metric("📈 Profit", f"₹{today_profit:,.2f}")
+    
+    # DATE-WISE PURCHASE VIEWER
+    st.divider()
+    st.subheader("📅 Date-wise Purchase Summary")
+    col1, col2 = st.columns([2, 3])
+    with col1:
+        selected_date = st.date_input("Select Date", value=today_dt, key="purchase_date_picker")
+    
+    if not i_df.empty and 'Date' in i_df.columns:
+        date_purchases = i_df[i_df['Date'] == selected_date]
+        if not date_purchases.empty and len(date_purchases.columns) > 3:
+            qty_vals = pd.to_numeric(date_purchases.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
+            rate_vals = pd.to_numeric(date_purchases.iloc[:, 3], errors='coerce').fillna(0)
+            date_total = (qty_vals * rate_vals).sum()
+            
+            with col2:
+                st.metric(f"📦 Total Purchase on {selected_date.strftime('%d-%m-%Y')}", f"₹{date_total:,.2f}")
+            
+            st.dataframe(date_purchases, use_container_width=True, height=300)
+        else:
+            st.info(f"No purchases found on {selected_date.strftime('%d-%m-%Y')}")
+    else:
+        st.info("No purchase data available")
 
     # MONTHLY REPORT
     st.divider()
