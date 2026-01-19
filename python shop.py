@@ -349,6 +349,91 @@ elif menu == "🧾 Billing":
             st.session_state.bill_cart = []
             time.sleep(3)
             st.rerun()
+    
+    # TODAY'S BILLS SECTION
+    st.divider()
+    st.subheader("📋 Today's Bills")
+    
+    if not s_df.empty and 'Date' in s_df.columns:
+        today_bills = s_df[s_df['Date'] == today_dt]
+        
+        if not today_bills.empty:
+            # Group by customer
+            customer_bills = {}
+            for _, row in today_bills.iterrows():
+                customer_info = str(row.iloc[5]) if len(row) > 5 else "Unknown"
+                item = str(row.iloc[1]) if len(row) > 1 else ""
+                qty = str(row.iloc[2]) if len(row) > 2 else ""
+                price = float(row.iloc[3]) if len(row) > 3 else 0
+                mode = str(row.iloc[4]) if len(row) > 4 else ""
+                points = int(pd.to_numeric(row.iloc[6], errors='coerce')) if len(row) > 6 else 0
+                
+                if customer_info not in customer_bills:
+                    customer_bills[customer_info] = {
+                        'items': [],
+                        'total': 0,
+                        'mode': mode,
+                        'points': 0
+                    }
+                
+                customer_bills[customer_info]['items'].append(f"{item} - {qty}")
+                customer_bills[customer_info]['total'] += price
+                customer_bills[customer_info]['points'] += points
+            
+            # Display each bill with WhatsApp button
+            for customer_info, bill_data in customer_bills.items():
+                with st.container():
+                    col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                    
+                    # Extract name and phone
+                    if "(" in customer_info and ")" in customer_info:
+                        cust_name = customer_info.split("(")[0].strip()
+                        cust_phone = customer_info.split("(")[1].replace(")", "").strip()
+                    else:
+                        cust_name = customer_info
+                        cust_phone = ""
+                    
+                    with col1:
+                        st.write(f"**{cust_name}**")
+                        for item in bill_data['items']:
+                            st.write(f"  • {item}")
+                    
+                    with col2:
+                        st.write(f"💰 ₹{bill_data['total']:,.2f}")
+                        st.write(f"💳 {bill_data['mode']}")
+                    
+                    with col3:
+                        st.write(f"👑 +{bill_data['points']} Points")
+                        st.write(f"📱 {cust_phone}")
+                    
+                    with col4:
+                        if cust_phone:
+                            # Create WhatsApp message
+                            items_text = "\n".join(bill_data['items'])
+                            message = f"""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते {cust_name} जी!
+
+आपकी आज की खरीदारी:
+{items_text}
+
+💰 *कुल राशि:* ₹{bill_data['total']:,.2f}
+👑 *आपके प्वाइंट्स:* +{bill_data['points']}
+
+धन्यवाद! 🙏
+फिर से आइएगा! 🐕"""
+                            
+                            import urllib.parse
+                            encoded_msg = urllib.parse.quote(message)
+                            whatsapp_url = f"https://wa.me/91{cust_phone}?text={encoded_msg}"
+                            
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><button style="background-color: #25D366; color: white; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 20px;">💬</button></a>', unsafe_allow_html=True)
+                    
+                    st.divider()
+        else:
+            st.info("No bills generated today yet.")
+    else:
+        st.info("No sales data available.")
 
 # --- 7. PURCHASE ---
 elif menu == "📦 Purchase":
