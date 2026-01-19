@@ -72,13 +72,22 @@ def get_current_balance(mode):
     return get_balance_from_sheet(mode)
 
 def set_balance(mode, amount):
-    """Set balance manually"""
+    """Set balance manually and save to sheets"""
+    # Update session state
     if mode == "Cash":
         st.session_state.manual_cash = amount
     elif mode == "Online":
         st.session_state.manual_online = amount
-    # Also try to save to sheets
-    save_data("Balances", [mode, amount])
+    
+    # Save to Google Sheets
+    try:
+        if save_data("Balances", [mode, amount]):
+            # Wait a bit for sheets to update
+            time.sleep(0.5)
+            return True
+        return False
+    except:
+        return False
 
 def update_balance(amount, mode, operation='add'):
     """Update balance"""
@@ -93,11 +102,20 @@ def update_balance(amount, mode, operation='add'):
         else:
             new_bal = current_bal - amount
         
-        # Update manually
-        set_balance(mode, new_bal)
-        
-        st.success(f"✅ {mode}: ₹{current_bal:,.2f} → ₹{new_bal:,.2f}")
-        return True
+        # Save to Google Sheets first
+        if save_data("Balances", [mode, new_bal]):
+            # Then update session state
+            if mode == "Cash":
+                st.session_state.manual_cash = new_bal
+            elif mode == "Online":
+                st.session_state.manual_online = new_bal
+            
+            st.success(f"✅ {mode}: ₹{current_bal:,.2f} → ₹{new_bal:,.2f}")
+            time.sleep(0.5)
+            return True
+        else:
+            st.error(f"❌ Failed to update {mode} balance in sheets!")
+            return False
     except Exception as e:
         st.error(f"Error: {str(e)}")
         return False
@@ -141,10 +159,19 @@ st.sidebar.divider()
 
 # Sync button
 if st.sidebar.button("🔄 Sync with Sheets", use_container_width=True):
-    st.session_state.manual_cash = get_balance_from_sheet("Cash")
-    st.session_state.manual_online = get_balance_from_sheet("Online")
-    st.sidebar.success("✅ Synced!")
-    time.sleep(0.5)
+    # Clear manual overrides and load fresh from sheets
+    st.session_state.manual_cash = None
+    st.session_state.manual_online = None
+    
+    # Force reload
+    cash_from_sheet = get_balance_from_sheet("Cash")
+    online_from_sheet = get_balance_from_sheet("Online")
+    
+    st.session_state.manual_cash = cash_from_sheet
+    st.session_state.manual_online = online_from_sheet
+    
+    st.sidebar.success(f"✅ Synced! Cash: ₹{cash_from_sheet:.2f}, Online: ₹{online_from_sheet:.2f}")
+    time.sleep(1)
     st.rerun()
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
@@ -681,4 +708,3 @@ elif menu == "👑 Royalty Points":
             st.info("No points data available yet. Start billing to earn points!")
     else:
         st.info("No sales data found. Start billing to track royalty points!")
-
