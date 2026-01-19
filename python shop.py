@@ -843,77 +843,128 @@ elif menu == "📒 Customer Khata":
 
 # --- 12. SUPPLIER DUES ---
 elif menu == "🏢 Supplier Dues":
-    st.header("🏢 Supplier Dues")
+    st.header("🏢 Supplier Dues Management")
     
-    with st.form("due"):
-        s = st.text_input("Supplier Name")
-        a = st.number_input("Amount", min_value=0.0)
-        t = st.selectbox("Type", ["Maal (+)", "Payment (-)"])
-        m = st.selectbox("Mode", ["Cash", "Online", "Hand", "Pocket"])
-        
-        if st.form_submit_button("💾 Save", type="primary"):
-            if a > 0 and s.strip():
-                final_amt = a if "+" in t else -a
-                save_data("Dues", [s, final_amt, str(today_dt), m])
-                
-                if "-" in t and m in ["Cash", "Online"]:
-                    update_balance(a, m, 'subtract')
-                else:
-                    st.success("✅ Entry saved!")
-                
-                time.sleep(1)
-                st.rerun()
+    # Two tabs: Add Entry and View Summary
+    tab1, tab2 = st.tabs(["➕ Add Entry", "📊 View Summary"])
     
-    d_df = load_data("Dues")
-    if not d_df.empty and len(d_df.columns) > 1:
-        st.divider()
-        st.subheader("📊 Supplier Balance Summary")
+    with tab1:
+        with st.form("due"):
+            st.subheader("Add Supplier Transaction")
+            s = st.text_input("Supplier Name")
+            a = st.number_input("Amount", min_value=0.0)
+            t = st.selectbox("Type", ["Maal Liya (Credit +)", "Payment Kiya (-)"])
+            m = st.selectbox("Payment Mode", ["Cash", "Online", "Pocket", "Hand", "N/A"])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info("💡 **Maal Liya** = Supplier ka balance badhega (we owe them)")
+            with col2:
+                st.info("💡 **Payment Kiya** = Supplier ka balance kam hoga (we paid them)")
+            
+            if st.form_submit_button("💾 Save Transaction", type="primary"):
+                if a > 0 and s.strip():
+                    # Determine amount: + for credit (we owe), - for payment (we paid)
+                    if "Credit" in t or "Liya" in t:
+                        final_amt = a  # Positive = we owe
+                        save_data("Dues", [s, final_amt, str(today_dt), m, "Credit"])
+                        st.success(f"✅ ₹{a:,.2f} ka maal entry added for {s}")
+                    else:  # Payment
+                        final_amt = -a  # Negative = we paid
+                        save_data("Dues", [s, final_amt, str(today_dt), m, "Payment"])
+                        
+                        # Update balance if Cash/Online
+                        if m == "Cash":
+                            update_balance(a, "Cash", 'subtract')
+                        elif m == "Online":
+                            update_balance(a, "Online", 'subtract')
+                        else:
+                            st.success(f"✅ ₹{a:,.2f} payment entry added (from {m})")
+                    
+                    time.sleep(1)
+                    st.rerun()
+    
+    with tab2:
+        d_df = load_data("Dues")
         
-        # Calculate balance per supplier
-        sum_df = d_df.groupby(d_df.columns[0]).agg({d_df.columns[1]: 'sum'}).reset_index()
-        sum_df.columns = ['Supplier', 'Balance']
-        
-        # Separate those who owe money (positive balance) and those we owe (negative)
-        suppliers_owe_us = sum_df[sum_df['Balance'] < 0].copy()
-        suppliers_owe_us['Balance'] = -suppliers_owe_us['Balance']
-        suppliers_owe_us = suppliers_owe_us.sort_values('Balance', ascending=False)
-        
-        we_owe_suppliers = sum_df[sum_df['Balance'] > 0].copy()
-        we_owe_suppliers = we_owe_suppliers.sort_values('Balance', ascending=False)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### 💰 We Paid Less (We Owe)")
-            if not we_owe_suppliers.empty:
-                for _, row in we_owe_suppliers.iterrows():
-                    st.error(f"📤 **{row['Supplier']}**: ₹{row['Balance']:,.2f}")
-                st.metric("Total We Owe", f"₹{we_owe_suppliers['Balance'].sum():,.2f}")
+        if not d_df.empty and len(d_df.columns) > 1:
+            st.subheader("📊 Supplier Balance Summary")
+            
+            # Calculate balance per supplier
+            sum_df = d_df.groupby(d_df.columns[0]).agg({d_df.columns[1]: 'sum'}).reset_index()
+            sum_df.columns = ['Supplier', 'Balance']
+            
+            # Filter out zero balances
+            sum_df = sum_df[sum_df['Balance'] != 0].sort_values('Balance', ascending=False)
+            
+            if not sum_df.empty:
+                st.markdown("### 💰 Outstanding Balances")
+                
+                for _, row in sum_df.iterrows():
+                    supplier_name = row['Supplier']
+                    balance = row['Balance']
+                    
+                    # Get transaction details for this supplier
+                    supplier_txns = d_df[d_df.iloc[:, 0] == supplier_name]
+                    
+                    with st.expander(f"{'🔴' if balance > 0 else '🟢'} **{supplier_name}** - Balance: ₹{abs(balance):,.2f} {'(We Owe)' if balance > 0 else '(They Owe)'}"):
+                        col1, col2 = st.columns([2, 1])
+                        
+                        with col1:
+                            st.markdown("#### Transaction History")
+                            for _, txn in supplier_txns.iterrows():
+                                date = str(txn.iloc[2]) if len(txn) > 2 else "N/A"
+                                amount = float(txn.iloc[1]) if len(txn) > 1 else 0
+                                mode = str(txn.iloc[3]) if len(txn) > 3 else "N/A"
+                                txn_type = str(txn.iloc[4]) if len(txn) > 4 else ("Credit" if amount > 0 else "Payment")
+                                
+                                if amount > 0:
+                                    st.info(f"📦 {date}: Maal liya ₹{amount:,.2f}")
+                                else:
+                                    st.success(f"💵 {date}: Payment ₹{abs(amount):,.2f} ({mode})")
+                        
+                        with col2:
+                            st.markdown("#### Summary")
+                            total_credit = supplier_txns[supplier_txns.iloc[:, 1] > 0].iloc[:, 1].sum() if len(supplier_txns) > 0 else 0
+                            total_paid = abs(supplier_txns[supplier_txns.iloc[:, 1] < 0].iloc[:, 1].sum()) if len(supplier_txns) > 0 else 0
+                            
+                            st.metric("📦 Total Credit", f"₹{total_credit:,.2f}")
+                            st.metric("💵 Total Paid", f"₹{total_paid:,.2f}")
+                            st.metric("⚖️ Balance", f"₹{abs(balance):,.2f}", 
+                                     delta=f"{'We Owe' if balance > 0 else 'They Owe'}")
+                
+                # Overall summary
+                st.divider()
+                st.subheader("🎯 Overall Summary")
+                col1, col2, col3 = st.columns(3)
+                
+                total_we_owe = sum_df[sum_df['Balance'] > 0]['Balance'].sum()
+                total_they_owe = abs(sum_df[sum_df['Balance'] < 0]['Balance'].sum())
+                net_balance = total_we_owe - total_they_owe
+                
+                col1.metric("🔴 Total We Owe", f"₹{total_we_owe:,.2f}")
+                col2.metric("🟢 Total They Owe", f"₹{total_they_owe:,.2f}")
+                col3.metric("⚖️ Net Position", f"₹{abs(net_balance):,.2f}", 
+                           delta=f"{'We Owe' if net_balance > 0 else 'They Owe'}")
             else:
-                st.success("✅ No pending dues!")
-        
-        with col2:
-            st.markdown("### 💵 They Paid Less (They Owe)")
-            if not suppliers_owe_us.empty:
-                for _, row in suppliers_owe_us.iterrows():
-                    st.info(f"📥 **{row['Supplier']}**: ₹{row['Balance']:,.2f}")
-                st.metric("Total They Owe", f"₹{suppliers_owe_us['Balance'].sum():,.2f}")
-            else:
-                st.info("No receivables")
-        
-        st.divider()
-        st.subheader("📋 All Transactions")
-        st.dataframe(d_df, use_container_width=True)
-        
-        # Delete option
-        st.divider()
-        with st.expander("🗑️ Delete Due Entry"):
-            if len(d_df) > 0:
-                del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(d_df)-1, value=0, key="del_due")
-                st.info(f"Selected: {d_df.iloc[del_idx, 0] if len(d_df.columns) > 0 else 'N/A'}")
-                if st.button("🗑️ Delete Selected Entry"):
-                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
-                    st.info("Go to Dues sheet and delete the corresponding row")
+                st.success("✅ All suppliers settled! No outstanding balances.")
+            
+            # All transactions table
+            st.divider()
+            st.subheader("📋 All Transactions")
+            st.dataframe(d_df, use_container_width=True)
+            
+            # Delete option
+            st.divider()
+            with st.expander("🗑️ Delete Transaction"):
+                if len(d_df) > 0:
+                    del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(d_df)-1, value=0, key="del_due")
+                    st.info(f"Selected: {d_df.iloc[del_idx, 0] if len(d_df.columns) > 0 else 'N/A'} - ₹{d_df.iloc[del_idx, 1] if len(d_df.columns) > 1 else 0}")
+                    if st.button("🗑️ Delete Selected Transaction"):
+                        st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
+                        st.info("Go to Dues sheet and delete the corresponding row")
+        else:
+            st.info("No supplier transactions yet. Add your first entry above!")
 
 # --- 13. ROYALTY POINTS ---
 elif menu == "👑 Royalty Points":
