@@ -136,7 +136,7 @@ if st.session_state.last_check_date != today_dt:
     st.session_state.last_check_date = today_dt
 
 # --- 4. SIDEBAR ---
-menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "📒 Customer Khata", "🏢 Supplier Dues"])
+menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "📒 Customer Khata", "🏢 Supplier Dues", "👑 Royalty Points"])
 st.sidebar.divider()
 
 # Sync button
@@ -246,46 +246,108 @@ elif menu == "🧾 Billing":
     inv_df = load_data("Inventory")
     s_df = load_data("Sales")
     
-    c_name = st.text_input("Name")
-    c_ph = st.text_input("Phone")
-    pay_m = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar"])
+    col1, col2 = st.columns([2, 1])
     
-    pts_bal = pd.to_numeric(s_df[s_df.iloc[:, 5].astype(str).str.contains(str(c_ph), na=False)].iloc[:, 6], errors='coerce').sum() if (c_ph and not s_df.empty and len(s_df.columns) > 6) else 0
-    st.info(f"👑 Royalty Points: {pts_bal}")
+    with col1:
+        c_name = st.text_input("Customer Name")
+        c_ph = st.text_input("Customer Phone")
+    
+    with col2:
+        st.write("")
+        st.write("")
+        # Calculate points for this customer
+        if c_ph and not s_df.empty and len(s_df.columns) > 6:
+            customer_sales = s_df[s_df.iloc[:, 5].astype(str).str.contains(str(c_ph), na=False)]
+            pts_bal = pd.to_numeric(customer_sales.iloc[:, 6], errors='coerce').sum()
+        else:
+            pts_bal = 0
+        
+        st.metric("👑 Available Points", int(pts_bal))
+    
+    pay_m = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar"])
     
     with st.expander("🛒 Add Item", expanded=True):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
         q = st.number_input("Qty", 0.1)
         u = st.selectbox("Unit", ["Kg", "Pcs", "Pkt", "Grams"])
         p = st.number_input("Price", 1.0)
-        rd = st.checkbox(f"Redeem {pts_bal} Pts?")
-        rf = st.checkbox("Referral Bonus (+10 Pts)")
         
-        if st.button("➕ Add"):
+        col1, col2 = st.columns(2)
+        with col1:
+            rd = st.checkbox(f"Redeem {int(pts_bal)} Points?", disabled=(pts_bal <= 0))
+        with col2:
+            ref_ph = st.text_input("Referral Phone (Optional)", placeholder="For +10 bonus points")
+        
+        if st.button("➕ Add to Cart"):
             pur_r = pd.to_numeric(inv_df[inv_df.iloc[:, 0] == it].iloc[0, 3], errors='coerce') if not inv_df.empty and len(inv_df[inv_df.iloc[:, 0] == it]) > 0 else 0
-            pts = int(((q*p)/100)* (5 if is_weekend else 2))
-            pts = -pts_bal if rd else pts
-            pts += 10 if rf else 0
-            st.session_state.bill_cart.append({"Item": it, "Qty": f"{q} {u}", "Price": p, "Profit": (p-pur_r)*q, "Pts": pts})
+            
+            # Calculate points
+            pts = int(((q*p)/100) * (5 if is_weekend else 2))
+            pts_used = 0
+            
+            if rd and pts_bal > 0:
+                pts_used = -int(pts_bal)
+                pts += pts_used
+            
+            if ref_ph and ref_ph.strip():
+                pts += 10
+            
+            st.session_state.bill_cart.append({
+                "Item": it, 
+                "Qty": f"{q} {u}", 
+                "Price": p, 
+                "Profit": (p-pur_r)*q, 
+                "Pts": pts,
+                "PtsUsed": pts_used
+            })
             st.rerun()
     
     if st.session_state.bill_cart:
         st.table(pd.DataFrame(st.session_state.bill_cart))
         total_amt = sum([item['Price'] for item in st.session_state.bill_cart])
-        st.subheader(f"💰 Total: ₹{total_amt:,.2f}")
+        total_pts = sum([item['Pts'] for item in st.session_state.bill_cart])
         
-        if st.button("✅ Save Bill", type="primary"):
+        st.subheader(f"💰 Total: ₹{total_amt:,.2f}")
+        st.info(f"🎁 Points Earned: +{total_pts}")
+        
+        if st.button("✅ Save Bill & Send WhatsApp", type="primary"):
+            # Save to Sales
             for item in st.session_state.bill_cart:
                 save_data("Sales", [str(today_dt), item['Item'], item['Qty'], item['Price'], pay_m, f"{c_name}({c_ph})", item['Pts'], item['Profit']])
             
+            # Update balance
             if pay_m in ["Cash", "Online"]:
                 update_balance(total_amt, pay_m, 'add')
             else:
                 save_data("CustomerKhata", [f"{c_name}({c_ph})", total_amt, str(today_dt), "Udhaar"])
                 st.success("✅ Bill saved as Udhaar!")
             
+            # Generate WhatsApp message
+            items_text = "\n".join([f"• {item['Item']} - {item['Qty']} - ₹{item['Price']}" for item in st.session_state.bill_cart])
+            
+            message = f"""🐾 *LAIKA PET MART* 🐾
+            
+नमस्ते {c_name} जी!
+
+आपकी आज की खरीदारी:
+{items_text}
+
+💰 *कुल राशि:* ₹{total_amt:,.2f}
+👑 *आपके प्वाइंट्स:* +{total_pts}
+
+धन्यवाद! 🙏
+फिर से आइएगा! 🐕"""
+            
+            import urllib.parse
+            encoded_msg = urllib.parse.quote(message)
+            whatsapp_url = f"https://wa.me/91{c_ph}?text={encoded_msg}"
+            
+            st.success("✅ Bill saved successfully!")
+            st.markdown(f"### 📱 Send WhatsApp Message")
+            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">📲 Send via WhatsApp</button></a>', unsafe_allow_html=True)
+            
             st.session_state.bill_cart = []
-            time.sleep(1)
+            time.sleep(3)
             st.rerun()
 
 # --- 7. PURCHASE ---
@@ -448,3 +510,90 @@ elif menu == "🏢 Supplier Dues":
         st.divider()
         st.subheader("📋 All Transactions")
         st.dataframe(d_df, use_container_width=True)
+
+# --- 13. ROYALTY POINTS ---
+elif menu == "👑 Royalty Points":
+    st.header("👑 Royalty Points System")
+    
+    s_df = load_data("Sales")
+    
+    if not s_df.empty and len(s_df.columns) > 6:
+        st.info("💡 Weekend shopping gives 5x points! Weekday shopping gives 2x points!")
+        
+        # Calculate points per customer
+        customer_points = {}
+        for _, row in s_df.iterrows():
+            customer_info = str(row.iloc[5]) if len(row) > 5 else ""
+            points = pd.to_numeric(row.iloc[6], errors='coerce') if len(row) > 6 else 0
+            
+            if customer_info and customer_info != "nan":
+                if customer_info in customer_points:
+                    customer_points[customer_info] += points
+                else:
+                    customer_points[customer_info] = points
+        
+        # Convert to dataframe
+        if customer_points:
+            points_df = pd.DataFrame([
+                {
+                    "Customer": k.split("(")[0] if "(" in k else k,
+                    "Phone": k.split("(")[1].replace(")", "") if "(" in k else "N/A",
+                    "Total Points": int(v)
+                }
+                for k, v in customer_points.items()
+            ])
+            
+            points_df = points_df.sort_values("Total Points", ascending=False)
+            
+            # Filter options
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                search = st.text_input("🔍 Search by Name or Phone", "")
+            with col2:
+                min_points = st.number_input("Min Points Filter", min_value=0, value=0)
+            
+            # Apply filters
+            if search:
+                points_df = points_df[
+                    points_df['Customer'].str.contains(search, case=False, na=False) | 
+                    points_df['Phone'].str.contains(search, case=False, na=False)
+                ]
+            
+            if min_points > 0:
+                points_df = points_df[points_df['Total Points'] >= min_points]
+            
+            # Display metrics
+            st.divider()
+            c1, c2, c3 = st.columns(3)
+            c1.metric("👥 Total Customers", len(customer_points))
+            c2.metric("🎁 Total Points Given", sum(customer_points.values()))
+            c3.metric("⭐ Active Customers", len([v for v in customer_points.values() if v > 0]))
+            
+            st.divider()
+            st.subheader("📊 Customer Points Leaderboard")
+            
+            # Color code the dataframe
+            def highlight_points(row):
+                if row['Total Points'] >= 100:
+                    return ['background-color: #D4EDDA'] * len(row)
+                elif row['Total Points'] >= 50:
+                    return ['background-color: #FFF3CD'] * len(row)
+                else:
+                    return [''] * len(row)
+            
+            styled_df = points_df.style.apply(highlight_points, axis=1)
+            st.dataframe(styled_df, use_container_width=True, height=400)
+            
+            # Download option
+            csv = points_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Points Report",
+                data=csv,
+                file_name=f"royalty_points_{today_dt}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("No points data available yet. Start billing to earn points!")
+    else:
+        st.info("No sales data found. Start billing to track royalty points!")
+
