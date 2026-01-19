@@ -48,11 +48,18 @@ def get_balance_from_sheet(mode):
     try:
         b_df = load_data("Balances")
         if b_df.empty or len(b_df.columns) < 2:
+            # Initialize if empty
+            save_data("Balances", ["Cash", 0.0])
+            save_data("Balances", ["Online", 0.0])
             return 0.0
+        
         rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
         if len(rows) > 0:
             return float(pd.to_numeric(rows.iloc[0, 1], errors='coerce'))
-        return 0.0
+        else:
+            # Mode not found, initialize it
+            save_data("Balances", [mode, 0.0])
+            return 0.0
     except:
         return 0.0
 
