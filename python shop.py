@@ -173,7 +173,14 @@ is_weekend = datetime.now().weekday() >= 5
 
 # --- 5. DASHBOARD ---
 if menu == "📊 Dashboard":
-    st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
+    # Professional Header with Logo
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 20px;">
+        <div style="font-size: 60px; margin-bottom: 10px;">🐾</div>
+        <h1 style="color: white; margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Welcome to Laika Pet Mart</h1>
+        <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     s_df = load_data("Sales")
     e_df = load_data("Expenses")
@@ -233,11 +240,13 @@ if menu == "📊 Dashboard":
                 st.rerun()
     
     st.divider()
-    col_header1, col_header2 = st.columns(2)
-    with col_header1:
-        st.subheader(f"📈 Today's Report - {today_dt.strftime('%d %b %Y')}")
-    with col_header2:
-        st.subheader(f"🗓️ {curr_m_name} Report")
+    
+    # TODAY'S REPORT
+    st.markdown(f"""
+    <div style="background-color: #E3F2FD; padding: 15px; border-radius: 10px; border-left: 5px solid #1976D2; margin-bottom: 20px;">
+        <h3 style="color: #1976D2; margin: 0;">📈 Today's Report - {today_dt.strftime('%d %B %Y')}</h3>
+    </div>
+    """, unsafe_allow_html=True)
     
     s_today = s_df[s_df['Date'] == today_dt] if not s_df.empty and 'Date' in s_df.columns else pd.DataFrame()
     i_today = i_df[i_df['Date'] == today_dt] if not i_df.empty and 'Date' in i_df.columns else pd.DataFrame()
@@ -253,6 +262,21 @@ if menu == "📊 Dashboard":
     
     today_exp = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty and len(e_today.columns) > 2 else 0
     today_profit = pd.to_numeric(s_today.iloc[:, 7], errors='coerce').sum() if not s_today.empty and len(s_today.columns) > 7 else 0
+    
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("💰 Total Sale", f"₹{today_sale:,.2f}")
+    c2.metric("📦 Total Purchase", f"₹{today_pur:,.2f}")
+    c3.metric("💸 Total Expense", f"₹{today_exp:,.2f}")
+    c4.metric("📈 Total Profit", f"₹{today_profit:,.2f}")
+    
+    st.divider()
+    
+    # MONTHLY REPORT
+    st.markdown(f"""
+    <div style="background-color: #F3E5F5; padding: 15px; border-radius: 10px; border-left: 5px solid #7B1FA2; margin-bottom: 20px;">
+        <h3 style="color: #7B1FA2; margin: 0;">🗓️ Monthly Report - {curr_m_name} {today_dt.year}</h3>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Calculate monthly data
     s_month = pd.DataFrame()
@@ -285,22 +309,11 @@ if menu == "📊 Dashboard":
     month_exp = pd.to_numeric(e_month.iloc[:, 2], errors='coerce').sum() if not e_month.empty and len(e_month.columns) > 2 else 0
     month_profit = pd.to_numeric(s_month.iloc[:, 7], errors='coerce').sum() if not s_month.empty and len(s_month.columns) > 7 else 0
     
-    # Display both reports side by side
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        c1, c2 = st.columns(2)
-        c1.metric("💰 Sale", f"₹{today_sale:,.2f}")
-        c2.metric("📦 Purchase", f"₹{today_pur:,.2f}")
-        c1.metric("💸 Expense", f"₹{today_exp:,.2f}")
-        c2.metric("📈 Profit", f"₹{today_profit:,.2f}")
-    
-    with col2:
-        c1, c2 = st.columns(2)
-        c1.metric("💰 Sale", f"₹{month_sale:,.2f}")
-        c2.metric("📦 Purchase", f"₹{month_pur:,.2f}")
-        c1.metric("💸 Expense", f"₹{month_exp:,.2f}")
-        c2.metric("📈 Profit", f"₹{month_profit:,.2f}")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("💰 Total Sale", f"₹{month_sale:,.2f}")
+    c2.metric("📦 Total Purchase", f"₹{month_pur:,.2f}")
+    c3.metric("💸 Total Expense", f"₹{month_exp:,.2f}")
+    c4.metric("📈 Total Profit", f"₹{month_profit:,.2f}")
 
 # --- 6. BILLING ---
 elif menu == "🧾 Billing":
