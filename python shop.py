@@ -301,6 +301,8 @@ elif menu == "🧾 Billing":
             if pay_m in ["Cash", "Online"]:
                 update_balance(total_amt, pay_m, 'add')
             else:
+                # For Udhaar, also save to CustomerKhata
+                save_data("CustomerKhata", [f"{c_name}({c_ph})", total_amt, str(today_dt), "Udhaar"])
                 st.success("✅ Bill saved as Udhaar!")
             
             st.session_state.bill_cart = []
@@ -427,6 +429,7 @@ elif menu == "📒 Customer Khata":
     
     k_df = load_data("CustomerKhata")
     if not k_df.empty and len(k_df.columns) > 1:
+        st.subheader("📊 Customer Balance Summary")
         sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
         sum_df.columns = ['Customer', 'Balance']
         sum_df = sum_df[sum_df['Balance'] != 0].sort_values('Balance', ascending=False)
@@ -456,5 +459,14 @@ elif menu == "🏢 Supplier Dues":
                 st.rerun()
     
     d_df = load_data("Dues")
-    if not d_df.empty: 
+    if not d_df.empty and len(d_df.columns) > 1:
+        st.subheader("📊 Supplier Dues Summary")
+        # Create summary
+        sum_df = d_df.groupby(d_df.columns[0]).agg({d_df.columns[1]: 'sum'}).reset_index()
+        sum_df.columns = ['Supplier', 'Due Amount']
+        sum_df = sum_df[sum_df['Due Amount'] != 0].sort_values('Due Amount', ascending=False)
+        st.table(sum_df)
+        
+        st.divider()
+        st.subheader("📋 All Transactions")
         st.dataframe(d_df, use_container_width=True)
