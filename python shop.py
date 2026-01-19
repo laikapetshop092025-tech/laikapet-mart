@@ -24,7 +24,7 @@ def load_data(sheet_name):
         url = f"{SHEET_LINK}{sheet_name}&cache={time.time()}"
         df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
-        # Photo Error Fix: Auto-detecting Date column safely
+        # Photo Error Fix: Force Date Detection
         date_col = next((c for c in df.columns if 'date' in c.lower()), None)
         if date_col:
             df[date_col] = pd.to_datetime(df[date_col], errors='coerce', dayfirst=True).dt.date
@@ -53,14 +53,15 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
 today_dt = datetime.now().date()
 curr_m = datetime.now().month
 curr_m_name = datetime.now().strftime('%B')
+is_weekend = datetime.now().weekday() >= 5
 
-# --- 4. DASHBOARD (FIXED FOR GALLA & REPORTS) ---
+# --- 4. DASHBOARD (5 BOXES + 4-METRIC REPORTS) ---
 if menu == "📊 Dashboard":
     st.markdown("<h1 style='text-align: center; color: #FF9800;'>🐾 Welcome to Laika Pet Mart 🐾</h1>", unsafe_allow_html=True)
     s_df = load_data("Sales"); e_df = load_data("Expenses"); b_df = load_data("Balances")
     k_df = load_data("CustomerKhata"); i_df = load_data("Inventory"); d_df = load_data("Dues")
     
-    # Financial Logic: Cash & Bank Balance
+    # Financial Logic (IndexError Fix)
     bc = pd.to_numeric(b_df.iloc[:, 1], errors='coerce').sum() if not b_df.empty and len(b_df.columns) > 1 else 0
     bo = pd.to_numeric(b_df.iloc[:, 1], errors='coerce').sum() if not b_df.empty and len(b_df.columns) > 1 else 0
     sc = pd.to_numeric(s_df[s_df.iloc[:, 4] == "Cash"].iloc[:, 3], errors='coerce').sum() if not s_df.empty and len(s_df.columns) > 4 else 0
@@ -68,31 +69,26 @@ if menu == "📊 Dashboard":
     ec = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Cash"].iloc[:, 2], errors='coerce').sum() if not e_df.empty and len(e_df.columns) > 3 else 0
     eo = pd.to_numeric(e_df[e_df.iloc[:, 3] == "Online"].iloc[:, 2], errors='coerce').sum() if not e_df.empty and len(e_df.columns) > 3 else 0
     
-    # 🚨 Purchase Deduction Logic (Jo kal mal kharida wo minus hoga)
     pc = 0; po = 0; total_stock_val = 0
     if not i_df.empty:
-        i_df['qty_n'] = pd.to_numeric(i_df.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
-        i_df['rate_n'] = pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)
-        total_stock_val = (i_df['qty_n'] * i_df['rate_n']).sum()
-        pc = (i_df[i_df.iloc[:, 5] == "Cash"]['qty_n'] * i_df[i_df.iloc[:, 5] == "Cash"]['rate_n']).sum() if len(i_df.columns)>5 else 0
-        po = (i_df[i_df.iloc[:, 5] == "Online"]['qty_n'] * i_df[i_df.iloc[:, 5] == "Online"]['rate_n']).sum() if len(i_df.columns)>5 else 0
+        i_df['qty_v'] = pd.to_numeric(i_df.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
+        i_df['rate_v'] = pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)
+        total_stock_val = (i_df['qty_v'] * i_df['rate_v']).sum()
+        pc = (i_df[i_df.iloc[:, 5] == "Cash"]['qty_v'] * i_df[i_df.iloc[:, 5] == "Cash"]['rate_v']).sum() if len(i_df.columns)>5 else 0
+        po = (i_df[i_df.iloc[:, 5] == "Online"]['qty_v'] * i_df[i_df.iloc[:, 5] == "Online"]['rate_v']).sum() if len(i_df.columns)>5 else 0
 
     total_u = pd.to_numeric(k_df.iloc[:, 1], errors='coerce').sum() if not k_df.empty else 0
-    
-    # Final Balances
-    final_cash = bc + sc - ec - pc
-    final_bank = bo + so - eo - po
 
     st.markdown(f"""
     <div style="display: flex; gap: 10px; justify-content: space-around;">
         <div style="background-color: #FFEBEE; padding: 15px; border-radius: 10px; border-left: 8px solid #D32F2F; width: 19%;">
-            <p style="color: #D32F2F; margin: 0;">💵 Galla (Cash)</p> <h3 style="margin: 0;">₹{final_cash:,.2f}</h3>
+            <p style="color: #D32F2F; margin: 0;">💵 Galla</p> <h3 style="margin: 0;">₹{bc + sc - ec - pc:,.2f}</h3>
         </div>
         <div style="background-color: #E3F2FD; padding: 15px; border-radius: 10px; border-left: 8px solid #1976D2; width: 19%;">
-            <p style="color: #1976D2; margin: 0;">🏦 Online (Bank)</p> <h3 style="margin: 0;">₹{final_bank:,.2f}</h3>
+            <p style="color: #1976D2; margin: 0;">🏦 Online</p> <h3 style="margin: 0;">₹{bo + so - eo - po:,.2f}</h3>
         </div>
         <div style="background-color: #F3E5F5; padding: 15px; border-radius: 10px; border-left: 8px solid #7B1FA2; width: 19%;">
-            <p style="color: #7B1FA2; margin: 0;">⚡ Mix Total</p> <h3 style="margin: 0;">₹{final_cash + final_bank:,.2f}</h3>
+            <p style="color: #7B1FA2; margin: 0;">⚡ Mix Balance</p> <h3 style="margin: 0;">₹{(bc+sc-ec-pc)+(bo+so-eo-po):,.2f}</h3>
         </div>
         <div style="background-color: #FFF3E0; padding: 15px; border-radius: 10px; border-left: 8px solid #F57C00; width: 19%;">
             <p style="color: #F57C00; margin: 0;">📒 Udhaar</p> <h3 style="margin: 0;">₹{total_u:,.2f}</h3>
@@ -103,57 +99,104 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
     
-    # --- TODAY & MONTHLY REPORTS SECTION ---
+
     for title, mode in [("📈 Today's Report", "today"), (f"🗓️ {curr_m_name} Summary", "month")]:
         st.divider(); st.subheader(title)
-        # Safe column indexing to prevent IndexError
-        s_s = s_df[s_df['Date'] == today_dt] if (not s_df.empty and mode=="today") else (s_df[pd.to_datetime(s_df['Date']).dt.month == curr_m] if not s_df.empty else pd.DataFrame())
-        i_s = i_df[i_df['Date'] == today_dt] if (not i_df.empty and mode=="today") else (i_df[pd.to_datetime(i_df['Date']).dt.month == curr_m] if not i_df.empty else pd.DataFrame())
-        e_s = e_df[e_df['Date'] == today_dt] if (not e_df.empty and mode=="today") else (e_df[pd.to_datetime(e_df['Date']).dt.month == curr_m] if not e_df.empty else pd.DataFrame())
+        s_s = s_df[s_df['Date'] == today_dt] if mode=="today" else s_df[pd.to_datetime(s_df['Date']).dt.month == curr_m]
+        i_s = i_df[i_df['Date'] == today_dt] if mode=="today" else i_df[pd.to_datetime(i_df['Date']).dt.month == curr_m]
+        e_s = e_df[e_df['Date'] == today_dt] if mode=="today" else e_df[pd.to_datetime(e_df['Date']).dt.month == curr_m]
         
-        sal = pd.to_numeric(s_s.iloc[:, 3], errors='coerce').sum() if not s_s.empty and len(s_s.columns)>3 else 0
-        pur = (pd.to_numeric(i_s.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0) * pd.to_numeric(i_s.iloc[:, 3], errors='coerce').fillna(0)).sum() if not i_s.empty and len(i_s.columns)>3 else 0
-        ex = pd.to_numeric(e_s.iloc[:, 2], errors='coerce').sum() if not e_s.empty and len(e_s.columns)>2 else 0
-        pr = pd.to_numeric(s_s.iloc[:, 7], errors='coerce').sum() if not s_s.empty and len(s_s.columns)>7 else 0
+        sal = pd.to_numeric(s_s.iloc[:, 3], errors='coerce').sum()
+        pur = (pd.to_numeric(i_s.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0) * pd.to_numeric(i_s.iloc[:, 3], errors='coerce').fillna(0)).sum()
+        ex = pd.to_numeric(e_s.iloc[:, 2], errors='coerce').sum()
+        pr = pd.to_numeric(s_s.iloc[:, 7], errors='coerce').sum() if len(s_s.columns)>7 else 0
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Sale", f"₹{sal}"); c2.metric("Total Purchase", f"₹{pur}"); c3.metric("Total Expense", f"₹{ex}"); c4.metric("Total Profit", f"₹{pr}")
+        c1.metric("Sale", f"₹{sal}"); c2.metric("Purchase", f"₹{pur}"); c3.metric("Expense", f"₹{ex}"); c4.metric("Profit", f"₹{pr}")
 
-# --- BAAKI SECTION MEIN KOI CHANGE NAHI (LOGIC PRESERVED) ---
+# --- 5. BILLING (ROYALTY + REFERRAL + UNITS RESTORED) ---
 elif menu == "🧾 Billing":
-    # Wahi logic rahega jo humne banaya hai
-    st.header("🧾 Billing & Royalty")
-    st.info("Original Logic Active")
+    st.header("🧾 Billing & Royalty Club")
+    inv_df = load_data("Inventory"); s_df = load_data("Sales")
+    c_name = st.text_input("Name"); c_ph = st.text_input("Phone"); pay_m = st.selectbox("Mode", ["Cash", "Online", "Udhaar"])
+    pts_bal = pd.to_numeric(s_df[s_df.iloc[:, 5].astype(str).str.contains(str(c_ph), na=False)].iloc[:, 6], errors='coerce').sum() if (c_ph and not s_df.empty) else 0
+    st.info(f"👑 Royalty Points: {pts_bal}")
+    with st.expander("🛒 Add Item", expanded=True):
+        it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
+        q = st.number_input("Qty", 0.1); u = st.selectbox("Unit", ["Kg", "Pcs", "Pkt", "Grams"]); p = st.number_input("Price", 1.0)
+        rd = st.checkbox(f"Redeem {pts_bal} Pts?"); rf = st.checkbox("Referral Bonus (+10 Pts)")
+        if st.button("➕ Add"):
+            pur_r = pd.to_numeric(inv_df[inv_df.iloc[:, 0] == it].iloc[0, 3], errors='coerce') if not inv_df.empty else 0
+            pts = int(((q*p)/100)* (5 if is_weekend else 2)); pts = -pts_bal if rd else pts; pts += 10 if rf else 0
+            st.session_state.bill_cart.append({"Item": it, "Qty": f"{q} {u}", "Price": p, "Profit": (p-pur_r)*q, "Pts": pts})
+            st.rerun()
+    if st.session_state.bill_cart:
+        if st.button("✅ Save Bill"):
+            for item in st.session_state.bill_cart:
+                save_data("Sales", [str(today_dt), item['Item'], item['Qty'], item['Price'], pay_m, f"{c_name}({c_ph})", item['Pts'], item['Profit']])
+            st.session_state.bill_cart = []; st.rerun()
 
+# --- 6. PURCHASE (MODES + CASH DEDUCTION RESTORED) ---
 elif menu == "📦 Purchase":
     st.header("📦 Purchase Entry")
-    # Purchase form logic
-    with st.expander("📥 Add New Items", expanded=True):
-        n = st.text_input("Name"); q = st.number_input("Qty", 1.0); r = st.number_input("Rate"); m = st.selectbox("Paid From", ["Cash", "Online", "Pocket"])
+    with st.expander("📥 Add Stock", expanded=True):
+        n = st.text_input("Item"); q = st.number_input("Qty", 1.0); u = st.selectbox("Unit", ["Kg", "Pcs", "Pkt"]); r = st.number_input("Rate"); m = st.selectbox("Paid From", ["Cash", "Online", "Pocket", "Hand"])
         if st.button("➕ Save"):
-            save_data("Inventory", [n, f"{q} Pcs", "Stock", r, str(today_dt), m]); st.rerun()
+            save_data("Inventory", [n, f"{q} {u}", "Stock", r, str(today_dt), m]); st.rerun()
 
+# --- 7. LIVE STOCK (TOTAL AMT + ALERT RESTORED) ---
 elif menu == "📋 Live Stock":
-    # Stock status logic
-    st.header("📋 Live Stock Status")
-    st.info("Original Logic Active")
+    st.header("📋 Live Stock")
+    i_df = load_data("Inventory")
+    if not i_df.empty:
+        t_v = (pd.to_numeric(i_df.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0) * pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)).sum()
+        st.subheader(f"💰 Total Stock Value: ₹{t_v:,.2f}")
+        for _, row in i_df.iterrows():
+            qv = float(str(row.iloc[1]).split()[0])
+            if qv < 2: st.error(f"🚨 LOW STOCK: {row.iloc[0]} ({row.iloc[1]})")
+            else: st.info(f"✅ {row.iloc[0]}: {row.iloc[1]}")
 
+# --- 8. EXPENSES (WINDOW RESTORED) ---
 elif menu == "💰 Expenses":
-    st.header("💰 Expense Tracker")
-    # Expense saving logic
-    st.info("Original Logic Active")
+    st.header("💰 Expense Entry")
+    with st.form("ex"):
+        cat = st.selectbox("Category", ["Rent", "Salary", "Food", "Other"]); amt = st.number_input("Amount"); m = st.selectbox("Mode", ["Cash", "Online"])
+        if st.form_submit_button("Save"):
+            save_data("Expenses", [str(today_dt), cat, amt, m]); st.rerun()
+    e_df = load_data("Expenses")
+    if not e_df.empty: st.dataframe(e_df, use_container_width=True)
 
+# --- 9. PET REGISTER (AGE/WT/VAX TRACKER RESTORED) ---
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Register")
-    # Register logic
-    st.info("Original Logic Active")
+    with st.form("pet"):
+        c1, c2 = st.columns(2)
+        on = c1.text_input("Owner"); ph = c2.text_input("Phone"); br = c1.text_input("Breed")
+        age = c2.number_input("Age (Months)", 1); wt = c1.number_input("Weight (Kg)", 0.1); vd = c2.date_input("Last Vax")
+        if st.form_submit_button("Save"):
+            nv = vd + timedelta(days=365)
+            save_data("PetRecords", [on, ph, br, age, wt, str(vd), str(nv), str(today_dt)]); st.rerun()
+    p_df = load_data("PetRecords")
+    if not p_df.empty: st.dataframe(p_df, use_container_width=True)
 
+# --- 10. CUSTOMER KHATA (ZERO BALANCE RESTORED) ---
 elif menu == "📒 Customer Khata":
     st.header("📒 Customer Khata")
-    # Khata logic
-    st.info("Original Logic Active")
+    with st.form("kh"):
+        n = st.text_input("Name"); a = st.number_input("Amt"); t = st.selectbox("Type", ["Udhaar (+)", "Jama (-)"]); m = st.selectbox("Mode", ["Cash", "Online", "N/A"])
+        if st.form_submit_button("Save Entry"):
+            save_data("CustomerKhata", [n, a if "+" in t else -a, str(today_dt), m]); st.rerun()
+    k_df = load_data("CustomerKhata")
+    if not k_df.empty:
+        sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
+        st.table(sum_df[sum_df.iloc[:, 1] != 0])
 
+# --- 11. SUPPLIER DUES (MODES + LIST RESTORED) ---
 elif menu == "🏢 Supplier Dues":
     st.header("🏢 Supplier Dues")
-    # Supplier logic
-    st.info("Original Logic Active")
+    with st.form("due"):
+        s = st.text_input("Supplier"); a = st.number_input("Amt"); t = st.selectbox("Type", ["Maal (+)", "Payment (-)"]); m = st.selectbox("Mode", ["Cash", "Online", "Hand", "Pocket"])
+        if st.form_submit_button("Save"):
+            save_data("Dues", [s, a if "+" in t else -a, str(today_dt), m]); st.rerun()
+    d_df = load_data("Dues")
+    if not d_df.empty: st.dataframe(d_df, use_container_width=True)
