@@ -22,6 +22,74 @@ if 'manual_cash' not in st.session_state:
 if 'manual_online' not in st.session_state:
     st.session_state.manual_online = None
 
+def generate_pdf_bill(customer_name, customer_phone, items, total_amt, points, payment_mode, bill_date):
+    """Generate PDF bill"""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        import io
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#FF1493'), alignment=TA_CENTER)
+        elements.append(Paragraph("LAIKA PET STORE", title_style))
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Bill details
+        bill_info = [
+            ['Customer:', customer_name, 'Date:', bill_date],
+            ['Phone:', customer_phone, 'Mode:', payment_mode]
+        ]
+        t = Table(bill_info, colWidths=[1.5*inch, 2.5*inch, 1*inch, 2*inch])
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#FF1493')),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Items table
+        data = [['Item', 'Quantity', 'Price']]
+        for item in items:
+            data.append([item['Item'], item['Qty'], f"₹{item['Price']:.2f}"])
+        
+        data.append(['', 'TOTAL', f"₹{total_amt:.2f}"])
+        data.append(['', 'Points Earned', f"+{points}"])
+        
+        t = Table(data, colWidths=[3*inch, 2*inch, 2*inch])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FF1493')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, -2), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -2), 1, colors.black),
+            ('FONTNAME', (0, -2), (-1, -1), 'Helvetica-Bold'),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 0.5*inch))
+        
+        # Footer
+        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, textColor=colors.grey)
+        elements.append(Paragraph("Thank you for shopping with us! 🐾", footer_style))
+        
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer.getvalue()
+    except ImportError:
+        return None
+
 def save_data(sheet_name, data_list):
     try:
         response = requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list, timeout=15)
@@ -174,13 +242,29 @@ is_weekend = datetime.now().weekday() >= 5
 # --- 5. DASHBOARD ---
 if menu == "📊 Dashboard":
     # Professional Header with Logo
-    st.markdown("""
-    <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 20px;">
-        <div style="font-size: 60px; margin-bottom: 10px;">🐾</div>
-        <h1 style="color: white; margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Welcome to Laika Pet Mart</h1>
-        <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
-    </div>
-    """, unsafe_allow_html=True)
+    try:
+        # Try to load logo from uploads
+        import base64
+        logo_path = "/mnt/user-data/uploads/logo_png.png"
+        with open(logo_path, "rb") as f:
+            logo_data = base64.b64encode(f.read()).decode()
+        
+        st.markdown(f"""
+        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%); border-radius: 15px; margin-bottom: 20px;">
+            <img src="data:image/png;base64,{logo_data}" style="width: 150px; margin-bottom: 15px;">
+            <h1 style="color: white; margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Welcome to Laika Pet Mart</h1>
+            <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
+        </div>
+        """, unsafe_allow_html=True)
+    except:
+        # Fallback without logo
+        st.markdown("""
+        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%); border-radius: 15px; margin-bottom: 20px;">
+            <div style="font-size: 60px; margin-bottom: 10px;">👑</div>
+            <h1 style="color: white; margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Welcome to Laika Pet Mart</h1>
+            <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
+        </div>
+        """, unsafe_allow_html=True)
     
     s_df = load_data("Sales")
     e_df = load_data("Expenses")
@@ -418,8 +502,27 @@ elif menu == "🧾 Billing":
             whatsapp_url = f"https://wa.me/91{c_ph}?text={encoded_msg}"
             
             st.success("✅ Bill saved successfully!")
-            st.markdown(f"### 📱 Send WhatsApp Message")
-            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">📲 Send via WhatsApp</button></a>', unsafe_allow_html=True)
+            
+            # Generate PDF
+            pdf_data = generate_pdf_bill(c_name, c_ph, st.session_state.bill_cart, total_amt, total_pts, pay_m, str(today_dt))
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown(f"### 📱 Send WhatsApp")
+                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">📲 Send via WhatsApp</button></a>', unsafe_allow_html=True)
+            
+            with col2:
+                if pdf_data:
+                    st.markdown(f"### 📄 Download PDF")
+                    st.download_button(
+                        label="📥 Download Bill PDF",
+                        data=pdf_data,
+                        file_name=f"Bill_{c_name}_{today_dt}.pdf",
+                        mime="application/pdf"
+                    )
+                else:
+                    st.info("📄 Install reportlab for PDF: pip install reportlab")
             
             st.session_state.bill_cart = []
             time.sleep(3)
@@ -503,8 +606,19 @@ elif menu == "🧾 Billing":
                             whatsapp_url = f"https://wa.me/91{cust_phone}?text={encoded_msg}"
                             
                             st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><button style="background-color: #25D366; color: white; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 20px;">💬</button></a>', unsafe_allow_html=True)
+                        else:
+                            st.write("")
                     
                     st.divider()
+            
+            # Delete option for today's bills
+            st.divider()
+            with st.expander("🗑️ Delete Bill Entry"):
+                st.warning("⚠️ This will delete entries from Google Sheets")
+                del_customer = st.selectbox("Select Customer", list(customer_bills.keys()), key="del_bill_customer")
+                if st.button("🗑️ Delete Selected Bill", key="del_bill_btn"):
+                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets for now")
+                    st.info(f"Go to Sales sheet and delete rows for: {del_customer}")
         else:
             st.info("No bills generated today yet.")
     else:
@@ -538,6 +652,17 @@ elif menu == "📦 Purchase":
     if not i_df.empty:
         st.subheader("📋 Recent Purchases")
         st.dataframe(i_df.tail(10), use_container_width=True)
+        
+        # Delete option
+        st.divider()
+        with st.expander("🗑️ Delete Purchase Entry"):
+            st.warning("⚠️ Select row to delete")
+            if len(i_df) > 0:
+                del_idx = st.number_input("Row number to delete (from above table)", min_value=0, max_value=len(i_df)-1, value=0)
+                st.info(f"Selected: {i_df.iloc[del_idx, 0] if len(i_df.columns) > 0 else 'N/A'}")
+                if st.button("🗑️ Delete Selected Purchase"):
+                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
+                    st.info("Go to Inventory sheet and delete the corresponding row")
 
 # --- 8. LIVE STOCK ---
 elif menu == "📋 Live Stock":
@@ -628,6 +753,17 @@ elif menu == "💰 Expenses":
     if not e_df.empty: 
         st.subheader("📋 Recent Expenses")
         st.dataframe(e_df.tail(15), use_container_width=True)
+        
+        # Delete option
+        st.divider()
+        with st.expander("🗑️ Delete Expense Entry"):
+            st.warning("⚠️ Select row to delete")
+            if len(e_df) > 0:
+                del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(e_df)-1, value=0, key="del_exp")
+                st.info(f"Selected: {e_df.iloc[del_idx, 1] if len(e_df.columns) > 1 else 'N/A'} - ₹{e_df.iloc[del_idx, 2] if len(e_df.columns) > 2 else 0}")
+                if st.button("🗑️ Delete Selected Expense"):
+                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
+                    st.info("Go to Expenses sheet and delete the corresponding row")
 
 # --- 10. PET REGISTER ---
 elif menu == "🐾 Pet Register":
@@ -652,6 +788,16 @@ elif menu == "🐾 Pet Register":
     p_df = load_data("PetRecords")
     if not p_df.empty: 
         st.dataframe(p_df, use_container_width=True)
+        
+        # Delete option
+        st.divider()
+        with st.expander("🗑️ Delete Pet Record"):
+            if len(p_df) > 0:
+                del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(p_df)-1, value=0, key="del_pet")
+                st.info(f"Selected: {p_df.iloc[del_idx, 0] if len(p_df.columns) > 0 else 'N/A'}")
+                if st.button("🗑️ Delete Selected Pet"):
+                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
+                    st.info("Go to PetRecords sheet and delete the corresponding row")
 
 # --- 11. CUSTOMER KHATA ---
 elif menu == "📒 Customer Khata":
@@ -683,6 +829,17 @@ elif menu == "📒 Customer Khata":
         sum_df.columns = ['Customer', 'Balance']
         sum_df = sum_df[sum_df['Balance'] != 0].sort_values('Balance', ascending=False)
         st.table(sum_df)
+        
+        # Delete option
+        st.divider()
+        with st.expander("🗑️ Delete Khata Entry"):
+            st.dataframe(k_df.tail(10), use_container_width=True)
+            if len(k_df) > 0:
+                del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(k_df)-1, value=0, key="del_khata")
+                st.info(f"Selected: {k_df.iloc[del_idx, 0] if len(k_df.columns) > 0 else 'N/A'}")
+                if st.button("🗑️ Delete Selected Entry"):
+                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
+                    st.info("Go to CustomerKhata sheet and delete the corresponding row")
 
 # --- 12. SUPPLIER DUES ---
 elif menu == "🏢 Supplier Dues":
@@ -747,6 +904,16 @@ elif menu == "🏢 Supplier Dues":
         st.divider()
         st.subheader("📋 All Transactions")
         st.dataframe(d_df, use_container_width=True)
+        
+        # Delete option
+        st.divider()
+        with st.expander("🗑️ Delete Due Entry"):
+            if len(d_df) > 0:
+                del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(d_df)-1, value=0, key="del_due")
+                st.info(f"Selected: {d_df.iloc[del_idx, 0] if len(d_df.columns) > 0 else 'N/A'}")
+                if st.button("🗑️ Delete Selected Entry"):
+                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
+                    st.info("Go to Dues sheet and delete the corresponding row")
 
 # --- 13. ROYALTY POINTS ---
 elif menu == "👑 Royalty Points":
