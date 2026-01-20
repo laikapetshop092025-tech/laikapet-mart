@@ -1398,12 +1398,13 @@ elif menu == "👑 Royalty Points":
 
 # --- 14. ADVANCED REPORTS & ANALYTICS ---
 elif menu == "📈 Advanced Reports":
-    st.markdown("""
-    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
-        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">📈 Advanced Reports & Analytics</h1>
-        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Deep Insights for Smart Business Decisions</p>
-    </div>
-    """, unsafe_allow_html=True)
+    try:
+        st.markdown("""
+        <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+            <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">📈 Advanced Reports & Analytics</h1>
+            <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Deep Insights for Smart Business Decisions</p>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Load all data
     s_df = load_data("Sales")
@@ -1478,12 +1479,12 @@ elif menu == "📈 Advanced Reports":
                 # Sort by revenue
                 best_sellers_df['Revenue_Numeric'] = [product_stats[k]['revenue'] for k in product_stats.keys()]
                 best_sellers_df = best_sellers_df.sort_values('Revenue_Numeric', ascending=False)
-                best_sellers_df = best_sellers_df.drop('Revenue_Numeric', axis=1)
+                best_sellers_df = best_sellers_df.drop('Revenue_Numeric', axis=1).reset_index(drop=True)
                 
                 # Display top 10
                 st.markdown("### 🥇 Top 10 Products by Revenue")
                 
-                top10 = best_sellers_df.head(10)
+                top10 = best_sellers_df.head(10).reset_index(drop=True)
                 
                 # Highlight rows
                 def highlight_top3(row):
@@ -1496,8 +1497,11 @@ elif menu == "📈 Advanced Reports":
                     else:
                         return [''] * len(row)
                 
-                styled_top10 = top10.style.apply(highlight_top3, axis=1)
-                st.dataframe(styled_top10, use_container_width=True)
+                if not top10.empty:
+                    styled_top10 = top10.style.apply(highlight_top3, axis=1)
+                    st.dataframe(styled_top10, use_container_width=True)
+                else:
+                    st.info("No product data to display")
                 
                 # Summary metrics
                 st.divider()
@@ -1691,9 +1695,13 @@ elif menu == "📈 Advanced Reports":
                     else:
                         return [''] * len(row)
                 
-                profit_df_display = profit_df.drop('Margin_Numeric', axis=1)
-                styled_profit = profit_df_display.style.apply(highlight_margins, axis=1)
-                st.dataframe(styled_profit, use_container_width=True)
+                # Check if dataframe has data before styling
+                if not profit_df.empty:
+                    profit_df_display = profit_df.drop('Margin_Numeric', axis=1)
+                    styled_profit = profit_df_display.style.apply(highlight_margins, axis=1)
+                    st.dataframe(styled_profit, use_container_width=True)
+                else:
+                    st.info("No profit data available for analysis")
                 
                 # Legend
                 st.markdown("""
@@ -1905,3 +1913,9 @@ elif menu == "📈 Advanced Reports":
                     
                     csv = summary.to_csv(index=False).encode('utf-8')
                     st.download_button("📥 Download", csv, f"udhaar_report_{today_dt}.csv", "text/csv")
+    
+    except Exception as e:
+        st.error(f"⚠️ Error generating report: {str(e)}")
+        st.info("💡 Please make sure you have sales data in your sheets")
+        with st.expander("🔧 Technical Details"):
+            st.code(str(e))
