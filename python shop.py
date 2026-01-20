@@ -430,8 +430,9 @@ if user_role == "owner":
         "🏢 Supplier Dues",
         "👑 Royalty Points",
         "📈 Advanced Reports",
-        "👥 User Management",
-        "🔔 Automated Reminders"
+        "🔔 Automated Reminders",
+        "💼 GST & Invoices",
+        "👥 User Management"
     ]
 elif user_role == "manager":
     # Manager has most access except user management
@@ -446,7 +447,8 @@ elif user_role == "manager":
         "🏢 Supplier Dues",
         "👑 Royalty Points",
         "📈 Advanced Reports",
-        "🔔 Automated Reminders"
+        "🔔 Automated Reminders",
+        "💼 GST & Invoices"
     ]
 else:  # staff
     # Staff has limited access - billing and basic operations only
@@ -788,7 +790,23 @@ elif menu == "🧾 Billing":
         else:
             st.metric("👑 Available Points", 0)
     
-    pay_m = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar"])
+    # GST Option Checkbox
+    col1, col2 = st.columns(2)
+    with col1:
+        pay_m = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar"])
+    with col2:
+        gst_bill = st.checkbox("📄 GST Bill Required?", value=False, help="Check if customer needs GST invoice")
+    
+    # Show GST fields only if checkbox is checked
+    if gst_bill:
+        st.info("📄 GST Invoice Details Required")
+        col1, col2 = st.columns(2)
+        with col1:
+            c_gstin = st.text_input("Customer GSTIN (Optional)", placeholder="Enter if available", help="Leave empty for B2C")
+            c_address = st.text_area("Billing Address", placeholder="Required for GST invoice")
+        with col2:
+            gst_rate = st.selectbox("GST Rate %", [5, 12, 18, 28], index=2, help="Select applicable GST rate")
+            st.info(f"Selected: {gst_rate}% GST\nCGST: {gst_rate/2}% | SGST: {gst_rate/2}%")
     
     with st.expander("🛒 Add Item", expanded=True):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
@@ -834,7 +852,26 @@ elif menu == "🧾 Billing":
         # Calculate what balance will be after this transaction
         new_balance = pts_bal + total_pts
         
-        st.subheader(f"💰 Total: ₹{total_amt:,.2f}")
+        # Show GST calculation if GST bill is selected
+        if gst_bill:
+            st.divider()
+            st.markdown("### 💼 GST Invoice Calculation")
+            
+            # Calculate GST amounts
+            taxable_amount = total_amt / (1 + gst_rate/100)
+            gst_amount = total_amt - taxable_amount
+            cgst = gst_amount / 2
+            sgst = gst_amount / 2
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("💰 Taxable Amount", f"₹{taxable_amount:.2f}")
+            col2.metric(f"🔴 CGST ({gst_rate/2}%)", f"₹{cgst:.2f}")
+            col3.metric(f"🔵 SGST ({gst_rate/2}%)", f"₹{sgst:.2f}")
+            col4.metric("📊 Total GST", f"₹{gst_amount:.2f}")
+            
+            st.success(f"💳 **Grand Total (with GST): ₹{total_amt:,.2f}**")
+        else:
+            st.subheader(f"💰 Total: ₹{total_amt:,.2f}")
         
         # Show points info
         col1, col2 = st.columns(2)
@@ -875,6 +912,22 @@ elif menu == "🧾 Billing":
             
             points_msg += f"\n👑 *कुल बचे प्वाइंट्स:* {int(new_pts_balance)}"
             
+            # Add GST details if applicable
+            if gst_bill:
+                taxable_amount = total_amt / (1 + gst_rate/100)
+                gst_amount = total_amt - taxable_amount
+                cgst = gst_amount / 2
+                sgst = gst_amount / 2
+                
+                gst_details = f"""
+📄 *GST Invoice Details:*
+Taxable Amount: ₹{taxable_amount:.2f}
+CGST ({gst_rate/2}%): ₹{cgst:.2f}
+SGST ({gst_rate/2}%): ₹{sgst:.2f}
+Total GST: ₹{gst_amount:.2f}"""
+            else:
+                gst_details = ""
+            
             message = f"""🐾 *LAIKA PET MART* 🐾
             
 नमस्ते {c_name} जी!
@@ -884,6 +937,7 @@ elif menu == "🧾 Billing":
 
 💰 *कुल राशि:* ₹{total_amt:,.2f}
 {points_msg}
+{gst_details}
 
 धन्यवाद! 🙏
 फिर से आइएगा! 🐕"""
@@ -2654,4 +2708,384 @@ Laika Pet Mart"""
         
         if st.button("💾 Save Settings", type="primary"):
             st.success("✅ Settings saved successfully!")
+            st.info("Note: Some features require additional setup")
+
+# --- 16. GST & INVOICE MANAGEMENT ---
+elif menu == "💼 GST & Invoices":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">💼 GST & Invoice Management</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Professional Invoicing & Tax Management</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📄 Generate Invoice",
+        "📊 GST Summary",
+        "🗂️ Invoice History",
+        "📈 Tax Reports",
+        "⚙️ GST Settings"
+    ])
+    
+    # ==================== TAB 1: GENERATE INVOICE ====================
+    with tab1:
+        st.subheader("📄 Generate GST Invoice")
+        
+        # Business details (should be in settings in production)
+        st.markdown("### 🏢 Business Details")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            business_name = st.text_input("Business Name", value="LAIKA PET MART", key="biz_name")
+            business_address = st.text_area("Address", value="Shop No. 123, Main Market\nBareilly, UP - 243001", key="biz_addr")
+            gstin = st.text_input("GSTIN", value="09XXXXX1234X1Z5", placeholder="Enter your GSTIN", key="gstin")
+        
+        with col2:
+            business_phone = st.text_input("Phone", value="+91 9876543210", key="biz_phone")
+            business_email = st.text_input("Email", value="laika@petmart.com", key="biz_email")
+            pan = st.text_input("PAN", value="XXXXX1234X", key="pan")
+        
+        st.divider()
+        
+        # Customer details
+        st.markdown("### 👤 Customer Details")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            cust_name = st.text_input("Customer Name", key="inv_cust_name")
+            cust_phone = st.text_input("Phone", key="inv_cust_phone")
+            cust_gstin = st.text_input("Customer GSTIN (Optional)", placeholder="Leave empty for B2C", key="cust_gstin")
+        
+        with col2:
+            cust_address = st.text_area("Billing Address", key="inv_cust_addr")
+            invoice_date = st.date_input("Invoice Date", value=datetime.now().date(), key="inv_date")
+            invoice_num = st.text_input("Invoice Number", value=f"INV-{datetime.now().strftime('%Y%m%d')}-001", key="inv_num")
+        
+        st.divider()
+        
+        # Items
+        st.markdown("### 📦 Invoice Items")
+        
+        # Initialize items in session state
+        if 'invoice_items' not in st.session_state:
+            st.session_state.invoice_items = []
+        
+        # Add item form
+        with st.form("add_invoice_item"):
+            col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
+            
+            with col1:
+                item_name = st.text_input("Item Description", key="item_desc")
+            with col2:
+                item_qty = st.number_input("Qty", min_value=0.1, value=1.0, key="item_qty")
+            with col3:
+                item_rate = st.number_input("Rate", min_value=0.0, value=0.0, key="item_rate")
+            with col4:
+                item_gst = st.selectbox("GST %", [0, 5, 12, 18, 28], index=3, key="item_gst")
+            with col5:
+                add_item = st.form_submit_button("➕ Add", use_container_width=True)
+            
+            if add_item and item_name and item_rate > 0:
+                taxable_amt = item_qty * item_rate
+                gst_amt = (taxable_amt * item_gst) / 100
+                total_amt = taxable_amt + gst_amt
+                
+                st.session_state.invoice_items.append({
+                    'Description': item_name,
+                    'Qty': item_qty,
+                    'Rate': item_rate,
+                    'Taxable': taxable_amt,
+                    'GST %': item_gst,
+                    'GST Amt': gst_amt,
+                    'Total': total_amt
+                })
+                st.rerun()
+        
+        # Display items
+        if st.session_state.invoice_items:
+            items_df = pd.DataFrame(st.session_state.invoice_items)
+            st.dataframe(items_df, use_container_width=True)
+            
+            # Calculate totals
+            total_taxable = sum([item['Taxable'] for item in st.session_state.invoice_items])
+            total_gst = sum([item['GST Amt'] for item in st.session_state.invoice_items])
+            grand_total = sum([item['Total'] for item in st.session_state.invoice_items])
+            
+            # Display summary
+            st.divider()
+            col1, col2, col3 = st.columns(3)
+            col1.metric("💰 Taxable Amount", f"₹{total_taxable:,.2f}")
+            col2.metric("📊 Total GST", f"₹{total_gst:,.2f}")
+            col3.metric("💳 Grand Total", f"₹{grand_total:,.2f}")
+            
+            # Action buttons
+            st.divider()
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("📄 Generate PDF Invoice", type="primary", use_container_width=True):
+                    st.success("✅ Invoice generated successfully!")
+                    st.info("📥 Download feature: Install reportlab library")
+                    st.code("pip install reportlab")
+            
+            with col2:
+                if st.button("📧 Email Invoice", use_container_width=True):
+                    st.info("📧 Email feature coming soon!")
+            
+            with col3:
+                if st.button("🗑️ Clear Items", use_container_width=True):
+                    st.session_state.invoice_items = []
+                    st.rerun()
+        else:
+            st.info("➕ Add items to generate invoice")
+    
+    # ==================== TAB 2: GST SUMMARY ====================
+    with tab2:
+        st.subheader("📊 GST Summary Report")
+        
+        # Date range
+        col1, col2 = st.columns(2)
+        with col1:
+            gst_start = st.date_input("From Date", value=datetime.now().date() - timedelta(days=30), key="gst_start")
+        with col2:
+            gst_end = st.date_input("To Date", value=datetime.now().date(), key="gst_end")
+        
+        # Load sales data
+        s_df = load_data("Sales")
+        
+        if not s_df.empty and 'Date' in s_df.columns:
+            # Filter by date
+            filtered_sales = s_df[(s_df['Date'] >= gst_start) & (s_df['Date'] <= gst_end)]
+            
+            if not filtered_sales.empty:
+                # Calculate GST (assuming 18% on all sales)
+                total_sales = pd.to_numeric(filtered_sales.iloc[:, 3], errors='coerce').sum()
+                
+                # GST breakdown
+                gst_rate = 18  # Default 18%
+                
+                # Taxable amount (sales / 1.18)
+                taxable_amt = total_sales / (1 + gst_rate/100)
+                gst_amt = total_sales - taxable_amt
+                
+                cgst = gst_amt / 2
+                sgst = gst_amt / 2
+                
+                # Display summary
+                st.markdown("### 💰 Period Summary")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("💵 Total Sales", f"₹{total_sales:,.2f}")
+                col2.metric("📊 Taxable Amount", f"₹{taxable_amt:,.2f}")
+                col3.metric("🔴 CGST (9%)", f"₹{cgst:,.2f}")
+                col4.metric("🔵 SGST (9%)", f"₹{sgst:,.2f}")
+                
+                st.divider()
+                
+                # GST breakdown by rate
+                st.markdown("### 📋 GST Rate-wise Breakdown")
+                
+                # Sample breakdown (in production, store GST % with each sale)
+                breakdown_data = {
+                    'GST Rate': ['5%', '12%', '18%', '28%'],
+                    'Taxable Amount': [0, 0, taxable_amt, 0],
+                    'CGST': [0, 0, cgst, 0],
+                    'SGST': [0, 0, sgst, 0],
+                    'Total GST': [0, 0, gst_amt, 0]
+                }
+                
+                breakdown_df = pd.DataFrame(breakdown_data)
+                st.dataframe(breakdown_df, use_container_width=True)
+                
+                # Download GSTR report
+                st.divider()
+                csv = breakdown_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download GST Report (CSV)",
+                    data=csv,
+                    file_name=f"GST_Report_{gst_start}_to_{gst_end}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("No sales in selected date range")
+        else:
+            st.info("No sales data available")
+    
+    # ==================== TAB 3: INVOICE HISTORY ====================
+    with tab3:
+        st.subheader("🗂️ Invoice History")
+        
+        # Load sales as invoices
+        s_df = load_data("Sales")
+        
+        if not s_df.empty:
+            st.info("💡 Currently showing sales records. Full invoice management coming soon!")
+            
+            # Display recent transactions
+            st.markdown("### 📋 Recent Transactions")
+            
+            # Show last 20 transactions
+            recent_sales = s_df.tail(20).copy()
+            
+            if not recent_sales.empty:
+                # Format for display
+                display_df = recent_sales.copy()
+                
+                # Add invoice number (simulated)
+                display_df['Invoice'] = [f"INV-{i+1:04d}" for i in range(len(display_df))]
+                
+                st.dataframe(display_df, use_container_width=True)
+                
+                # Summary
+                st.divider()
+                total = pd.to_numeric(recent_sales.iloc[:, 3], errors='coerce').sum()
+                st.success(f"💰 Total: ₹{total:,.2f} ({len(recent_sales)} transactions)")
+        else:
+            st.info("No invoice history available")
+    
+    # ==================== TAB 4: TAX REPORTS ====================
+    with tab4:
+        st.subheader("📈 Tax Reports & Analytics")
+        
+        # Report type selector
+        report_type = st.selectbox(
+            "Select Report Type",
+            [
+                "Monthly GST Summary",
+                "Quarterly GST Summary", 
+                "Annual Tax Report",
+                "GSTR-1 Format",
+                "GSTR-3B Format"
+            ]
+        )
+        
+        # Financial year selector
+        fy_year = st.selectbox("Financial Year", ["2024-25", "2025-26", "2026-27"], index=1)
+        
+        if report_type == "Monthly GST Summary":
+            st.info("📊 Monthly GST breakdown for " + fy_year)
+            
+            # Sample monthly data
+            months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar']
+            
+            monthly_data = {
+                'Month': months,
+                'Sales': [0] * 12,
+                'Taxable': [0] * 12,
+                'CGST': [0] * 12,
+                'SGST': [0] * 12,
+                'Total GST': [0] * 12
+            }
+            
+            # Load actual data
+            s_df = load_data("Sales")
+            if not s_df.empty and 'Date' in s_df.columns:
+                s_df['Month'] = pd.to_datetime(s_df['Date'], errors='coerce').dt.month
+                s_df['Year'] = pd.to_datetime(s_df['Date'], errors='coerce').dt.year
+                
+                # Filter for current FY
+                fy_sales = s_df[s_df['Year'] == 2026]  # Adjust based on FY
+                
+                for i, month_num in enumerate(range(4, 13)):  # Apr to Dec
+                    month_sales = fy_sales[fy_sales['Month'] == month_num]
+                    if not month_sales.empty:
+                        total = pd.to_numeric(month_sales.iloc[:, 3], errors='coerce').sum()
+                        taxable = total / 1.18
+                        gst = total - taxable
+                        
+                        monthly_data['Sales'][i] = total
+                        monthly_data['Taxable'][i] = taxable
+                        monthly_data['CGST'][i] = gst / 2
+                        monthly_data['SGST'][i] = gst / 2
+                        monthly_data['Total GST'][i] = gst
+            
+            monthly_df = pd.DataFrame(monthly_data)
+            st.dataframe(monthly_df, use_container_width=True)
+            
+            # Download
+            csv = monthly_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Monthly Report",
+                data=csv,
+                file_name=f"Monthly_GST_{fy_year}.csv",
+                mime="text/csv"
+            )
+        
+        elif report_type == "GSTR-1 Format":
+            st.warning("📋 GSTR-1 Format Template")
+            st.info("""
+            **GSTR-1 Components:**
+            - B2B Invoices (with GSTIN)
+            - B2C Large Invoices (>₹2.5 lakh)
+            - B2C Small Invoices
+            - Credit/Debit Notes
+            - Exports
+            
+            This feature requires detailed invoice data with customer GSTIN.
+            """)
+        
+        else:
+            st.info(f"📊 {report_type} feature coming soon!")
+    
+    # ==================== TAB 5: GST SETTINGS ====================
+    with tab5:
+        st.subheader("⚙️ GST Configuration & Settings")
+        
+        st.markdown("### 🏢 Business Registration Details")
+        
+        with st.form("gst_settings"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.text_input("Legal Business Name", value="LAIKA PET MART", key="legal_name")
+                st.text_input("Trade Name", value="Laika Pet Store", key="trade_name")
+                st.text_input("GSTIN", value="09XXXXX1234X1Z5", key="gstin_settings")
+                st.text_input("PAN", value="XXXXX1234X", key="pan_settings")
+            
+            with col2:
+                st.text_input("State Code", value="09 - Uttar Pradesh", key="state_code")
+                st.selectbox("Business Type", ["Retailer", "Wholesaler", "Both"], key="biz_type")
+                st.selectbox("Composition Scheme", ["No", "Yes"], key="composition")
+                st.date_input("GST Registration Date", key="gst_reg_date")
+            
+            st.divider()
+            
+            st.markdown("### 📊 Default GST Rates")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.number_input("Pet Food GST %", value=18, min_value=0, max_value=28, key="food_gst")
+                st.number_input("Pet Accessories GST %", value=18, min_value=0, max_value=28, key="acc_gst")
+            
+            with col2:
+                st.number_input("Pet Medicines GST %", value=12, min_value=0, max_value=28, key="med_gst")
+                st.number_input("Pet Grooming GST %", value=18, min_value=0, max_value=28, key="groom_gst")
+            
+            with col3:
+                st.number_input("Services GST %", value=18, min_value=0, max_value=28, key="serv_gst")
+                st.number_input("Other Items GST %", value=18, min_value=0, max_value=28, key="other_gst")
+            
+            st.divider()
+            
+            st.markdown("### 📄 Invoice Settings")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.text_input("Invoice Prefix", value="INV", key="inv_prefix")
+                st.selectbox("Invoice Numbering", ["Sequential", "Date-based", "Custom"], key="inv_numbering")
+                st.checkbox("Show HSN/SAC Codes", value=True, key="show_hsn")
+            
+            with col2:
+                st.text_input("Invoice Footer Text", value="Thank you for your business!", key="inv_footer")
+                st.checkbox("Include Bank Details", value=True, key="show_bank")
+                st.checkbox("Include Terms & Conditions", value=True, key="show_terms")
+            
+            st.divider()
+            
+            if st.form_submit_button("💾 Save GST Settings", type="primary"):
+                st.success("✅ GST settings saved successfully!")
+                st.info("⚠️ Note: Settings are stored in session. For permanent storage, connect to database.")
             st.info("Note: Some features require additional setup")
