@@ -524,8 +524,34 @@ if menu == "📊 Dashboard":
         rate_vals = pd.to_numeric(i_today.iloc[:, 3], errors='coerce').fillna(0)
         today_pur = (qty_vals * rate_vals).sum()
     
+    # Calculate 18 Jan 2026 purchase total
+    jan18_date = datetime(2026, 1, 18).date()
+    i_jan18 = i_df[i_df['Date'] == jan18_date] if not i_df.empty and 'Date' in i_df.columns else pd.DataFrame()
+    jan18_pur = 0
+    jan18_items_count = 0
+    if not i_jan18.empty and len(i_jan18.columns) > 3:
+        qty_vals_jan18 = pd.to_numeric(i_jan18.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
+        rate_vals_jan18 = pd.to_numeric(i_jan18.iloc[:, 3], errors='coerce').fillna(0)
+        jan18_pur = (qty_vals_jan18 * rate_vals_jan18).sum()
+        jan18_items_count = len(i_jan18)
+    
     today_exp = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty and len(e_today.columns) > 2 else 0
     today_profit = pd.to_numeric(s_today.iloc[:, 7], errors='coerce').sum() if not s_today.empty and len(s_today.columns) > 7 else 0
+    
+    # Show 18 Jan Purchase Alert (if exists)
+    if jan18_pur > 0:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(255,107,107,0.4);">
+            <div style="text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 24px;">🚨 18 January 2026 Purchase</h3>
+                <p style="margin: 10px 0 0 0; font-size: 18px;">Total Items: {jan18_items_count} | Total Amount: ₹{jan18_pur:,.2f}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Show detailed items
+        with st.expander("📋 View 18 Jan Purchase Details"):
+            st.dataframe(i_jan18, use_container_width=True)
     
     c1, c2, c3, c4 = st.columns(4)
     
@@ -599,6 +625,11 @@ if menu == "📊 Dashboard":
         qty_vals = pd.to_numeric(i_month.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
         rate_vals = pd.to_numeric(i_month.iloc[:, 3], errors='coerce').fillna(0)
         month_pur = (qty_vals * rate_vals).sum()
+    
+    # Add 18 Jan purchase to monthly total if it's in current month
+    if jan18_date.month == curr_m and jan18_date.year == today_dt.year:
+        month_pur += jan18_pur
+        st.info(f"📌 18 Jan Purchase (₹{jan18_pur:,.2f}) is included in Monthly Purchase Total")
     
     month_exp = pd.to_numeric(e_month.iloc[:, 2], errors='coerce').sum() if not e_month.empty and len(e_month.columns) > 2 else 0
     month_profit = pd.to_numeric(s_month.iloc[:, 7], errors='coerce').sum() if not s_month.empty and len(s_month.columns) > 7 else 0
