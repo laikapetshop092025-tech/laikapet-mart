@@ -116,42 +116,19 @@ def load_data(sheet_name):
         return pd.DataFrame()
 
 def get_balance_from_sheet(mode):
-    """Get balance from Google Sheets"""
-    try:
-        b_df = load_data("Balances")
-        if b_df.empty or len(b_df.columns) < 2:
-            # Initialize if empty
-            save_data("Balances", ["Cash", 0.0])
-            save_data("Balances", ["Online", 0.0])
-            return 0.0
-        
-        rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
-        if len(rows) > 0:
-            return float(pd.to_numeric(rows.iloc[0, 1], errors='coerce'))
-        else:
-            # Mode not found, initialize it
-            save_data("Balances", [mode, 0.0])
-            return 0.0
-    except:
-        return 0.0
+    """Get balance from Google Sheets - DISABLED FOR NOW"""
+    # Returning 0 always - not loading from sheets anymore
+    return 0.0
 
 def get_current_balance(mode):
-    """Get current balance - only from session state, initialize once from sheets"""
+    """Get current balance - PURE LOCAL, NO SHEETS LOADING"""
     if mode == "Cash":
-        # Only load from sheets if never initialized before
-        if st.session_state.manual_cash is None and not st.session_state.balance_initialized:
-            st.session_state.manual_cash = get_balance_from_sheet("Cash")
-            st.session_state.balance_initialized = True
-        # If still None after initialization, set to 0
+        # If never set, default to 0
         if st.session_state.manual_cash is None:
             st.session_state.manual_cash = 0.0
         return st.session_state.manual_cash
     elif mode == "Online":
-        # Only load from sheets if never initialized before
-        if st.session_state.manual_online is None and not st.session_state.balance_initialized:
-            st.session_state.manual_online = get_balance_from_sheet("Online")
-            st.session_state.balance_initialized = True
-        # If still None after initialization, set to 0
+        # If never set, default to 0
         if st.session_state.manual_online is None:
             st.session_state.manual_online = 0.0
         return st.session_state.manual_online
@@ -279,6 +256,33 @@ if menu == "📊 Dashboard":
             <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
         </div>
         """, unsafe_allow_html=True)
+    
+    # FIRST TIME SETUP ALERT
+    cash_test = st.session_state.manual_cash if st.session_state.manual_cash is not None else 0
+    online_test = st.session_state.manual_online if st.session_state.manual_online is not None else 0
+    
+    if cash_test == 0 and online_test == 0 and not st.session_state.balance_initialized:
+        st.error("🚨 **BALANCE NOT SET** - Please set your starting balance below!")
+        col1, col2, col3 = st.columns([1, 1, 1])
+        
+        with col1:
+            set_cash = st.number_input("💵 Starting Cash", value=0.0, step=100.0, key="init_cash")
+        
+        with col2:
+            set_online = st.number_input("🏦 Starting Online", value=920.0, step=100.0, key="init_online")
+        
+        with col3:
+            st.write("")
+            st.write("")
+            if st.button("✅ SET & START", type="primary", use_container_width=True, key="init_btn"):
+                st.session_state.manual_cash = set_cash
+                st.session_state.manual_online = set_online
+                st.session_state.balance_initialized = True
+                st.success(f"✅ Set! Cash: ₹{set_cash:,.2f}, Online: ₹{set_online:,.2f}")
+                time.sleep(1)
+                st.rerun()
+        
+        st.divider()
     
     s_df = load_data("Sales")
     e_df = load_data("Expenses")
