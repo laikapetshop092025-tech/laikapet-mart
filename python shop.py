@@ -7,7 +7,7 @@ import time
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 
-# Custom CSS for beautiful sidebar
+# Custom CSS for beautiful sidebar with button menu
 st.markdown("""
 <style>
     /* Sidebar styling - Light background */
@@ -15,38 +15,32 @@ st.markdown("""
         background: linear-gradient(180deg, #e0e7ff 0%, #f3f4f6 100%);
     }
     
-    /* Hide default radio circles */
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] > div[data-testid="stRadio"] > div {
-        gap: 8px;
-    }
-    
-    /* Menu item buttons */
-    [data-testid="stSidebar"] .stRadio > label {
+    /* All sidebar buttons - Menu items + Logout */
+    [data-testid="stSidebar"] .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: 2px solid transparent;
         padding: 14px 20px;
         border-radius: 12px;
-        margin: 6px 0;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
-        display: block;
-        color: white !important;
         font-weight: 600;
         font-size: 15px;
+        transition: all 0.3s ease;
         box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+        width: 100%;
+        margin: 4px 0;
         text-align: left;
     }
     
-    /* Hover effect */
-    [data-testid="stSidebar"] .stRadio > label:hover {
+    /* Hover effect - All buttons */
+    [data-testid="stSidebar"] .stButton > button:hover {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         transform: translateX(5px);
         box-shadow: 0 5px 20px rgba(240, 147, 251, 0.5);
         border: 2px solid #ff6b9d;
     }
     
-    /* Selected button - Bright and clear */
-    [data-testid="stSidebar"] .stRadio > label:has(input:checked) {
+    /* Primary button (selected menu item) */
+    [data-testid="stSidebar"] .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
         box-shadow: 0 5px 25px rgba(255, 216, 155, 0.6);
         transform: scale(1.03);
@@ -54,25 +48,11 @@ st.markdown("""
         font-weight: 700;
     }
     
-    /* Logout button */
-    [data-testid="stSidebar"] .stButton > button {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        border: 2px solid transparent;
-        padding: 14px 20px;
-        border-radius: 12px;
-        font-weight: bold;
-        font-size: 15px;
-        transition: all 0.3s ease;
-        box-shadow: 0 3px 15px rgba(240, 147, 251, 0.4);
-        width: 100%;
-    }
-    
-    [data-testid="stSidebar"] .stButton > button:hover {
+    /* Primary button hover */
+    [data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
         background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(255, 216, 155, 0.5);
-        border: 2px solid #ffd89b;
+        transform: scale(1.05) translateX(5px);
+        box-shadow: 0 8px 30px rgba(255, 216, 155, 0.7);
     }
     
     /* Main Menu heading */
@@ -346,8 +326,46 @@ if st.session_state.last_check_date != today_dt:
         archive_daily_data()
     st.session_state.last_check_date = today_dt
 
-# --- 4. SIDEBAR ---
-menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Purchase", "📋 Live Stock", "💰 Expenses", "🐾 Pet Register", "📒 Customer Khata", "🏢 Supplier Dues", "👑 Royalty Points"])
+# --- 4. SIDEBAR MENU WITH BUTTONS ---
+st.sidebar.markdown("<h2 style='text-align: center; color: #1e293b; margin-bottom: 20px;'>📋 Main Menu</h2>", unsafe_allow_html=True)
+
+# Initialize selected menu in session state
+if 'selected_menu' not in st.session_state:
+    st.session_state.selected_menu = "📊 Dashboard"
+
+# Menu items
+menu_items = [
+    "📊 Dashboard",
+    "🧾 Billing", 
+    "📦 Purchase",
+    "📋 Live Stock",
+    "💰 Expenses",
+    "🐾 Pet Register",
+    "📒 Customer Khata",
+    "🏢 Supplier Dues",
+    "👑 Royalty Points"
+]
+
+# Create buttons for each menu item
+for item in menu_items:
+    # Check if this is the selected menu
+    is_selected = (st.session_state.selected_menu == item)
+    
+    # Button with custom styling based on selection
+    button_type = "primary" if is_selected else "secondary"
+    
+    if st.sidebar.button(
+        item, 
+        key=f"menu_{item}",
+        use_container_width=True,
+        type=button_type
+    ):
+        st.session_state.selected_menu = item
+        st.rerun()
+
+# Get the selected menu (without emoji for comparison)
+menu = st.session_state.selected_menu
+
 st.sidebar.divider()
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
