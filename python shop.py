@@ -1339,20 +1339,11 @@ elif menu == "👑 Royalty Points":
             st.divider()
             st.subheader("📊 Customer Points Leaderboard (Consolidated)")
             
-            # Color code the dataframe
-            def highlight_points(row):
-                pts = row['Total Points']
-                if pts >= 100:
-                    return ['background-color: #D4EDDA'] * len(row)
-                elif pts >= 50:
-                    return ['background-color: #FFF3CD'] * len(row)
-                elif pts < 0:
-                    return ['background-color: #F8D7DA'] * len(row)
-                else:
-                    return [''] * len(row)
+            # Simple display without styling
+            st.dataframe(points_df, use_container_width=True, height=400)
             
-            styled_df = points_df.style.apply(highlight_points, axis=1)
-            st.dataframe(styled_df, use_container_width=True, height=400)
+            # Show color guide
+            st.info("💚 100+ points = VIP | 💛 50+ points = Regular | 🔴 Negative = Used more than earned")
             
             # Detailed transaction history
             st.divider()
@@ -1485,20 +1476,16 @@ elif menu == "📈 Advanced Reports":
                 
                 top10 = best_sellers_df.head(10).reset_index(drop=True)
                 
-                # Highlight rows
-                def highlight_top3(row):
-                    if row.name == 0:
-                        return ['background-color: #FFD700'] * len(row)  # Gold
-                    elif row.name == 1:
-                        return ['background-color: #C0C0C0'] * len(row)  # Silver
-                    elif row.name == 2:
-                        return ['background-color: #CD7F32'] * len(row)  # Bronze
-                    else:
-                        return [''] * len(row)
-                
                 if not top10.empty:
-                    styled_top10 = top10.style.apply(highlight_top3, axis=1)
-                    st.dataframe(styled_top10, use_container_width=True)
+                    # Simple display without styling
+                    st.dataframe(top10, use_container_width=True)
+                    
+                    # Show medals separately
+                    st.info("🥇 #1: " + str(top10.iloc[0]['Product']) if len(top10) > 0 else "")
+                    if len(top10) > 1:
+                        st.info("🥈 #2: " + str(top10.iloc[1]['Product']))
+                    if len(top10) > 2:
+                        st.info("🥉 #3: " + str(top10.iloc[2]['Product']))
                 else:
                     st.info("No product data to display")
                 
@@ -1682,35 +1669,24 @@ elif menu == "📈 Advanced Reports":
                 # Sort by margin
                 profit_df = profit_df.sort_values('Margin_Numeric', ascending=False)
                 
-                # Highlight
-                def highlight_margins(row):
-                    margin = row['Margin_Numeric']
-                    if margin >= 30:
-                        return ['background-color: #D4EDDA'] * len(row)  # High margin
-                    elif margin >= 15:
-                        return ['background-color: #FFF3CD'] * len(row)  # Medium
-                    elif margin < 10:
-                        return ['background-color: #F8D7DA'] * len(row)  # Low margin
-                    else:
-                        return [''] * len(row)
-                
-                # Check if dataframe has data before styling
+                # Check if dataframe has data before displaying
                 if not profit_df.empty:
                     profit_df_display = profit_df.drop('Margin_Numeric', axis=1)
-                    styled_profit = profit_df_display.style.apply(highlight_margins, axis=1)
-                    st.dataframe(styled_profit, use_container_width=True)
+                    
+                    # Simple display without styling
+                    st.dataframe(profit_df_display, use_container_width=True)
+                    
+                    # Show color guide
+                    st.markdown("""
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;">
+                        <b>Margin Guide:</b><br>
+                        ✅ 30%+ = High margin - Excellent!<br>
+                        ⚠️ 15-30% = Medium margin - Good<br>
+                        ❌ <10% = Low margin - Review pricing
+                    </div>
+                    """, unsafe_allow_html=True)
                 else:
                     st.info("No profit data available for analysis")
-                
-                # Legend
-                st.markdown("""
-                <div style="padding: 15px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;">
-                    <b>Color Guide:</b><br>
-                    🟢 Green: High margin (30%+) - Excellent!<br>
-                    🟡 Yellow: Medium margin (15-30%) - Good<br>
-                    🔴 Red: Low margin (<10%) - Review pricing
-                </div>
-                """, unsafe_allow_html=True)
                 
                 # Download
                 csv = profit_df_display.to_csv(index=False).encode('utf-8')
