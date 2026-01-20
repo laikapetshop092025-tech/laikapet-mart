@@ -431,6 +431,7 @@ if user_role == "owner":
         "👑 Royalty Points",
         "📈 Advanced Reports",
         "🔔 Automated Reminders",
+        "👥 Customer Analytics",
         "💼 GST & Invoices",
         "👥 User Management"
     ]
@@ -448,6 +449,7 @@ elif user_role == "manager":
         "👑 Royalty Points",
         "📈 Advanced Reports",
         "🔔 Automated Reminders",
+        "👥 Customer Analytics",
         "💼 GST & Invoices"
     ]
 else:  # staff
@@ -2710,7 +2712,649 @@ Laika Pet Mart"""
             st.success("✅ Settings saved successfully!")
             st.info("Note: Some features require additional setup")
 
-# --- 16. GST & INVOICE MANAGEMENT ---
+# --- 17. CUSTOMER ANALYTICS ---
+elif menu == "👥 Customer Analytics":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">👥 Customer Analytics</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Deep Customer Insights & Behavior Analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Load data
+    s_df = load_data("Sales")
+    k_df = load_data("CustomerKhata")
+    p_df = load_data("PetRecords")
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "🏆 Top Customers",
+        "📊 Customer Segments",
+        "🔍 Individual Profile",
+        "📈 Purchase Patterns",
+        "⚠️ At-Risk Customers",
+        "🎯 Recommendations"
+    ])
+    
+    # ==================== TAB 1: TOP CUSTOMERS ====================
+    with tab1:
+        st.subheader("🏆 Top Customers by Value")
+        
+        if not s_df.empty and len(s_df.columns) > 5:
+            # Analyze customer data
+            customer_stats = {}
+            
+            for _, row in s_df.iterrows():
+                customer_info = str(row.iloc[5]) if len(row) > 5 else ""
+                amount = float(row.iloc[3]) if len(row) > 3 else 0
+                date = row.iloc[0] if len(row) > 0 else None
+                points = pd.to_numeric(row.iloc[6], errors='coerce') if len(row) > 6 else 0
+                
+                if customer_info and customer_info != "nan":
+                    if customer_info not in customer_stats:
+                        customer_stats[customer_info] = {
+                            'total_spent': 0,
+                            'visits': 0,
+                            'points': 0,
+                            'first_visit': date,
+                            'last_visit': date,
+                            'items_bought': []
+                        }
+                    
+                    customer_stats[customer_info]['total_spent'] += amount
+                    customer_stats[customer_info]['visits'] += 1
+                    customer_stats[customer_info]['points'] += points
+                    
+                    if date:
+                        if customer_stats[customer_info]['last_visit'] and date > customer_stats[customer_info]['last_visit']:
+                            customer_stats[customer_info]['last_visit'] = date
+                        if customer_stats[customer_info]['first_visit'] and date < customer_stats[customer_info]['first_visit']:
+                            customer_stats[customer_info]['first_visit'] = date
+            
+            if customer_stats:
+                # Convert to sorted list
+                top_customers = sorted(customer_stats.items(), key=lambda x: x[1]['total_spent'], reverse=True)
+                
+                # Summary metrics
+                total_customers = len(customer_stats)
+                total_revenue = sum([c[1]['total_spent'] for c in top_customers])
+                avg_spend = total_revenue / total_customers if total_customers > 0 else 0
+                
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("👥 Total Customers", total_customers)
+                col2.metric("💰 Total Revenue", f"₹{total_revenue:,.2f}")
+                col3.metric("📊 Avg Spend/Customer", f"₹{avg_spend:,.2f}")
+                col4.metric("🏆 Top Customer Spend", f"₹{top_customers[0][1]['total_spent']:,.2f}" if top_customers else "₹0")
+                
+                st.divider()
+                
+                # Display top 20 customers
+                st.markdown("### 🥇 Top 20 Customers")
+                
+                for i, (customer_info, stats) in enumerate(top_customers[:20], 1):
+                    # Extract name and phone
+                    if "(" in customer_info and ")" in customer_info:
+                        cust_name = customer_info.split("(")[0].strip()
+                        cust_phone = customer_info.split("(")[1].replace(")", "").strip()
+                    else:
+                        cust_name = customer_info
+                        cust_phone = "N/A"
+                    
+                    # Calculate customer lifetime value metrics
+                    avg_bill = stats['total_spent'] / stats['visits'] if stats['visits'] > 0 else 0
+                    
+                    # Days since last visit
+                    if stats['last_visit']:
+                        days_since = (datetime.now().date() - stats['last_visit']).days
+                    else:
+                        days_since = 999
+                    
+                    # Determine tier
+                    if stats['total_spent'] >= 10000:
+                        tier = "💎 Diamond"
+                        tier_color = "#B9F2FF"
+                    elif stats['total_spent'] >= 5000:
+                        tier = "👑 Platinum"
+                        tier_color = "#FFD700"
+                    elif stats['total_spent'] >= 2000:
+                        tier = "🥈 Gold"
+                        tier_color = "#C0C0C0"
+                    else:
+                        tier = "🥉 Silver"
+                        tier_color = "#CD7F32"
+                    
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, {tier_color} 0%, white 100%); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #667eea;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <h3 style="margin: 0; color: #333;">#{i} {cust_name} {tier}</h3>
+                                    <p style="margin: 5px 0; color: #666;">📱 {cust_phone}</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <h2 style="margin: 0; color: #667eea;">₹{stats['total_spent']:,.2f}</h2>
+                                    <p style="margin: 5px 0; color: #888;">{stats['visits']} visits | ₹{avg_bill:.0f} avg</p>
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Additional details
+                        col1, col2, col3, col4 = st.columns(4)
+                        col1.write(f"🎁 Points: {int(stats['points'])}")
+                        col2.write(f"📅 First Visit: {stats['first_visit']}")
+                        col3.write(f"🕒 Last Visit: {stats['last_visit']}")
+                        
+                        if days_since <= 7:
+                            col4.success(f"✅ Active ({days_since}d ago)")
+                        elif days_since <= 30:
+                            col4.warning(f"⚠️ {days_since}d ago")
+                        else:
+                            col4.error(f"🚨 Inactive ({days_since}d)")
+                        
+                        st.divider()
+                
+                # Download option
+                customer_df = pd.DataFrame([
+                    {
+                        'Customer': k.split("(")[0] if "(" in k else k,
+                        'Phone': k.split("(")[1].replace(")", "") if "(" in k else "N/A",
+                        'Total Spent': v['total_spent'],
+                        'Visits': v['visits'],
+                        'Avg Bill': v['total_spent']/v['visits'] if v['visits'] > 0 else 0,
+                        'Points': v['points'],
+                        'Last Visit': v['last_visit']
+                    }
+                    for k, v in customer_stats.items()
+                ])
+                
+                csv = customer_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Customer Report",
+                    data=csv,
+                    file_name=f"top_customers_{today_dt}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("No customer data available")
+        else:
+            st.info("No sales data found")
+    
+    # ==================== TAB 2: CUSTOMER SEGMENTS ====================
+    with tab2:
+        st.subheader("📊 Customer Segmentation Analysis")
+        
+        if not s_df.empty and len(s_df.columns) > 5:
+            # Calculate RFM (Recency, Frequency, Monetary)
+            customer_rfm = {}
+            
+            for _, row in s_df.iterrows():
+                customer_info = str(row.iloc[5]) if len(row) > 5 else ""
+                amount = float(row.iloc[3]) if len(row) > 3 else 0
+                date = row.iloc[0] if len(row) > 0 else None
+                
+                if customer_info and customer_info != "nan":
+                    if customer_info not in customer_rfm:
+                        customer_rfm[customer_info] = {
+                            'last_purchase': date,
+                            'frequency': 0,
+                            'monetary': 0
+                        }
+                    
+                    customer_rfm[customer_info]['frequency'] += 1
+                    customer_rfm[customer_info]['monetary'] += amount
+                    
+                    if date and customer_rfm[customer_info]['last_purchase']:
+                        if date > customer_rfm[customer_info]['last_purchase']:
+                            customer_rfm[customer_info]['last_purchase'] = date
+            
+            # Categorize customers
+            champions = []
+            loyal = []
+            potential = []
+            at_risk = []
+            dormant = []
+            
+            for customer, rfm in customer_rfm.items():
+                days_since = (datetime.now().date() - rfm['last_purchase']).days if rfm['last_purchase'] else 999
+                
+                if days_since <= 30 and rfm['frequency'] >= 5 and rfm['monetary'] >= 5000:
+                    champions.append((customer, rfm))
+                elif days_since <= 60 and rfm['frequency'] >= 3:
+                    loyal.append((customer, rfm))
+                elif days_since <= 90 and rfm['monetary'] >= 2000:
+                    potential.append((customer, rfm))
+                elif days_since <= 180 and rfm['frequency'] >= 2:
+                    at_risk.append((customer, rfm))
+                else:
+                    dormant.append((customer, rfm))
+            
+            # Display segments
+            st.markdown("### 🎯 Customer Segments")
+            
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            col1.markdown(f"""
+            <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                <h2 style="margin: 0; font-size: 36px;">{len(champions)}</h2>
+                <p style="margin: 5px 0 0 0;">💎 Champions</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col2.markdown(f"""
+            <div style="background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                <h2 style="margin: 0; font-size: 36px;">{len(loyal)}</h2>
+                <p style="margin: 5px 0 0 0;">👑 Loyal</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col3.markdown(f"""
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                <h2 style="margin: 0; font-size: 36px;">{len(potential)}</h2>
+                <p style="margin: 5px 0 0 0;">⭐ Potential</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col4.markdown(f"""
+            <div style="background: linear-gradient(135deg, #ffa751 0%, #ffe259 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                <h2 style="margin: 0; font-size: 36px;">{len(at_risk)}</h2>
+                <p style="margin: 5px 0 0 0;">⚠️ At Risk</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col5.markdown(f"""
+            <div style="background: linear-gradient(135deg, #868f96 0%, #596164 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                <h2 style="margin: 0; font-size: 36px;">{len(dormant)}</h2>
+                <p style="margin: 5px 0 0 0;">😴 Dormant</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            # Segment details
+            segment_choice = st.selectbox(
+                "View Segment Details",
+                ["💎 Champions", "👑 Loyal Customers", "⭐ Potential Loyalists", "⚠️ At Risk", "😴 Dormant"]
+            )
+            
+            if "Champions" in segment_choice and champions:
+                st.success(f"💎 **{len(champions)} Champion Customers** - Your best customers!")
+                st.info("""
+                **Characteristics:**
+                • Recent purchase (≤30 days)
+                • High frequency (≥5 visits)
+                • High spend (≥₹5,000)
+                
+                **Action:** Reward with exclusive offers, VIP treatment
+                """)
+                
+                for customer, rfm in champions[:10]:
+                    name = customer.split("(")[0] if "(" in customer else customer
+                    st.write(f"✅ {name} - ₹{rfm['monetary']:,.2f} | {rfm['frequency']} visits")
+            
+            elif "Loyal" in segment_choice and loyal:
+                st.info(f"👑 **{len(loyal)} Loyal Customers** - Regular shoppers")
+                st.info("""
+                **Characteristics:**
+                • Recent activity (≤60 days)
+                • Moderate frequency (≥3 visits)
+                
+                **Action:** Maintain engagement with loyalty programs
+                """)
+                
+                for customer, rfm in loyal[:10]:
+                    name = customer.split("(")[0] if "(" in customer else customer
+                    st.write(f"✅ {name} - ₹{rfm['monetary']:,.2f} | {rfm['frequency']} visits")
+            
+            elif "Potential" in segment_choice and potential:
+                st.warning(f"⭐ **{len(potential)} Potential Loyalists** - Can become loyal!")
+                st.info("""
+                **Characteristics:**
+                • Recent activity (≤90 days)
+                • Good spending (≥₹2,000)
+                
+                **Action:** Encourage repeat visits with targeted offers
+                """)
+                
+                for customer, rfm in potential[:10]:
+                    name = customer.split("(")[0] if "(" in customer else customer
+                    st.write(f"⭐ {name} - ₹{rfm['monetary']:,.2f} | {rfm['frequency']} visits")
+            
+            elif "At Risk" in segment_choice and at_risk:
+                st.warning(f"⚠️ **{len(at_risk)} At-Risk Customers** - May churn!")
+                st.info("""
+                **Characteristics:**
+                • Haven't visited in 60-180 days
+                • Were regular customers before
+                
+                **Action:** Win-back campaigns, special discounts
+                """)
+                
+                for customer, rfm in at_risk[:10]:
+                    name = customer.split("(")[0] if "(" in customer else customer
+                    days = (datetime.now().date() - rfm['last_purchase']).days if rfm['last_purchase'] else 999
+                    st.write(f"⚠️ {name} - Last seen {days} days ago | {rfm['frequency']} visits")
+            
+            elif "Dormant" in segment_choice and dormant:
+                st.error(f"😴 **{len(dormant)} Dormant Customers** - Lost customers")
+                st.info("""
+                **Characteristics:**
+                • No activity in 180+ days
+                • Previously made purchases
+                
+                **Action:** Re-engagement campaigns, surveys
+                """)
+                
+                for customer, rfm in dormant[:10]:
+                    name = customer.split("(")[0] if "(" in customer else customer
+                    days = (datetime.now().date() - rfm['last_purchase']).days if rfm['last_purchase'] else 999
+                    st.write(f"😴 {name} - Inactive for {days} days")
+        else:
+            st.info("No data available for segmentation")
+    
+    # ==================== TAB 3: INDIVIDUAL PROFILE ====================
+    with tab3:
+        st.subheader("🔍 Individual Customer Profile")
+        
+        if not s_df.empty and len(s_df.columns) > 5:
+            # Get unique customers
+            customers = s_df.iloc[:, 5].unique()
+            customers = [c for c in customers if str(c) != 'nan']
+            
+            selected_customer = st.selectbox("Select Customer", customers)
+            
+            if selected_customer:
+                # Filter data for this customer
+                cust_data = s_df[s_df.iloc[:, 5] == selected_customer]
+                
+                # Extract name and phone
+                if "(" in selected_customer and ")" in selected_customer:
+                    cust_name = selected_customer.split("(")[0].strip()
+                    cust_phone = selected_customer.split("(")[1].replace(")", "").strip()
+                else:
+                    cust_name = selected_customer
+                    cust_phone = "N/A"
+                
+                # Calculate metrics
+                total_spent = pd.to_numeric(cust_data.iloc[:, 3], errors='coerce').sum()
+                total_visits = len(cust_data)
+                avg_bill = total_spent / total_visits if total_visits > 0 else 0
+                total_points = pd.to_numeric(cust_data.iloc[:, 6], errors='coerce').sum() if len(cust_data.columns) > 6 else 0
+                
+                first_visit = cust_data.iloc[:, 0].min() if len(cust_data) > 0 else None
+                last_visit = cust_data.iloc[:, 0].max() if len(cust_data) > 0 else None
+                
+                # Display profile
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 15px; color: white; margin-bottom: 20px;">
+                    <h1 style="margin: 0;">{cust_name}</h1>
+                    <p style="margin: 10px 0 0 0; font-size: 18px;">📱 {cust_phone}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Key metrics
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("💰 Lifetime Value", f"₹{total_spent:,.2f}")
+                col2.metric("🛒 Total Visits", total_visits)
+                col3.metric("📊 Avg Bill", f"₹{avg_bill:.2f}")
+                col4.metric("👑 Total Points", int(total_points))
+                
+                st.divider()
+                
+                # Visit history
+                col1, col2 = st.columns(2)
+                col1.info(f"📅 First Visit: {first_visit}")
+                col2.info(f"🕒 Last Visit: {last_visit}")
+                
+                # Check udhaar
+                if not k_df.empty:
+                    cust_udhaar = k_df[k_df.iloc[:, 0].astype(str).str.contains(cust_phone, na=False)]
+                    if not cust_udhaar.empty:
+                        balance = pd.to_numeric(cust_udhaar.iloc[:, 1], errors='coerce').sum()
+                        if balance > 0:
+                            st.warning(f"💰 Outstanding Udhaar: ₹{balance:,.2f}")
+                        elif balance < 0:
+                            st.success(f"💚 Credit Balance: ₹{abs(balance):,.2f}")
+                
+                st.divider()
+                
+                # Purchase history
+                st.markdown("### 📋 Purchase History")
+                
+                # Show last 10 transactions
+                recent_purchases = cust_data.tail(10).copy()
+                st.dataframe(recent_purchases, use_container_width=True)
+                
+                # Items purchased
+                st.divider()
+                st.markdown("### 🛍️ Favorite Products")
+                
+                items_bought = {}
+                for _, row in cust_data.iterrows():
+                    item = str(row.iloc[1]) if len(row) > 1 else "Unknown"
+                    if item not in items_bought:
+                        items_bought[item] = 0
+                    items_bought[item] += 1
+                
+                # Sort by frequency
+                top_items = sorted(items_bought.items(), key=lambda x: x[1], reverse=True)[:5]
+                
+                for item, count in top_items:
+                    st.write(f"✅ **{item}** - Purchased {count} times")
+        else:
+            st.info("No customer data available")
+    
+    # ==================== TAB 4: PURCHASE PATTERNS ====================
+    with tab4:
+        st.subheader("📈 Purchase Patterns & Trends")
+        
+        if not s_df.empty and 'Date' in s_df.columns:
+            st.markdown("### 📅 Purchase Frequency Analysis")
+            
+            # Day of week analysis
+            s_df['DayOfWeek'] = pd.to_datetime(s_df['Date'], errors='coerce').dt.day_name()
+            
+            day_counts = s_df['DayOfWeek'].value_counts()
+            
+            st.markdown("#### 📊 Busiest Days")
+            
+            days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            for day in days_order:
+                if day in day_counts.index:
+                    count = day_counts[day]
+                    percentage = (count / len(s_df)) * 100
+                    
+                    if day in ['Saturday', 'Sunday']:
+                        st.success(f"🔥 **{day}**: {count} sales ({percentage:.1f}%)")
+                    else:
+                        st.info(f"📅 **{day}**: {count} sales ({percentage:.1f}%)")
+            
+            st.divider()
+            
+            # Time-based patterns
+            st.markdown("### ⏰ Peak Shopping Hours")
+            st.info("💡 Based on historical data, customers prefer:")
+            st.write("• Morning (9-12): Regular shopping")
+            st.write("• Afternoon (12-5): Peak hours")
+            st.write("• Evening (5-8): Quick purchases")
+            
+            st.divider()
+            
+            # Monthly trends
+            st.markdown("### 📈 Monthly Trends")
+            
+            s_df['Month'] = pd.to_datetime(s_df['Date'], errors='coerce').dt.month
+            monthly_sales = s_df.groupby('Month').agg({
+                s_df.columns[3]: lambda x: pd.to_numeric(x, errors='coerce').sum()
+            }).reset_index()
+            monthly_sales.columns = ['Month', 'Sales']
+            
+            month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            
+            for _, row in monthly_sales.iterrows():
+                month_num = int(row['Month'])
+                if 1 <= month_num <= 12:
+                    month_name = month_names[month_num - 1]
+                    sales = row['Sales']
+                    st.write(f"📅 **{month_name}**: ₹{sales:,.2f}")
+        else:
+            st.info("No sales data with dates available")
+    
+    # ==================== TAB 5: AT-RISK CUSTOMERS ====================
+    with tab5:
+        st.subheader("⚠️ At-Risk Customer Analysis")
+        
+        if not s_df.empty and len(s_df.columns) > 5:
+            st.warning("🚨 Customers who may stop shopping with you")
+            
+            # Find customers who haven't visited recently
+            customer_last_visit = {}
+            
+            for _, row in s_df.iterrows():
+                customer_info = str(row.iloc[5]) if len(row) > 5 else ""
+                date = row.iloc[0] if len(row) > 0 else None
+                amount = float(row.iloc[3]) if len(row) > 3 else 0
+                
+                if customer_info and customer_info != "nan" and date:
+                    if customer_info not in customer_last_visit:
+                        customer_last_visit[customer_info] = {
+                            'last_date': date,
+                            'total_spent': 0,
+                            'visits': 0
+                        }
+                    
+                    if date > customer_last_visit[customer_info]['last_date']:
+                        customer_last_visit[customer_info]['last_date'] = date
+                    
+                    customer_last_visit[customer_info]['total_spent'] += amount
+                    customer_last_visit[customer_info]['visits'] += 1
+            
+            # Categorize at-risk
+            high_risk = []
+            medium_risk = []
+            
+            for customer, data in customer_last_visit.items():
+                days_since = (datetime.now().date() - data['last_date']).days
+                
+                # High value customers who haven't visited
+                if data['total_spent'] >= 2000 and days_since >= 60:
+                    high_risk.append((customer, data, days_since))
+                elif days_since >= 90:
+                    medium_risk.append((customer, data, days_since))
+            
+            # Display high risk
+            if high_risk:
+                st.error(f"🚨 {len(high_risk)} High-Value Customers at Risk!")
+                
+                for customer, data, days in sorted(high_risk, key=lambda x: x[2], reverse=True)[:10]:
+                    name = customer.split("(")[0] if "(" in customer else customer
+                    phone = customer.split("(")[1].replace(")", "") if "(" in customer else ""
+                    
+                    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                    
+                    with col1:
+                        st.write(f"👤 **{name}**")
+                        st.write(f"📱 {phone}")
+                    
+                    with col2:
+                        st.write(f"💰 Spent: ₹{data['total_spent']:,.2f}")
+                        st.write(f"🛒 {data['visits']} visits")
+                    
+                    with col3:
+                        st.error(f"⏰ Last seen: {days} days ago")
+                    
+                    with col4:
+                        if phone:
+                            message = f"""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते {name} जी!
+
+हमें आपकी याद आ रही है! 😊
+
+आपको {days} दिन हो गए हैं।
+विशेष छूट के साथ वापस आइए!
+
+🎁 20% OFF on next purchase
+📞 Contact: Laika Pet Mart"""
+                            
+                            import urllib.parse
+                            encoded_msg = urllib.parse.quote(message)
+                            whatsapp_url = f"https://wa.me/91{phone}?text={encoded_msg}"
+                            
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 8px; border: none; border-radius: 5px; cursor: pointer;">💬</button></a>', unsafe_allow_html=True)
+                    
+                    st.divider()
+            
+            # Display medium risk
+            if medium_risk:
+                st.warning(f"⚠️ {len(medium_risk)} Customers Becoming Inactive")
+                
+                inactive_count = len(medium_risk)
+                st.info(f"📊 {inactive_count} customers haven't visited in 90+ days")
+        else:
+            st.info("No data available")
+    
+    # ==================== TAB 6: RECOMMENDATIONS ====================
+    with tab6:
+        st.subheader("🎯 Smart Recommendations")
+        
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; color: white; margin-bottom: 20px;">
+            <h3 style="margin: 0;">💡 AI-Powered Business Insights</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if not s_df.empty:
+            # Calculate some smart recommendations
+            total_customers = len(s_df.iloc[:, 5].unique())
+            total_sales = pd.to_numeric(s_df.iloc[:, 3], errors='coerce').sum()
+            avg_sale = total_sales / len(s_df) if len(s_df) > 0 else 0
+            
+            st.markdown("### 📊 Key Insights")
+            
+            st.success(f"""
+            **Customer Base Health:**
+            • {total_customers} unique customers
+            • ₹{total_sales:,.2f} total revenue
+            • ₹{avg_sale:.2f} average transaction
+            """)
+            
+            st.divider()
+            
+            st.markdown("### 🎯 Recommended Actions")
+            
+            st.info("""
+            **1. Loyalty Program Optimization**
+            • Identify your top 20% customers (80/20 rule)
+            • Offer exclusive benefits to champions
+            • Create VIP tier for high spenders
+            """)
+            
+            st.warning("""
+            **2. Win-Back Campaigns**
+            • Target customers inactive 60+ days
+            • Offer special comeback discounts
+            • Send personalized WhatsApp messages
+            """)
+            
+            st.success("""
+            **3. Increase Visit Frequency**
+            • Reward program for 5+ visits/month
+            • Send reminders on low-stock favorite items
+            • Birthday/anniversary special offers
+            """)
+            
+            st.info("""
+            **4. Upselling Opportunities**
+            • Bundle frequently bought items
+            • Suggest complementary products
+            • Premium product recommendations for high-spenders
+            """)
+        else:
+            st.info("Collect more sales data for personalized recommendations")
+
+# --- 18. GST & INVOICE MANAGEMENT ---
 elif menu == "💼 GST & Invoices":
     st.markdown("""
     <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
