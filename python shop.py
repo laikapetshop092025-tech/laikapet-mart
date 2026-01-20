@@ -432,6 +432,7 @@ if user_role == "owner":
         "📈 Advanced Reports",
         "🔔 Automated Reminders",
         "👥 Customer Analytics",
+        "🎁 Discounts & Offers",
         "💼 GST & Invoices",
         "👥 User Management"
     ]
@@ -450,6 +451,7 @@ elif user_role == "manager":
         "📈 Advanced Reports",
         "🔔 Automated Reminders",
         "👥 Customer Analytics",
+        "🎁 Discounts & Offers",
         "💼 GST & Invoices"
     ]
 else:  # staff
@@ -3354,7 +3356,523 @@ elif menu == "👥 Customer Analytics":
         else:
             st.info("Collect more sales data for personalized recommendations")
 
-# --- 18. GST & INVOICE MANAGEMENT ---
+# --- 18. DISCOUNTS & OFFERS MANAGEMENT ---
+elif menu == "🎁 Discounts & Offers":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🎁 Discounts & Offers</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Boost Sales with Smart Offers</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize session state for offers
+    if 'active_offers' not in st.session_state:
+        st.session_state.active_offers = {
+            'bulk_discounts': [],
+            'seasonal_offers': [],
+            'combo_deals': [],
+            'loyalty_tiers': {
+                'Silver': {'min_spend': 2000, 'discount': 5, 'perks': []},
+                'Gold': {'min_spend': 5000, 'discount': 10, 'perks': []},
+                'Platinum': {'min_spend': 10000, 'discount': 15, 'perks': []},
+                'Diamond': {'min_spend': 20000, 'discount': 20, 'perks': []}
+            }
+        }
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "💰 Bulk Discounts",
+        "🌸 Seasonal Offers",
+        "🎯 Combo Deals",
+        "👑 Loyalty Tiers",
+        "📊 Active Offers"
+    ])
+    
+    # ==================== TAB 1: BULK DISCOUNTS ====================
+    with tab1:
+        st.subheader("💰 Bulk Purchase Discounts")
+        
+        st.info("💡 Encourage customers to buy more with quantity-based discounts")
+        
+        # Add new bulk discount
+        with st.expander("➕ Create New Bulk Discount", expanded=True):
+            with st.form("add_bulk_discount"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    product = st.text_input("Product Name", placeholder="e.g., Dog Food")
+                    min_qty = st.number_input("Minimum Quantity", min_value=1, value=5)
+                    discount_type = st.selectbox("Discount Type", ["Percentage", "Fixed Amount"])
+                
+                with col2:
+                    if discount_type == "Percentage":
+                        discount_value = st.number_input("Discount %", min_value=0, max_value=100, value=10)
+                    else:
+                        discount_value = st.number_input("Discount Amount (₹)", min_value=0, value=100)
+                    
+                    valid_until = st.date_input("Valid Until", value=datetime.now().date() + timedelta(days=30))
+                
+                description = st.text_area("Offer Description", 
+                    placeholder="e.g., Buy 5 or more bags and save 10%!")
+                
+                if st.form_submit_button("💾 Create Bulk Discount", type="primary"):
+                    if product:
+                        new_discount = {
+                            'product': product,
+                            'min_qty': min_qty,
+                            'discount_type': discount_type,
+                            'discount_value': discount_value,
+                            'valid_until': str(valid_until),
+                            'description': description,
+                            'created': str(datetime.now().date())
+                        }
+                        st.session_state.active_offers['bulk_discounts'].append(new_discount)
+                        st.success(f"✅ Bulk discount created for {product}!")
+                        st.rerun()
+        
+        # Display active bulk discounts
+        st.divider()
+        st.markdown("### 📋 Active Bulk Discounts")
+        
+        if st.session_state.active_offers['bulk_discounts']:
+            for i, discount in enumerate(st.session_state.active_offers['bulk_discounts']):
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    
+                    with col1:
+                        st.markdown(f"### 🎁 {discount['product']}")
+                        st.write(discount['description'])
+                    
+                    with col2:
+                        if discount['discount_type'] == "Percentage":
+                            st.metric("Discount", f"{discount['discount_value']}%")
+                        else:
+                            st.metric("Discount", f"₹{discount['discount_value']}")
+                        st.write(f"Min Qty: {discount['min_qty']}")
+                    
+                    with col3:
+                        st.info(f"Valid till\n{discount['valid_until']}")
+                        if st.button("🗑️ Delete", key=f"del_bulk_{i}"):
+                            st.session_state.active_offers['bulk_discounts'].pop(i)
+                            st.rerun()
+                    
+                    st.divider()
+        else:
+            st.info("No bulk discounts active. Create one above!")
+        
+        # Example calculations
+        st.divider()
+        st.markdown("### 🧮 Quick Calculator")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            calc_price = st.number_input("Item Price", value=500, key="bulk_calc_price")
+        with col2:
+            calc_qty = st.number_input("Quantity", value=5, key="bulk_calc_qty")
+        with col3:
+            calc_discount = st.number_input("Discount %", value=10, key="bulk_calc_disc")
+        
+        normal_price = calc_price * calc_qty
+        discount_amt = (normal_price * calc_discount) / 100
+        final_price = normal_price - discount_amt
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Normal Price", f"₹{normal_price:,.2f}")
+        col2.metric("You Save", f"₹{discount_amt:,.2f}", delta=f"-{calc_discount}%")
+        col3.metric("Final Price", f"₹{final_price:,.2f}")
+    
+    # ==================== TAB 2: SEASONAL OFFERS ====================
+    with tab2:
+        st.subheader("🌸 Seasonal & Festival Offers")
+        
+        st.info("💡 Create time-limited offers for festivals, seasons, and special occasions")
+        
+        # Predefined seasons/festivals
+        occasions = [
+            "Diwali", "Holi", "Christmas", "New Year",
+            "Summer Sale", "Monsoon Sale", "Winter Sale",
+            "Independence Day", "Republic Day",
+            "Custom Event"
+        ]
+        
+        # Add new seasonal offer
+        with st.expander("➕ Create Seasonal Offer", expanded=True):
+            with st.form("add_seasonal_offer"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    occasion = st.selectbox("Occasion", occasions)
+                    if occasion == "Custom Event":
+                        custom_name = st.text_input("Event Name")
+                        occasion = custom_name
+                    
+                    offer_type = st.selectbox("Offer Type", [
+                        "Flat Discount",
+                        "Buy 1 Get 1",
+                        "Free Gift",
+                        "Extra Points"
+                    ])
+                
+                with col2:
+                    start_date = st.date_input("Start Date", value=datetime.now().date())
+                    end_date = st.date_input("End Date", value=datetime.now().date() + timedelta(days=7))
+                    
+                    if offer_type == "Flat Discount":
+                        offer_value = st.number_input("Discount %", min_value=0, max_value=100, value=20)
+                    elif offer_type == "Extra Points":
+                        offer_value = st.number_input("Points Multiplier", min_value=1, max_value=10, value=3)
+                    else:
+                        offer_value = 1
+                
+                offer_desc = st.text_area("Offer Details", 
+                    placeholder="e.g., Diwali Dhamaka! 25% off on all items + Extra rewards!")
+                
+                applicable_to = st.multiselect("Applicable to", [
+                    "All Products",
+                    "Dog Food",
+                    "Cat Food",
+                    "Accessories",
+                    "Medicines",
+                    "Grooming"
+                ])
+                
+                if st.form_submit_button("🎉 Create Seasonal Offer", type="primary"):
+                    if occasion:
+                        new_offer = {
+                            'occasion': occasion,
+                            'type': offer_type,
+                            'value': offer_value,
+                            'start_date': str(start_date),
+                            'end_date': str(end_date),
+                            'description': offer_desc,
+                            'applicable_to': applicable_to,
+                            'created': str(datetime.now().date())
+                        }
+                        st.session_state.active_offers['seasonal_offers'].append(new_offer)
+                        st.success(f"✅ {occasion} offer created!")
+                        st.rerun()
+        
+        # Display active seasonal offers
+        st.divider()
+        st.markdown("### 🎊 Active Seasonal Offers")
+        
+        if st.session_state.active_offers['seasonal_offers']:
+            for i, offer in enumerate(st.session_state.active_offers['seasonal_offers']):
+                # Check if offer is currently active
+                start = datetime.strptime(offer['start_date'], '%Y-%m-%d').date()
+                end = datetime.strptime(offer['end_date'], '%Y-%m-%d').date()
+                today = datetime.now().date()
+                
+                is_active = start <= today <= end
+                
+                status_color = "#38ef7d" if is_active else "#868f96"
+                status_text = "🟢 ACTIVE" if is_active else "⚪ SCHEDULED"
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {status_color} 0%, white 100%); padding: 20px; border-radius: 12px; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #333;">🎉 {offer['occasion']} {status_text}</h3>
+                    <p style="margin: 10px 0; color: #666;">{offer['description']}</p>
+                    <p style="margin: 5px 0; color: #888;">
+                        📅 {offer['start_date']} to {offer['end_date']} | 
+                        🎯 {offer['type']} | 
+                        📦 {', '.join(offer['applicable_to']) if offer['applicable_to'] else 'All'}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("🗑️ Delete Offer", key=f"del_seasonal_{i}"):
+                    st.session_state.active_offers['seasonal_offers'].pop(i)
+                    st.rerun()
+                
+                st.divider()
+        else:
+            st.info("No seasonal offers active. Create one above!")
+    
+    # ==================== TAB 3: COMBO DEALS ====================
+    with tab3:
+        st.subheader("🎯 Combo Deals & Bundles")
+        
+        st.info("💡 Increase average order value by bundling products together")
+        
+        # Add new combo deal
+        with st.expander("➕ Create Combo Deal", expanded=True):
+            with st.form("add_combo_deal"):
+                combo_name = st.text_input("Combo Name", placeholder="e.g., Complete Dog Care Pack")
+                
+                st.markdown("### 📦 Select Products")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    product1 = st.text_input("Product 1", placeholder="e.g., Dog Food 5Kg")
+                    price1 = st.number_input("Price 1", min_value=0, value=500, key="combo_p1")
+                    
+                    product2 = st.text_input("Product 2", placeholder="e.g., Dog Shampoo")
+                    price2 = st.number_input("Price 2", min_value=0, value=200, key="combo_p2")
+                
+                with col2:
+                    product3 = st.text_input("Product 3 (Optional)", placeholder="e.g., Treats")
+                    price3 = st.number_input("Price 3", min_value=0, value=150, key="combo_p3")
+                    
+                    product4 = st.text_input("Product 4 (Optional)", placeholder="e.g., Toy")
+                    price4 = st.number_input("Price 4", min_value=0, value=100, key="combo_p4")
+                
+                # Calculate combo
+                total_mrp = price1 + price2 + price3 + price4
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total MRP", f"₹{total_mrp}")
+                with col2:
+                    combo_discount = st.number_input("Combo Discount %", min_value=0, max_value=50, value=15)
+                
+                combo_price = total_mrp - (total_mrp * combo_discount / 100)
+                savings = total_mrp - combo_price
+                
+                st.success(f"💰 Combo Price: ₹{combo_price:.2f} | You Save: ₹{savings:.2f} ({combo_discount}%)")
+                
+                valid_until = st.date_input("Valid Until", value=datetime.now().date() + timedelta(days=30), key="combo_valid")
+                
+                if st.form_submit_button("🎁 Create Combo Deal", type="primary"):
+                    if combo_name and product1 and product2:
+                        products = [
+                            {'name': product1, 'price': price1},
+                            {'name': product2, 'price': price2}
+                        ]
+                        if product3:
+                            products.append({'name': product3, 'price': price3})
+                        if product4:
+                            products.append({'name': product4, 'price': price4})
+                        
+                        new_combo = {
+                            'name': combo_name,
+                            'products': products,
+                            'total_mrp': total_mrp,
+                            'discount': combo_discount,
+                            'combo_price': combo_price,
+                            'savings': savings,
+                            'valid_until': str(valid_until),
+                            'created': str(datetime.now().date())
+                        }
+                        st.session_state.active_offers['combo_deals'].append(new_combo)
+                        st.success(f"✅ Combo deal '{combo_name}' created!")
+                        st.rerun()
+        
+        # Display active combos
+        st.divider()
+        st.markdown("### 🎁 Active Combo Deals")
+        
+        if st.session_state.active_offers['combo_deals']:
+            for i, combo in enumerate(st.session_state.active_offers['combo_deals']):
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">🎯 {combo['name']}</h3>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown("**Includes:**")
+                    for product in combo['products']:
+                        st.write(f"✅ {product['name']} - ₹{product['price']}")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Total MRP", f"₹{combo['total_mrp']}")
+                    col2.metric("Combo Price", f"₹{combo['combo_price']:.2f}")
+                    col3.metric("You Save", f"₹{combo['savings']:.2f}")
+                    col4.info(f"Valid till\n{combo['valid_until']}")
+                    
+                    if st.button("🗑️ Delete Combo", key=f"del_combo_{i}"):
+                        st.session_state.active_offers['combo_deals'].pop(i)
+                        st.rerun()
+                    
+                    st.divider()
+        else:
+            st.info("No combo deals active. Create one above!")
+    
+    # ==================== TAB 4: LOYALTY TIERS ====================
+    with tab4:
+        st.subheader("👑 Loyalty Tier System")
+        
+        st.info("💡 Reward your best customers with exclusive benefits based on lifetime spend")
+        
+        # Load customer data for tier assignment
+        s_df = load_data("Sales")
+        
+        # Configure tiers
+        with st.expander("⚙️ Configure Loyalty Tiers", expanded=True):
+            st.markdown("### 🏆 Tier Configuration")
+            
+            tiers = ['Silver', 'Gold', 'Platinum', 'Diamond']
+            tier_colors = {
+                'Silver': '#C0C0C0',
+                'Gold': '#FFD700',
+                'Platinum': '#E5E4E2',
+                'Diamond': '#B9F2FF'
+            }
+            
+            for tier in tiers:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {tier_colors[tier]} 0%, white 100%); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                    <h4 style="margin: 0; color: #333;">{tier} Tier</h4>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    min_spend = st.number_input(
+                        f"Min Lifetime Spend",
+                        value=st.session_state.active_offers['loyalty_tiers'][tier]['min_spend'],
+                        key=f"tier_{tier}_spend"
+                    )
+                
+                with col2:
+                    discount = st.number_input(
+                        f"Discount %",
+                        min_value=0,
+                        max_value=30,
+                        value=st.session_state.active_offers['loyalty_tiers'][tier]['discount'],
+                        key=f"tier_{tier}_disc"
+                    )
+                
+                with col3:
+                    st.write("**Benefits:**")
+                    if tier == 'Silver':
+                        st.write("• Basic rewards")
+                    elif tier == 'Gold':
+                        st.write("• Priority support\n• Birthday gift")
+                    elif tier == 'Platinum':
+                        st.write("• Free delivery\n• Exclusive previews")
+                    else:
+                        st.write("• VIP events\n• Personal shopper")
+                
+                # Update tier config
+                st.session_state.active_offers['loyalty_tiers'][tier]['min_spend'] = min_spend
+                st.session_state.active_offers['loyalty_tiers'][tier]['discount'] = discount
+                
+                st.divider()
+        
+        # Display customer tier distribution
+        st.divider()
+        st.markdown("### 📊 Customer Tier Distribution")
+        
+        if not s_df.empty and len(s_df.columns) > 5:
+            # Calculate customer spending
+            customer_spend = {}
+            for _, row in s_df.iterrows():
+                customer = str(row.iloc[5]) if len(row) > 5 else ""
+                amount = float(row.iloc[3]) if len(row) > 3 else 0
+                
+                if customer and customer != "nan":
+                    if customer not in customer_spend:
+                        customer_spend[customer] = 0
+                    customer_spend[customer] += amount
+            
+            # Assign tiers
+            tier_counts = {'Silver': 0, 'Gold': 0, 'Platinum': 0, 'Diamond': 0, 'No Tier': 0}
+            tier_customers = {'Silver': [], 'Gold': [], 'Platinum': [], 'Diamond': []}
+            
+            for customer, spend in customer_spend.items():
+                assigned = False
+                for tier in ['Diamond', 'Platinum', 'Gold', 'Silver']:
+                    if spend >= st.session_state.active_offers['loyalty_tiers'][tier]['min_spend']:
+                        tier_counts[tier] += 1
+                        tier_customers[tier].append((customer, spend))
+                        assigned = True
+                        break
+                if not assigned:
+                    tier_counts['No Tier'] += 1
+            
+            # Display tier summary
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            col1.markdown(f"""
+            <div style="background: linear-gradient(135deg, {tier_colors['Diamond']} 0%, white 100%); padding: 15px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0;">{tier_counts['Diamond']}</h2>
+                <p style="margin: 5px 0;">💎 Diamond</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col2.markdown(f"""
+            <div style="background: linear-gradient(135deg, {tier_colors['Platinum']} 0%, white 100%); padding: 15px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0;">{tier_counts['Platinum']}</h2>
+                <p style="margin: 5px 0;">💍 Platinum</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col3.markdown(f"""
+            <div style="background: linear-gradient(135deg, {tier_colors['Gold']} 0%, white 100%); padding: 15px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0;">{tier_counts['Gold']}</h2>
+                <p style="margin: 5px 0;">👑 Gold</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col4.markdown(f"""
+            <div style="background: linear-gradient(135deg, {tier_colors['Silver']} 0%, white 100%); padding: 15px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0;">{tier_counts['Silver']}</h2>
+                <p style="margin: 5px 0;">🥈 Silver</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col5.markdown(f"""
+            <div style="background: linear-gradient(135deg, #868f96 0%, white 100%); padding: 15px; border-radius: 10px; text-align: center;">
+                <h2 style="margin: 0;">{tier_counts['No Tier']}</h2>
+                <p style="margin: 5px 0;">⚪ No Tier</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # View customers by tier
+            st.divider()
+            view_tier = st.selectbox("View Tier Members", ['Diamond', 'Platinum', 'Gold', 'Silver'])
+            
+            if tier_customers[view_tier]:
+                st.success(f"👑 {len(tier_customers[view_tier])} {view_tier} Tier Customers")
+                
+                for customer, spend in sorted(tier_customers[view_tier], key=lambda x: x[1], reverse=True):
+                    name = customer.split("(")[0] if "(" in customer else customer
+                    discount_pct = st.session_state.active_offers['loyalty_tiers'][view_tier]['discount']
+                    st.write(f"✅ {name} - Lifetime: ₹{spend:,.2f} | Discount: {discount_pct}%")
+            else:
+                st.info(f"No {view_tier} tier customers yet")
+        else:
+            st.info("No customer data available for tier assignment")
+    
+    # ==================== TAB 5: ACTIVE OFFERS SUMMARY ====================
+    with tab5:
+        st.subheader("📊 All Active Offers Summary")
+        
+        # Summary metrics
+        total_bulk = len(st.session_state.active_offers['bulk_discounts'])
+        total_seasonal = len(st.session_state.active_offers['seasonal_offers'])
+        total_combos = len(st.session_state.active_offers['combo_deals'])
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("💰 Bulk Discounts", total_bulk)
+        col2.metric("🌸 Seasonal Offers", total_seasonal)
+        col3.metric("🎯 Combo Deals", total_combos)
+        
+        st.divider()
+        
+        # Quick view all offers
+        if total_bulk > 0:
+            st.markdown("### 💰 Bulk Discounts")
+            for discount in st.session_state.active_offers['bulk_discounts']:
+                st.info(f"🎁 {discount['product']} - Buy {discount['min_qty']}+ get {discount['discount_value']}% off")
+        
+        if total_seasonal > 0:
+            st.markdown("### 🌸 Seasonal Offers")
+            for offer in st.session_state.active_offers['seasonal_offers']:
+                st.success(f"🎉 {offer['occasion']} - {offer['type']} ({offer['start_date']} to {offer['end_date']})")
+        
+        if total_combos > 0:
+            st.markdown("### 🎯 Combo Deals")
+            for combo in st.session_state.active_offers['combo_deals']:
+                st.warning(f"🎁 {combo['name']} - ₹{combo['combo_price']:.2f} (Save ₹{combo['savings']:.2f})")
+        
+        if total_bulk == 0 and total_seasonal == 0 and total_combos == 0:
+            st.info("No active offers. Create offers in other tabs!")
+
+# --- 19. GST & INVOICE MANAGEMENT ---
 elif menu == "💼 GST & Invoices":
     st.markdown("""
     <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
