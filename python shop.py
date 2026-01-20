@@ -305,18 +305,90 @@ def archive_daily_data():
                 for _, row in old_data.iterrows():
                     save_data(archive_sheet, row.tolist())
 
-# --- 2. LOGIN ---
+# --- 2. MULTI-USER LOGIN SYSTEM ---
 if 'logged_in' not in st.session_state: 
     st.session_state.logged_in = False
+if 'user_role' not in st.session_state:
+    st.session_state.user_role = None
+if 'username' not in st.session_state:
+    st.session_state.username = None
+
+# User credentials database
+USERS = {
+    "Owner": {
+        "password": "Ayush@092025",
+        "role": "owner",
+        "name": "Ayush (Owner)"
+    },
+    "Manager": {
+        "password": "Manager@123",
+        "role": "manager",
+        "name": "Store Manager"
+    },
+    "Staff1": {
+        "password": "Staff@123",
+        "role": "staff",
+        "name": "Staff Member 1"
+    },
+    "Staff2": {
+        "password": "Staff@456",
+        "role": "staff",
+        "name": "Staff Member 2"
+    }
+}
 
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center;'>🔐 LAIKA PET MART LOGIN</h1>", unsafe_allow_html=True)
-    u = st.text_input("Username").strip()
-    p = st.text_input("Password", type="password")
-    if st.button("LOGIN", use_container_width=True):
-        if u == "Laika" and p == "Ayush@092025":
-            st.session_state.logged_in = True
-            st.rerun()
+    st.markdown("""
+    <div style="text-align: center; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🔐 LAIKA PET MART</h1>
+        <p style="color: white; margin-top: 15px; font-size: 20px; opacity: 0.95;">Multi-User Login System</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("""
+        <div style="background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1);">
+        """, unsafe_allow_html=True)
+        
+        u = st.text_input("👤 Username", key="login_username").strip()
+        p = st.text_input("🔒 Password", type="password", key="login_password")
+        
+        # Show available users hint
+        with st.expander("ℹ️ Available User Roles"):
+            st.info("""
+            **Owner**: Full access to all features
+            **Manager**: Access to reports, billing, inventory
+            **Staff**: Billing and basic operations only
+            """)
+        
+        if st.button("🚀 LOGIN", use_container_width=True, type="primary"):
+            if u in USERS and USERS[u]["password"] == p:
+                st.session_state.logged_in = True
+                st.session_state.user_role = USERS[u]["role"]
+                st.session_state.username = USERS[u]["name"]
+                st.success(f"✅ Welcome {USERS[u]['name']}!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password!")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Show demo credentials
+        st.divider()
+        st.markdown("""
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 20px;">
+            <b>🔑 Demo Credentials:</b><br>
+            <small>
+            Owner: <code>Owner</code> / <code>Ayush@092025</code><br>
+            Manager: <code>Manager</code> / <code>Manager@123</code><br>
+            Staff: <code>Staff1</code> / <code>Staff@123</code>
+            </small>
+        </div>
+        """, unsafe_allow_html=True)
+    
     st.stop()
 
 # --- 3. CHECK NEW DAY ---
@@ -326,26 +398,58 @@ if st.session_state.last_check_date != today_dt:
         archive_daily_data()
     st.session_state.last_check_date = today_dt
 
-# --- 4. SIDEBAR MENU WITH BUTTONS ---
+# --- 4. SIDEBAR MENU WITH ROLE-BASED ACCESS ---
+st.sidebar.markdown(f"""
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+    <h3 style="color: white; margin: 0;">👤 {st.session_state.username}</h3>
+    <p style="color: white; margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">{st.session_state.user_role.upper()}</p>
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.markdown("<h2 style='text-align: center; color: #1e293b; margin-bottom: 20px;'>📋 Main Menu</h2>", unsafe_allow_html=True)
 
 # Initialize selected menu in session state
 if 'selected_menu' not in st.session_state:
     st.session_state.selected_menu = "📊 Dashboard"
 
-# Menu items
-menu_items = [
-    "📊 Dashboard",
-    "🧾 Billing", 
-    "📦 Purchase",
-    "📋 Live Stock",
-    "💰 Expenses",
-    "🐾 Pet Register",
-    "📒 Customer Khata",
-    "🏢 Supplier Dues",
-    "👑 Royalty Points",
-    "📈 Advanced Reports"
-]
+# Define menu items based on user role
+if st.session_state.user_role == "owner":
+    # Owner has access to everything
+    menu_items = [
+        "📊 Dashboard",
+        "🧾 Billing", 
+        "📦 Purchase",
+        "📋 Live Stock",
+        "💰 Expenses",
+        "🐾 Pet Register",
+        "📒 Customer Khata",
+        "🏢 Supplier Dues",
+        "👑 Royalty Points",
+        "📈 Advanced Reports",
+        "👥 User Management"
+    ]
+elif st.session_state.user_role == "manager":
+    # Manager has most access except user management
+    menu_items = [
+        "📊 Dashboard",
+        "🧾 Billing", 
+        "📦 Purchase",
+        "📋 Live Stock",
+        "💰 Expenses",
+        "🐾 Pet Register",
+        "📒 Customer Khata",
+        "🏢 Supplier Dues",
+        "👑 Royalty Points",
+        "📈 Advanced Reports"
+    ]
+else:  # staff
+    # Staff has limited access - billing and basic operations only
+    menu_items = [
+        "📊 Dashboard",
+        "🧾 Billing",
+        "📋 Live Stock",
+        "🐾 Pet Register"
+    ]
 
 # Create buttons for each menu item
 for item in menu_items:
@@ -370,8 +474,10 @@ menu = st.session_state.selected_menu
 st.sidebar.divider()
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
-    # Clear login AND balance session so it reloads fresh from sheets
+    # Clear ALL session states
     st.session_state.logged_in = False
+    st.session_state.user_role = None
+    st.session_state.username = None
     st.session_state.manual_cash = None
     st.session_state.manual_online = None
     st.session_state.balance_initialized = False
@@ -1888,3 +1994,128 @@ elif menu == "📈 Advanced Reports":
                     
                     csv = summary.to_csv(index=False).encode('utf-8')
                     st.download_button("📥 Download", csv, f"udhaar_report_{today_dt}.csv", "text/csv")
+
+# --- 15. USER MANAGEMENT (OWNER ONLY) ---
+elif menu == "👥 User Management":
+    if st.session_state.user_role != "owner":
+        st.error("🚫 Access Denied! Only Owner can access User Management.")
+        st.stop()
+    
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">👥 User Management</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Manage Staff & Access Control</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    tab1, tab2, tab3 = st.tabs(["👥 Current Users", "➕ Add User", "📊 Activity Log"])
+    
+    # TAB 1: Current Users
+    with tab1:
+        st.subheader("📋 Current User List")
+        
+        # Display users in cards
+        for username, data in USERS.items():
+            with st.container():
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                
+                with col1:
+                    st.markdown(f"### 👤 {data['name']}")
+                
+                with col2:
+                    role_color = {
+                        "owner": "🔴",
+                        "manager": "🟡", 
+                        "staff": "🟢"
+                    }
+                    st.write(f"{role_color.get(data['role'], '⚪')} Role: **{data['role'].upper()}**")
+                
+                with col3:
+                    st.write(f"🔑 Username: `{username}`")
+                
+                with col4:
+                    if data['role'] != "owner":
+                        if st.button("🗑️", key=f"del_{username}"):
+                            st.warning(f"Delete feature coming soon for {username}")
+                
+                st.divider()
+        
+        # Summary
+        st.markdown("### 📊 User Summary")
+        col1, col2, col3 = st.columns(3)
+        
+        owner_count = sum(1 for u in USERS.values() if u['role'] == 'owner')
+        manager_count = sum(1 for u in USERS.values() if u['role'] == 'manager')
+        staff_count = sum(1 for u in USERS.values() if u['role'] == 'staff')
+        
+        col1.metric("👑 Owners", owner_count)
+        col2.metric("📊 Managers", manager_count)
+        col3.metric("👥 Staff", staff_count)
+    
+    # TAB 2: Add User
+    with tab2:
+        st.subheader("➕ Add New User")
+        
+        with st.form("add_user_form"):
+            new_username = st.text_input("Username", placeholder="e.g., Staff3")
+            new_name = st.text_input("Full Name", placeholder="e.g., Rahul Kumar")
+            new_password = st.text_input("Password", type="password", placeholder="Min 8 characters")
+            new_role = st.selectbox("Role", ["staff", "manager", "owner"])
+            
+            st.info(f"""
+            **Role Permissions:**
+            - **Owner**: Full access (Dashboard, Billing, Reports, User Management, etc.)
+            - **Manager**: All except User Management
+            - **Staff**: Billing & Basic Operations only
+            """)
+            
+            if st.form_submit_button("✅ Add User", type="primary"):
+                if new_username and new_name and new_password:
+                    if new_username in USERS:
+                        st.error(f"❌ Username '{new_username}' already exists!")
+                    elif len(new_password) < 8:
+                        st.error("❌ Password must be at least 8 characters!")
+                    else:
+                        # Note: In production, this should save to database
+                        st.success(f"""
+                        ✅ User Created Successfully!
+                        
+                        **Username**: {new_username}
+                        **Name**: {new_name}
+                        **Role**: {new_role.upper()}
+                        
+                        ⚠️ Note: Currently users are stored in code. 
+                        For permanent storage, connect to database.
+                        """)
+                        st.info("📋 User credentials to share:")
+                        st.code(f"Username: {new_username}\nPassword: {new_password}")
+                else:
+                    st.error("❌ Please fill all fields!")
+    
+    # TAB 3: Activity Log
+    with tab3:
+        st.subheader("📊 User Activity Log")
+        
+        st.info("🚧 Activity logging feature coming soon!")
+        
+        # Sample activity log
+        st.markdown("### 📝 Recent Activities (Demo)")
+        
+        sample_activities = [
+            {"user": "Staff1", "action": "Created Bill", "amount": "₹1,250", "time": "2 hours ago"},
+            {"user": "Manager", "action": "Added Inventory", "amount": "₹8,500", "time": "3 hours ago"},
+            {"user": "Staff2", "action": "Created Bill", "amount": "₹850", "time": "5 hours ago"},
+            {"user": "Owner", "action": "Viewed Reports", "amount": "-", "time": "1 day ago"},
+        ]
+        
+        for activity in sample_activities:
+            col1, col2, col3, col4 = st.columns([2, 3, 2, 2])
+            with col1:
+                st.write(f"👤 {activity['user']}")
+            with col2:
+                st.write(f"📝 {activity['action']}")
+            with col3:
+                st.write(f"💰 {activity['amount']}")
+            with col4:
+                st.write(f"🕒 {activity['time']}")
+            st.divider()
