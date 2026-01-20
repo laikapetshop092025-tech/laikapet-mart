@@ -249,7 +249,7 @@ is_weekend = datetime.now().weekday() >= 5
 
 # --- 5. DASHBOARD ---
 if menu == "📊 Dashboard":
-    # Professional Header with Logo
+    # Professional Header with Logo and Gradient
     try:
         # Try to load logo from uploads
         import base64
@@ -258,19 +258,19 @@ if menu == "📊 Dashboard":
             logo_data = base64.b64encode(f.read()).decode()
         
         st.markdown(f"""
-        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%); border-radius: 15px; margin-bottom: 20px;">
-            <img src="data:image/png;base64,{logo_data}" style="width: 150px; margin-bottom: 15px;">
-            <h1 style="color: white; margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Welcome to Laika Pet Mart</h1>
-            <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
+        <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); border-radius: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <img src="data:image/png;base64,{logo_data}" style="width: 180px; margin-bottom: 15px; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3));">
+            <h1 style="color: white; margin: 0; font-size: 52px; text-shadow: 3px 3px 6px rgba(0,0,0,0.4); font-weight: bold; letter-spacing: 2px;">Welcome to Laika Pet Mart</h1>
+            <p style="color: white; margin-top: 15px; font-size: 22px; opacity: 0.95; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🐕 Your Trusted Pet Care Partner 🐈</p>
         </div>
         """, unsafe_allow_html=True)
     except:
         # Fallback without logo
         st.markdown("""
-        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%); border-radius: 15px; margin-bottom: 20px;">
-            <div style="font-size: 60px; margin-bottom: 10px;">👑</div>
-            <h1 style="color: white; margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">Welcome to Laika Pet Mart</h1>
-            <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
+        <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); border-radius: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <div style="font-size: 80px; margin-bottom: 15px;">👑🐾</div>
+            <h1 style="color: white; margin: 0; font-size: 52px; text-shadow: 3px 3px 6px rgba(0,0,0,0.4); font-weight: bold; letter-spacing: 2px;">Welcome to Laika Pet Mart</h1>
+            <p style="color: white; margin-top: 15px; font-size: 22px; opacity: 0.95; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🐕 Your Trusted Pet Care Partner 🐈</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -292,21 +292,52 @@ if menu == "📊 Dashboard":
     total_u = pd.to_numeric(k_df.iloc[:, 1], errors='coerce').sum() if not k_df.empty and len(k_df.columns) > 1 else 0
 
     st.markdown(f"""
-    <div style="display: flex; gap: 10px; justify-content: space-around;">
-        <div style="background-color: #FFEBEE; padding: 15px; border-radius: 10px; border-left: 8px solid #D32F2F; width: 19%;">
-            <p style="color: #D32F2F; margin: 0;">💵 Galla (Cash)</p> <h3 style="margin: 0;">₹{cash_bal:,.2f}</h3>
+    <style>
+    .balance-card {{
+        padding: 25px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+        border: 2px solid rgba(255,255,255,0.3);
+    }}
+    .balance-card:hover {{
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+    }}
+    .card-label {{
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        opacity: 0.9;
+    }}
+    .card-amount {{
+        font-size: 32px;
+        font-weight: bold;
+        margin: 0;
+    }}
+    </style>
+    
+    <div style="display: flex; gap: 15px; justify-content: space-between; margin-bottom: 30px;">
+        <div class="balance-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; flex: 1;">
+            <p class="card-label">💵 Galla (Cash)</p>
+            <h2 class="card-amount">₹{cash_bal:,.2f}</h2>
         </div>
-        <div style="background-color: #E3F2FD; padding: 15px; border-radius: 10px; border-left: 8px solid #1976D2; width: 19%;">
-            <p style="color: #1976D2; margin: 0;">🏦 Online</p> <h3 style="margin: 0;">₹{online_bal:,.2f}</h3>
+        <div class="balance-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; flex: 1;">
+            <p class="card-label">🏦 Online</p>
+            <h2 class="card-amount">₹{online_bal:,.2f}</h2>
         </div>
-        <div style="background-color: #F3E5F5; padding: 15px; border-radius: 10px; border-left: 8px solid #7B1FA2; width: 19%;">
-            <p style="color: #7B1FA2; margin: 0;">⚡ Total Balance</p> <h3 style="margin: 0;">₹{total_bal:,.2f}</h3>
+        <div class="balance-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; flex: 1;">
+            <p class="card-label">⚡ Total Balance</p>
+            <h2 class="card-amount">₹{total_bal:,.2f}</h2>
         </div>
-        <div style="background-color: #FFF3E0; padding: 15px; border-radius: 10px; border-left: 8px solid #F57C00; width: 19%;">
-            <p style="color: #F57C00; margin: 0;">📒 Udhaar</p> <h3 style="margin: 0;">₹{total_u:,.2f}</h3>
+        <div class="balance-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; flex: 1;">
+            <p class="card-label">📒 Udhaar</p>
+            <h2 class="card-amount">₹{total_u:,.2f}</h2>
         </div>
-        <div style="background-color: #E8F5E9; padding: 15px; border-radius: 10px; border-left: 8px solid #388E3C; width: 19%;">
-            <p style="color: #388E3C; margin: 0;">📦 Stock Value</p> <h3 style="margin: 0;">₹{total_stock_val:,.2f}</h3>
+        <div class="balance-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); color: white; flex: 1;">
+            <p class="card-label">📦 Stock Value</p>
+            <h2 class="card-amount">₹{total_stock_val:,.2f}</h2>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -341,8 +372,10 @@ if menu == "📊 Dashboard":
     
     # TODAY'S REPORT
     st.markdown(f"""
-    <div style="background-color: #E3F2FD; padding: 15px; border-radius: 10px; border-left: 5px solid #1976D2; margin-bottom: 20px;">
-        <h3 style="color: #1976D2; margin: 0;">📈 Today's Report - {today_dt.strftime('%d %B %Y')}</h3>
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);">
+        <h2 style="color: white; margin: 0; text-align: center; font-size: 28px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+            📈 Today's Report - {today_dt.strftime('%d %B %Y')}
+        </h2>
     </div>
     """, unsafe_allow_html=True)
     
@@ -362,17 +395,47 @@ if menu == "📊 Dashboard":
     today_profit = pd.to_numeric(s_today.iloc[:, 7], errors='coerce').sum() if not s_today.empty and len(s_today.columns) > 7 else 0
     
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("💰 Total Sale", f"₹{today_sale:,.2f}")
-    c2.metric("📦 Total Purchase", f"₹{today_pur:,.2f}")
-    c3.metric("💸 Total Expense", f"₹{today_exp:,.2f}")
-    c4.metric("📈 Total Profit", f"₹{today_profit:,.2f}")
+    
+    with c1:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 5px 15px rgba(0,0,0,0.15);">
+            <p style="margin: 0; font-size: 14px; opacity: 0.9;">💰 Total Sale</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{today_sale:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with c2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 5px 15px rgba(0,0,0,0.15);">
+            <p style="margin: 0; font-size: 14px; opacity: 0.9;">📦 Total Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{today_pur:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with c3:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #f857a6 0%, #ff5858 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 5px 15px rgba(0,0,0,0.15);">
+            <p style="margin: 0; font-size: 14px; opacity: 0.9;">💸 Total Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{today_exp:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with c4:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 5px 15px rgba(0,0,0,0.15);">
+            <p style="margin: 0; font-size: 14px; opacity: 0.9;">📈 Total Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{today_profit:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.divider()
     
     # MONTHLY REPORT
     st.markdown(f"""
-    <div style="background-color: #F3E5F5; padding: 15px; border-radius: 10px; border-left: 5px solid #7B1FA2; margin-bottom: 20px;">
-        <h3 style="color: #7B1FA2; margin: 0;">🗓️ Monthly Report - {curr_m_name} {today_dt.year}</h3>
+    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);">
+        <h2 style="color: white; margin: 0; text-align: center; font-size: 28px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+            🗓️ Monthly Report - {curr_m_name} {today_dt.year}
+        </h2>
     </div>
     """, unsafe_allow_html=True)
     
@@ -408,10 +471,38 @@ if menu == "📊 Dashboard":
     month_profit = pd.to_numeric(s_month.iloc[:, 7], errors='coerce').sum() if not s_month.empty and len(s_month.columns) > 7 else 0
     
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("💰 Total Sale", f"₹{month_sale:,.2f}")
-    c2.metric("📦 Total Purchase", f"₹{month_pur:,.2f}")
-    c3.metric("💸 Total Expense", f"₹{month_exp:,.2f}")
-    c4.metric("📈 Total Profit", f"₹{month_profit:,.2f}")
+    
+    with c1:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333; box-shadow: 0 5px 15px rgba(0,0,0,0.15); border: 2px solid rgba(255,255,255,0.5);">
+            <p style="margin: 0; font-size: 14px; font-weight: 600;">💰 Total Sale</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #11998e;">₹{month_sale:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with c2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333; box-shadow: 0 5px 15px rgba(0,0,0,0.15); border: 2px solid rgba(255,255,255,0.5);">
+            <p style="margin: 0; font-size: 14px; font-weight: 600;">📦 Total Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #ee0979;">₹{month_pur:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with c3:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333; box-shadow: 0 5px 15px rgba(0,0,0,0.15); border: 2px solid rgba(255,255,255,0.5);">
+            <p style="margin: 0; font-size: 14px; font-weight: 600;">💸 Total Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #f857a6;">₹{month_exp:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with c4:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333; box-shadow: 0 5px 15px rgba(0,0,0,0.15); border: 2px solid rgba(255,255,255,0.5);">
+            <p style="margin: 0; font-size: 14px; font-weight: 600;">📈 Total Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #2193b0;">₹{month_profit:,.2f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
 
 # --- 6. BILLING ---
 elif menu == "🧾 Billing":
