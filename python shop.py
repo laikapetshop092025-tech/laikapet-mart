@@ -116,21 +116,36 @@ def load_data(sheet_name):
         return pd.DataFrame()
 
 def get_balance_from_sheet(mode):
-    """Get balance from Google Sheets - DISABLED FOR NOW"""
-    # Returning 0 always - not loading from sheets anymore
-    return 0.0
+    """Get LATEST balance from Google Sheets Balances sheet"""
+    try:
+        b_df = load_data("Balances")
+        if b_df.empty or len(b_df.columns) < 2:
+            return 0.0
+        
+        # Find rows matching the mode (Cash or Online)
+        rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
+        
+        if len(rows) > 0:
+            # Get the LAST (latest) entry for this mode
+            latest_balance = rows.iloc[-1, 1]  # Last row, second column
+            return float(pd.to_numeric(latest_balance, errors='coerce'))
+        
+        return 0.0
+    except Exception as e:
+        st.error(f"Error loading balance from sheets: {str(e)}")
+        return 0.0
 
 def get_current_balance(mode):
-    """Get current balance - PURE LOCAL, NO SHEETS LOADING"""
+    """Get current balance - Load from sheets ONCE when app opens, then use local"""
     if mode == "Cash":
-        # If never set, default to 0
+        # If not loaded yet (app just opened), load from sheets
         if st.session_state.manual_cash is None:
-            st.session_state.manual_cash = 0.0
+            st.session_state.manual_cash = get_balance_from_sheet("Cash")
         return st.session_state.manual_cash
     elif mode == "Online":
-        # If never set, default to 0
+        # If not loaded yet (app just opened), load from sheets
         if st.session_state.manual_online is None:
-            st.session_state.manual_online = 0.0
+            st.session_state.manual_online = get_balance_from_sheet("Online")
         return st.session_state.manual_online
     return 0.0
 
@@ -153,7 +168,7 @@ def set_balance(mode, amount):
         return False
 
 def update_balance(amount, mode, operation='add'):
-    """Update balance"""
+    """Update balance and save to Google Sheets"""
     if mode not in ["Cash", "Online"]:
         return True
     
@@ -165,19 +180,19 @@ def update_balance(amount, mode, operation='add'):
         else:
             new_bal = current_bal - amount
         
-        # Save to Google Sheets first
+        # Update session state
+        if mode == "Cash":
+            st.session_state.manual_cash = new_bal
+        elif mode == "Online":
+            st.session_state.manual_online = new_bal
+        
+        # Save to Google Sheets (this will be the new LATEST entry)
         if save_data("Balances", [mode, new_bal]):
-            # Then update session state
-            if mode == "Cash":
-                st.session_state.manual_cash = new_bal
-            elif mode == "Online":
-                st.session_state.manual_online = new_bal
-            
             st.success(f"✅ {mode}: ₹{current_bal:,.2f} → ₹{new_bal:,.2f}")
             time.sleep(0.5)
             return True
         else:
-            st.error(f"❌ Failed to update {mode} balance in sheets!")
+            st.error(f"❌ Failed to save {mode} balance to sheets!")
             return False
     except Exception as e:
         st.error(f"Error: {str(e)}")
@@ -221,9 +236,11 @@ menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Pu
 st.sidebar.divider()
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
-    # Only clear login state, NOT balance
+    # Clear login AND balance session so it reloads fresh from sheets
     st.session_state.logged_in = False
-    # Keep balance intact - do NOT reset manual_cash or manual_online
+    st.session_state.manual_cash = None
+    st.session_state.manual_online = None
+    st.session_state.balance_initialized = False
     st.rerun()
 
 curr_m = datetime.now().month
@@ -256,33 +273,6 @@ if menu == "📊 Dashboard":
             <p style="color: white; margin-top: 10px; font-size: 20px; opacity: 0.9;">Your Trusted Pet Care Partner 🐕 🐈</p>
         </div>
         """, unsafe_allow_html=True)
-    
-    # FIRST TIME SETUP ALERT
-    cash_test = st.session_state.manual_cash if st.session_state.manual_cash is not None else 0
-    online_test = st.session_state.manual_online if st.session_state.manual_online is not None else 0
-    
-    if cash_test == 0 and online_test == 0 and not st.session_state.balance_initialized:
-        st.error("🚨 **BALANCE NOT SET** - Please set your starting balance below!")
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col1:
-            set_cash = st.number_input("💵 Starting Cash", value=0.0, step=100.0, key="init_cash")
-        
-        with col2:
-            set_online = st.number_input("🏦 Starting Online", value=920.0, step=100.0, key="init_online")
-        
-        with col3:
-            st.write("")
-            st.write("")
-            if st.button("✅ SET & START", type="primary", use_container_width=True, key="init_btn"):
-                st.session_state.manual_cash = set_cash
-                st.session_state.manual_online = set_online
-                st.session_state.balance_initialized = True
-                st.success(f"✅ Set! Cash: ₹{set_cash:,.2f}, Online: ₹{set_online:,.2f}")
-                time.sleep(1)
-                st.rerun()
-        
-        st.divider()
     
     s_df = load_data("Sales")
     e_df = load_data("Expenses")
@@ -322,62 +312,28 @@ if menu == "📊 Dashboard":
     """, unsafe_allow_html=True)
     
     with st.expander("🔧 Balance Settings"):
-        st.warning("⚠️ **Important**: Set your current correct balance here ONCE")
-        st.info("💡 After setting, this balance will be used for all transactions. Logout/Login will NOT change it.")
-        
+        st.success("✅ Balance automatically loads from Google Sheets latest entry!")
+        st.info("💡 Logout/Login karne par latest balance Google Sheets se load hoga")
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Cash Balance")
             st.write(f"Current: ₹{cash_bal:,.2f}")
-            new_cash = st.number_input("Set Correct Cash Balance", value=0.0, step=1.0, key="cash_set")
-            if st.button("✅ Set Cash to ₹" + f"{new_cash:.2f}", key="btn_cash"):
+            new_cash = st.number_input("Update Cash Balance", value=float(cash_bal), step=1.0, key="cash_set")
+            if st.button("💾 Save Cash Balance", key="btn_cash"):
                 st.session_state.manual_cash = new_cash
-                st.session_state.balance_initialized = True
                 save_data("Balances", ["Cash", new_cash])
-                st.success(f"✅ Cash balance permanently set to ₹{new_cash:,.2f}")
+                st.success(f"✅ Cash updated to ₹{new_cash:,.2f}")
                 time.sleep(1)
                 st.rerun()
         
         with col2:
             st.subheader("Online Balance")
             st.write(f"Current: ₹{online_bal:,.2f}")
-            new_online = st.number_input("Set Correct Online Balance", value=0.0, step=1.0, key="online_set")
-            if st.button("✅ Set Online to ₹" + f"{new_online:.2f}", key="btn_online"):
+            new_online = st.number_input("Update Online Balance", value=float(online_bal), step=1.0, key="online_set")
+            if st.button("💾 Save Online Balance", key="btn_online"):
                 st.session_state.manual_online = new_online
-                st.session_state.balance_initialized = True
                 save_data("Balances", ["Online", new_online])
-                st.success(f"✅ Online balance permanently set to ₹{new_online:,.2f}")
-                time.sleep(1)
-                st.rerun()
-        
-        st.divider()
-        
-        # Quick set buttons
-        st.markdown("#### 🚀 Quick Actions")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("💵 Cash = ₹0", use_container_width=True):
-                st.session_state.manual_cash = 0.0
-                st.session_state.balance_initialized = True
-                save_data("Balances", ["Cash", 0.0])
-                st.rerun()
-        
-        with col2:
-            if st.button("🏦 Online = ₹920", use_container_width=True):
-                st.session_state.manual_online = 920.0
-                st.session_state.balance_initialized = True
-                save_data("Balances", ["Online", 920.0])
-                st.rerun()
-        
-        with col3:
-            if st.button("🔄 Reset Both to Current", use_container_width=True):
-                st.session_state.manual_cash = 0.0
-                st.session_state.manual_online = 920.0
-                st.session_state.balance_initialized = True
-                save_data("Balances", ["Cash", 0.0])
-                save_data("Balances", ["Online", 920.0])
-                st.success("✅ Cash = ₹0, Online = ₹920")
+                st.success(f"✅ Online updated to ₹{new_online:,.2f}")
                 time.sleep(1)
                 st.rerun()
     
