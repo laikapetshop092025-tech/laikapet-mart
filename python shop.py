@@ -10,61 +10,77 @@ st.set_page_config(page_title="LAIKA PET MART", layout="wide")
 # Custom CSS for beautiful sidebar
 st.markdown("""
 <style>
-    /* Sidebar styling */
+    /* Sidebar styling - Light background */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+        background: linear-gradient(180deg, #e0e7ff 0%, #f3f4f6 100%);
     }
     
-    /* Radio buttons styling - Button-like appearance */
-    .stRadio > label {
+    /* Hide default radio circles */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] > div[data-testid="stRadio"] > div {
+        gap: 8px;
+    }
+    
+    /* Menu item buttons */
+    [data-testid="stSidebar"] .stRadio > label {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 14px 18px;
+        padding: 14px 20px;
         border-radius: 12px;
-        margin: 8px 0;
+        margin: 6px 0;
         cursor: pointer;
         transition: all 0.3s ease;
-        border: 2px solid rgba(255, 255, 255, 0.3);
+        border: 2px solid transparent;
         display: block;
         color: white !important;
         font-weight: 600;
         font-size: 15px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+        text-align: left;
     }
     
-    .stRadio > label:hover {
+    /* Hover effect */
+    [data-testid="stSidebar"] .stRadio > label:hover {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        transform: translateX(8px) scale(1.02);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-        border: 2px solid rgba(255,255,255,0.5);
+        transform: translateX(5px);
+        box-shadow: 0 5px 20px rgba(240, 147, 251, 0.5);
+        border: 2px solid #ff6b9d;
     }
     
-    /* Selected menu item - Bright highlight */
-    .stRadio > label[aria-checked="true"] {
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-        box-shadow: 0 6px 25px rgba(250, 112, 154, 0.4);
-        transform: scale(1.05);
-        border: 2px solid white;
+    /* Selected button - Bright and clear */
+    [data-testid="stSidebar"] .stRadio > label:has(input:checked) {
+        background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+        box-shadow: 0 5px 25px rgba(255, 216, 155, 0.6);
+        transform: scale(1.03);
+        border: 2px solid #ffd89b;
+        font-weight: 700;
     }
     
-    /* Logout button styling */
-    .stButton > button {
+    /* Logout button */
+    [data-testid="stSidebar"] .stButton > button {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         color: white;
-        border: 2px solid rgba(255, 255, 255, 0.3);
+        border: 2px solid transparent;
         padding: 14px 20px;
         border-radius: 12px;
         font-weight: bold;
         font-size: 15px;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 3px 15px rgba(240, 147, 251, 0.4);
         width: 100%;
     }
     
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
         transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-        border: 2px solid white;
+        box-shadow: 0 8px 25px rgba(255, 216, 155, 0.5);
+        border: 2px solid #ffd89b;
+    }
+    
+    /* Main Menu heading */
+    [data-testid="stSidebar"] h2 {
+        color: #1e293b !important;
+        font-weight: 700 !important;
+        text-align: center;
+        margin-bottom: 20px;
     }
     
     /* Main content area */
@@ -102,12 +118,6 @@ st.markdown("""
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-    }
-    
-    /* Sidebar divider */
-    [data-testid="stSidebar"] hr {
-        border-color: rgba(255, 255, 255, 0.3);
-        margin: 15px 0;
     }
 </style>
 """, unsafe_allow_html=True)
