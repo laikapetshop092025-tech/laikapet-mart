@@ -399,12 +399,14 @@ if st.session_state.last_check_date != today_dt:
     st.session_state.last_check_date = today_dt
 
 # --- 4. SIDEBAR MENU WITH ROLE-BASED ACCESS ---
-st.sidebar.markdown(f"""
-<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
-    <h3 style="color: white; margin: 0;">👤 {st.session_state.username}</h3>
-    <p style="color: white; margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">{st.session_state.user_role.upper()}</p>
-</div>
-""", unsafe_allow_html=True)
+# Display user info in sidebar (only if logged in)
+if st.session_state.user_role:
+    st.sidebar.markdown(f"""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+        <h3 style="color: white; margin: 0;">👤 {st.session_state.username}</h3>
+        <p style="color: white; margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">{st.session_state.user_role.upper()}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.sidebar.markdown("<h2 style='text-align: center; color: #1e293b; margin-bottom: 20px;'>📋 Main Menu</h2>", unsafe_allow_html=True)
 
@@ -413,7 +415,9 @@ if 'selected_menu' not in st.session_state:
     st.session_state.selected_menu = "📊 Dashboard"
 
 # Define menu items based on user role
-if st.session_state.user_role == "owner":
+user_role = st.session_state.user_role or "staff"  # Default to staff if None
+
+if user_role == "owner":
     # Owner has access to everything
     menu_items = [
         "📊 Dashboard",
@@ -428,7 +432,7 @@ if st.session_state.user_role == "owner":
         "📈 Advanced Reports",
         "👥 User Management"
     ]
-elif st.session_state.user_role == "manager":
+elif user_role == "manager":
     # Manager has most access except user management
     menu_items = [
         "📊 Dashboard",
