@@ -484,16 +484,19 @@ elif menu == "🧾 Billing":
         st.info(f"🎁 Points Earned: +{total_pts}")
         
         if st.button("✅ Save Bill & Send WhatsApp", type="primary"):
-            # Save to Sales
+            # Save all items to Sales
             for item in st.session_state.bill_cart:
                 save_data("Sales", [str(today_dt), item['Item'], item['Qty'], item['Price'], pay_m, f"{c_name}({c_ph})", item['Pts'], item['Profit']])
             
-            # Update balance
-            if pay_m in ["Cash", "Online"]:
-                update_balance(total_amt, pay_m, 'add')
-            else:
+            # Update balance based on payment mode
+            if pay_m == "Cash":
+                update_balance(total_amt, "Cash", 'add')
+            elif pay_m == "Online":
+                update_balance(total_amt, "Online", 'add')
+            else:  # Udhaar
+                # Add to Customer Khata automatically
                 save_data("CustomerKhata", [f"{c_name}({c_ph})", total_amt, str(today_dt), "Udhaar"])
-                st.success("✅ Bill saved as Udhaar!")
+                st.success(f"✅ Bill saved as Udhaar! Added to Customer Khata: {c_name}")
             
             # Generate WhatsApp message
             items_text = "\n".join([f"• {item['Item']} - {item['Qty']} - ₹{item['Price']}" for item in st.session_state.bill_cart])
@@ -825,16 +828,29 @@ elif menu == "📒 Customer Khata":
         
         if st.form_submit_button("💾 Save Entry", type="primary"):
             if a > 0 and n.strip():
-                final_amt = a if "+" in t else -a
-                save_data("CustomerKhata", [n, final_amt, str(today_dt), m])
-                
-                if "-" in t and m in ["Cash", "Online"]:
-                    update_balance(a, m, 'add')
-                else:
-                    st.success("✅ Entry saved!")
+                # Determine the type
+                if "+" in t:  # Udhaar (customer ne udhaar liya)
+                    final_amt = a  # Positive amount
+                    save_data("CustomerKhata", [n, final_amt, str(today_dt), m])
+                    st.success(f"✅ Udhaar entry added: {n} owes ₹{a:,.2f}")
+                else:  # Jama (customer ne payment kiya)
+                    final_amt = -a  # Negative amount (reduces balance)
+                    save_data("CustomerKhata", [n, final_amt, str(today_dt), m])
+                    
+                    # Update Cash/Online balance if payment received
+                    if m == "Cash":
+                        update_balance(a, "Cash", 'add')
+                        st.success(f"✅ Payment received! ₹{a:,.2f} added to Cash")
+                    elif m == "Online":
+                        update_balance(a, "Online", 'add')
+                        st.success(f"✅ Payment received! ₹{a:,.2f} added to Online")
+                    else:
+                        st.success(f"✅ Payment entry added (Mode: {m})")
                 
                 time.sleep(1)
                 st.rerun()
+            else:
+                st.error("❌ Please enter valid name and amount!")
     
     k_df = load_data("CustomerKhata")
     if not k_df.empty and len(k_df.columns) > 1:
