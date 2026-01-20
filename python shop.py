@@ -2012,7 +2012,7 @@ elif menu == "👥 User Management":
     </div>
     """, unsafe_allow_html=True)
     
-    tab1, tab2, tab3 = st.tabs(["👥 Current Users", "➕ Add User", "📊 Activity Log"])
+    tab1, tab2, tab3, tab4 = st.tabs(["👥 Current Users", "➕ Add User", "✏️ Edit User", "📊 Activity Log"])
     
     # TAB 1: Current Users
     with tab1:
@@ -2038,9 +2038,9 @@ elif menu == "👥 User Management":
                     st.write(f"🔑 Username: `{username}`")
                 
                 with col4:
-                    if data['role'] != "owner":
-                        if st.button("🗑️", key=f"del_{username}"):
-                            st.warning(f"Delete feature coming soon for {username}")
+                    if st.button("✏️", key=f"edit_{username}", help="Edit User"):
+                        st.session_state.edit_user = username
+                        st.rerun()
                 
                 st.divider()
         
@@ -2096,8 +2096,155 @@ elif menu == "👥 User Management":
                 else:
                     st.error("❌ Please fill all fields!")
     
-    # TAB 3: Activity Log
+    # TAB 3: Edit User
     with tab3:
+        st.subheader("✏️ Edit User Details")
+        
+        # Check if user selected for editing
+        if 'edit_user' not in st.session_state:
+            st.session_state.edit_user = None
+        
+        # User selector
+        edit_username = st.selectbox(
+            "Select User to Edit",
+            options=list(USERS.keys()),
+            index=list(USERS.keys()).index(st.session_state.edit_user) if st.session_state.edit_user in USERS else 0
+        )
+        
+        if edit_username:
+            user_data = USERS[edit_username]
+            
+            st.divider()
+            
+            # Show current details
+            st.markdown("### 📋 Current Details")
+            col1, col2, col3 = st.columns(3)
+            col1.info(f"**Username:** {edit_username}")
+            col2.info(f"**Name:** {user_data['name']}")
+            col3.info(f"**Role:** {user_data['role'].upper()}")
+            
+            st.divider()
+            
+            # Edit form
+            st.markdown("### ✏️ Update Details")
+            
+            with st.form("edit_user_form"):
+                st.warning("⚠️ Leave fields empty if you don't want to change them")
+                
+                # New username
+                new_username = st.text_input(
+                    "New Username (Optional)",
+                    placeholder=f"Current: {edit_username}",
+                    help="Change username - leave empty to keep current"
+                )
+                
+                # New name
+                new_name = st.text_input(
+                    "New Full Name (Optional)",
+                    placeholder=f"Current: {user_data['name']}",
+                    help="Change display name - leave empty to keep current"
+                )
+                
+                # New password
+                new_password = st.text_input(
+                    "New Password (Optional)",
+                    type="password",
+                    placeholder="Enter new password (min 8 chars)",
+                    help="Change password - leave empty to keep current"
+                )
+                
+                confirm_password = st.text_input(
+                    "Confirm New Password",
+                    type="password",
+                    placeholder="Re-enter new password",
+                    help="Confirm your new password"
+                )
+                
+                # Role change
+                new_role = st.selectbox(
+                    "Role",
+                    ["staff", "manager", "owner"],
+                    index=["staff", "manager", "owner"].index(user_data['role'])
+                )
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    submit_edit = st.form_submit_button("💾 Save Changes", type="primary", use_container_width=True)
+                
+                with col2:
+                    cancel_edit = st.form_submit_button("❌ Cancel", use_container_width=True)
+                
+                if submit_edit:
+                    # Validation
+                    errors = []
+                    
+                    # Check if new username already exists
+                    if new_username and new_username != edit_username and new_username in USERS:
+                        errors.append(f"Username '{new_username}' already exists!")
+                    
+                    # Check password match
+                    if new_password or confirm_password:
+                        if new_password != confirm_password:
+                            errors.append("Passwords do not match!")
+                        elif len(new_password) < 8:
+                            errors.append("Password must be at least 8 characters!")
+                    
+                    if errors:
+                        for error in errors:
+                            st.error(f"❌ {error}")
+                    else:
+                        # Prepare update message
+                        changes = []
+                        
+                        # Build the updated user data
+                        updated_username = new_username if new_username else edit_username
+                        updated_name = new_name if new_name else user_data['name']
+                        updated_password = new_password if new_password else user_data['password']
+                        updated_role = new_role
+                        
+                        # Track what changed
+                        if new_username and new_username != edit_username:
+                            changes.append(f"Username: {edit_username} → {new_username}")
+                        if new_name and new_name != user_data['name']:
+                            changes.append(f"Name: {user_data['name']} → {new_name}")
+                        if new_password:
+                            changes.append("Password: Updated")
+                        if new_role != user_data['role']:
+                            changes.append(f"Role: {user_data['role']} → {new_role}")
+                        
+                        if changes:
+                            st.success("✅ User Updated Successfully!")
+                            st.markdown("### 📝 Changes Made:")
+                            for change in changes:
+                                st.write(f"• {change}")
+                            
+                            # Show new credentials if username or password changed
+                            if new_username or new_password:
+                                st.divider()
+                                st.info("📋 Updated Credentials:")
+                                st.code(f"""Username: {updated_username}
+Password: {updated_password if new_password else '[Unchanged]'}
+Role: {updated_role.upper()}""")
+                            
+                            st.warning("""
+                            ⚠️ **Important:**
+                            - These changes are currently stored in memory only
+                            - For permanent storage, connect to a database
+                            - User will need to re-login with new credentials
+                            """)
+                            
+                            # Clear edit selection
+                            st.session_state.edit_user = None
+                        else:
+                            st.info("ℹ️ No changes made")
+                
+                if cancel_edit:
+                    st.session_state.edit_user = None
+                    st.rerun()
+    
+    # TAB 4: Activity Log
+    with tab4:
         st.subheader("📊 User Activity Log")
         
         st.info("🚧 Activity logging feature coming soon!")
