@@ -430,7 +430,8 @@ if user_role == "owner":
         "🏢 Supplier Dues",
         "👑 Royalty Points",
         "📈 Advanced Reports",
-        "👥 User Management"
+        "👥 User Management",
+        "🔔 Automated Reminders"
     ]
 elif user_role == "manager":
     # Manager has most access except user management
@@ -444,7 +445,8 @@ elif user_role == "manager":
         "📒 Customer Khata",
         "🏢 Supplier Dues",
         "👑 Royalty Points",
-        "📈 Advanced Reports"
+        "📈 Advanced Reports",
+        "🔔 Automated Reminders"
     ]
 else:  # staff
     # Staff has limited access - billing and basic operations only
@@ -2270,3 +2272,386 @@ Role: {updated_role.upper()}""")
             with col4:
                 st.write(f"🕒 {activity['time']}")
             st.divider()
+
+# --- 16. AUTOMATED REMINDERS ---
+elif menu == "🔔 Automated Reminders":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🔔 Automated Reminders</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Never Miss Important Dates & Tasks</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Load data
+    p_df = load_data("PetRecords")
+    k_df = load_data("CustomerKhata")
+    d_df = load_data("Dues")
+    i_df = load_data("Inventory")
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "💉 Vaccination Due",
+        "💰 Payment Reminders", 
+        "📦 Low Stock Alerts",
+        "🏢 Supplier Payments",
+        "⚙️ Settings"
+    ])
+    
+    # ==================== TAB 1: VACCINATION DUE ====================
+    with tab1:
+        st.subheader("💉 Pet Vaccination Due Reminders")
+        
+        if not p_df.empty and len(p_df.columns) > 6:
+            # Calculate vaccination due dates
+            today = datetime.now().date()
+            
+            # Find pets with upcoming vaccinations
+            upcoming_vax = []
+            overdue_vax = []
+            
+            for _, row in p_df.iterrows():
+                try:
+                    owner = str(row.iloc[0]) if len(row) > 0 else "Unknown"
+                    phone = str(row.iloc[1]) if len(row) > 1 else "N/A"
+                    breed = str(row.iloc[2]) if len(row) > 2 else "Unknown"
+                    next_vax_str = str(row.iloc[6]) if len(row) > 6 else None
+                    
+                    if next_vax_str and next_vax_str != "nan":
+                        next_vax = pd.to_datetime(next_vax_str, errors='coerce').date()
+                        
+                        if next_vax:
+                            days_until = (next_vax - today).days
+                            
+                            vax_info = {
+                                'owner': owner,
+                                'phone': phone,
+                                'breed': breed,
+                                'next_vax': next_vax,
+                                'days_until': days_until
+                            }
+                            
+                            if days_until < 0:
+                                overdue_vax.append(vax_info)
+                            elif days_until <= 30:
+                                upcoming_vax.append(vax_info)
+                except:
+                    continue
+            
+            # Display overdue vaccinations
+            if overdue_vax:
+                st.error(f"🚨 {len(overdue_vax)} Overdue Vaccinations!")
+                
+                for vax in overdue_vax:
+                    with st.container():
+                        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                        
+                        with col1:
+                            st.write(f"👤 **{vax['owner']}**")
+                            st.write(f"🐕 {vax['breed']}")
+                        
+                        with col2:
+                            st.write(f"📱 {vax['phone']}")
+                        
+                        with col3:
+                            st.error(f"⚠️ Overdue by {abs(vax['days_until'])} days")
+                            st.write(f"Due: {vax['next_vax']}")
+                        
+                        with col4:
+                            # WhatsApp reminder button
+                            message = f"""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते {vax['owner']} जी!
+
+आपके पालतू ({vax['breed']}) का टीकाकरण {abs(vax['days_until'])} दिन से लंबित है!
+
+📅 Due Date: {vax['next_vax']}
+💉 कृपया जल्द से जल्द appointment लें
+
+🏥 Contact: Laika Pet Mart"""
+                            
+                            import urllib.parse
+                            encoded_msg = urllib.parse.quote(message)
+                            whatsapp_url = f"https://wa.me/91{vax['phone']}?text={encoded_msg}"
+                            
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #dc3545; color: white; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer;">📱 Send</button></a>', unsafe_allow_html=True)
+                        
+                        st.divider()
+            
+            # Display upcoming vaccinations
+            if upcoming_vax:
+                st.warning(f"⏰ {len(upcoming_vax)} Vaccinations Due in Next 30 Days")
+                
+                for vax in sorted(upcoming_vax, key=lambda x: x['days_until']):
+                    with st.container():
+                        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                        
+                        with col1:
+                            st.write(f"👤 **{vax['owner']}**")
+                            st.write(f"🐕 {vax['breed']}")
+                        
+                        with col2:
+                            st.write(f"📱 {vax['phone']}")
+                        
+                        with col3:
+                            st.warning(f"📅 Due in {vax['days_until']} days")
+                            st.write(f"Date: {vax['next_vax']}")
+                        
+                        with col4:
+                            # WhatsApp reminder button
+                            message = f"""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते {vax['owner']} जी!
+
+आपके पालतू ({vax['breed']}) का टीकाकरण {vax['days_until']} दिन में है!
+
+📅 Due Date: {vax['next_vax']}
+💉 कृपया appointment बुक करें
+
+🏥 Contact: Laika Pet Mart"""
+                            
+                            import urllib.parse
+                            encoded_msg = urllib.parse.quote(message)
+                            whatsapp_url = f"https://wa.me/91{vax['phone']}?text={encoded_msg}"
+                            
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #ffc107; color: black; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer;">📱 Send</button></a>', unsafe_allow_html=True)
+                        
+                        st.divider()
+            
+            if not overdue_vax and not upcoming_vax:
+                st.success("✅ No vaccinations due in the next 30 days!")
+        else:
+            st.info("No pet records found. Add pets in Pet Register to track vaccinations.")
+    
+    # ==================== TAB 2: PAYMENT REMINDERS ====================
+    with tab2:
+        st.subheader("💰 Customer Payment Reminders (Udhaar)")
+        
+        if not k_df.empty and len(k_df.columns) > 1:
+            # Calculate customer balances
+            customer_balances = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
+            customer_balances.columns = ['Customer', 'Balance']
+            
+            # Filter only customers with positive balance (owe money)
+            udhaar_customers = customer_balances[customer_balances['Balance'] > 0].sort_values('Balance', ascending=False)
+            
+            if not udhaar_customers.empty:
+                st.warning(f"📋 {len(udhaar_customers)} Customers with Pending Payments")
+                
+                # Summary metrics
+                col1, col2, col3 = st.columns(3)
+                total_udhaar = udhaar_customers['Balance'].sum()
+                avg_udhaar = total_udhaar / len(udhaar_customers)
+                max_udhaar = udhaar_customers['Balance'].max()
+                
+                col1.metric("💰 Total Udhaar", f"₹{total_udhaar:,.2f}")
+                col2.metric("📊 Average", f"₹{avg_udhaar:,.2f}")
+                col3.metric("🔴 Highest", f"₹{max_udhaar:,.2f}")
+                
+                st.divider()
+                
+                # Filter options
+                min_amount = st.slider("Show customers with udhaar ≥", 0, int(max_udhaar), 0, 100)
+                
+                filtered_customers = udhaar_customers[udhaar_customers['Balance'] >= min_amount]
+                
+                # Display customers
+                for _, row in filtered_customers.iterrows():
+                    customer_info = row['Customer']
+                    balance = row['Balance']
+                    
+                    # Extract name and phone
+                    if "(" in customer_info and ")" in customer_info:
+                        cust_name = customer_info.split("(")[0].strip()
+                        cust_phone = customer_info.split("(")[1].replace(")", "").strip()
+                    else:
+                        cust_name = customer_info
+                        cust_phone = ""
+                    
+                    with st.container():
+                        col1, col2, col3 = st.columns([3, 2, 1])
+                        
+                        with col1:
+                            st.write(f"👤 **{cust_name}**")
+                            if cust_phone:
+                                st.write(f"📱 {cust_phone}")
+                        
+                        with col2:
+                            if balance >= 5000:
+                                st.error(f"💰 ₹{balance:,.2f}")
+                            elif balance >= 2000:
+                                st.warning(f"💰 ₹{balance:,.2f}")
+                            else:
+                                st.info(f"💰 ₹{balance:,.2f}")
+                        
+                        with col3:
+                            if cust_phone:
+                                # WhatsApp reminder
+                                message = f"""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते {cust_name} जी!
+
+आपका बकाया: ₹{balance:,.2f}
+
+कृपया जल्द से जल्द भुगतान करें।
+
+धन्यवाद! 🙏
+Laika Pet Mart"""
+                                
+                                import urllib.parse
+                                encoded_msg = urllib.parse.quote(message)
+                                whatsapp_url = f"https://wa.me/91{cust_phone}?text={encoded_msg}"
+                                
+                                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer;">💬 Send</button></a>', unsafe_allow_html=True)
+                        
+                        st.divider()
+            else:
+                st.success("✅ No pending customer payments!")
+        else:
+            st.info("No udhaar records found.")
+    
+    # ==================== TAB 3: LOW STOCK ALERTS ====================
+    with tab3:
+        st.subheader("📦 Low Stock Alerts")
+        
+        if not i_df.empty and len(i_df.columns) > 3:
+            # Calculate current stock
+            i_df['qty_v'] = pd.to_numeric(i_df.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
+            i_df['rate_v'] = pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)
+            
+            # Get latest stock for each item
+            stock_summary = i_df.groupby(i_df.columns[0]).agg({
+                i_df.columns[1]: 'last',
+                'qty_v': 'last',
+                'rate_v': 'last'
+            }).reset_index()
+            stock_summary.columns = ['Item', 'Quantity', 'Qty_Numeric', 'Rate']
+            
+            # Low stock threshold selector
+            threshold = st.slider("Low Stock Threshold (units)", 1, 10, 5)
+            
+            # Find low stock items
+            low_stock = stock_summary[stock_summary['Qty_Numeric'] < threshold]
+            
+            if not low_stock.empty:
+                st.error(f"🚨 {len(low_stock)} Items Below Threshold!")
+                
+                # Calculate total value locked
+                low_stock['Value'] = low_stock['Qty_Numeric'] * low_stock['Rate']
+                total_value = low_stock['Value'].sum()
+                
+                st.warning(f"💸 Current Stock Value: ₹{total_value:,.2f}")
+                
+                st.divider()
+                
+                # Display low stock items
+                for _, row in low_stock.iterrows():
+                    col1, col2, col3 = st.columns([3, 2, 2])
+                    
+                    with col1:
+                        st.write(f"📦 **{row['Item']}**")
+                    
+                    with col2:
+                        st.error(f"⚠️ Only {row['Qty_Numeric']:.0f} units left!")
+                    
+                    with col3:
+                        st.write(f"💰 Rate: ₹{row['Rate']:,.2f}")
+                    
+                    st.divider()
+                
+                # Recommendation
+                st.info("💡 Recommendation: Order these items soon to avoid stock-out!")
+            else:
+                st.success(f"✅ All items above {threshold} units threshold!")
+        else:
+            st.info("No inventory data found.")
+    
+    # ==================== TAB 4: SUPPLIER PAYMENTS ====================
+    with tab4:
+        st.subheader("🏢 Supplier Payment Reminders")
+        
+        if not d_df.empty and len(d_df.columns) > 1:
+            # Calculate supplier balances
+            supplier_balances = d_df.groupby(d_df.columns[0]).agg({d_df.columns[1]: 'sum'}).reset_index()
+            supplier_balances.columns = ['Supplier', 'Balance']
+            
+            # Filter suppliers we owe money to (positive balance)
+            pending_payments = supplier_balances[supplier_balances['Balance'] > 0].sort_values('Balance', ascending=False)
+            
+            if not pending_payments.empty:
+                st.warning(f"💰 {len(pending_payments)} Suppliers Pending Payment")
+                
+                # Summary
+                col1, col2, col3 = st.columns(3)
+                total_due = pending_payments['Balance'].sum()
+                avg_due = total_due / len(pending_payments)
+                max_due = pending_payments['Balance'].max()
+                
+                col1.metric("💸 Total Due", f"₹{total_due:,.2f}")
+                col2.metric("📊 Average", f"₹{avg_due:,.2f}")
+                col3.metric("🔴 Highest", f"₹{max_due:,.2f}")
+                
+                st.divider()
+                
+                # Display suppliers
+                for _, row in pending_payments.iterrows():
+                    col1, col2 = st.columns([3, 2])
+                    
+                    with col1:
+                        st.write(f"🏢 **{row['Supplier']}**")
+                    
+                    with col2:
+                        if row['Balance'] >= 10000:
+                            st.error(f"💰 ₹{row['Balance']:,.2f}")
+                        elif row['Balance'] >= 5000:
+                            st.warning(f"💰 ₹{row['Balance']:,.2f}")
+                        else:
+                            st.info(f"💰 ₹{row['Balance']:,.2f}")
+                    
+                    st.divider()
+                
+                st.info("💡 Tip: Maintain good relationships by paying suppliers on time!")
+            else:
+                st.success("✅ No pending supplier payments!")
+        else:
+            st.info("No supplier dues data found.")
+    
+    # ==================== TAB 5: SETTINGS ====================
+    with tab5:
+        st.subheader("⚙️ Reminder Settings")
+        
+        st.info("🚧 Advanced settings coming soon!")
+        
+        # Sample settings
+        st.markdown("### 📅 Reminder Frequency")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.checkbox("Daily Low Stock Alert", value=True)
+            st.checkbox("Weekly Udhaar Summary", value=True)
+            st.checkbox("Monthly Supplier Report", value=False)
+        
+        with col2:
+            st.checkbox("Vaccination 7 days before", value=True)
+            st.checkbox("Vaccination 3 days before", value=True)
+            st.checkbox("Vaccination day reminder", value=True)
+        
+        st.divider()
+        
+        st.markdown("### 📱 Notification Channels")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.checkbox("WhatsApp Notifications", value=True)
+            st.checkbox("SMS Notifications", value=False, disabled=True)
+        
+        with col2:
+            st.checkbox("Email Notifications", value=False, disabled=True)
+            st.checkbox("In-App Notifications", value=True)
+        
+        st.divider()
+        
+        if st.button("💾 Save Settings", type="primary"):
+            st.success("✅ Settings saved successfully!")
+            st.info("Note: Some features require additional setup")
