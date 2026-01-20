@@ -18,9 +18,13 @@ if 'pur_cart' not in st.session_state:
 if 'last_check_date' not in st.session_state: 
     st.session_state.last_check_date = None
 if 'manual_cash' not in st.session_state:
+    # Only initialize from sheets if NOT set yet
     st.session_state.manual_cash = None
+    st.session_state.balance_initialized = False
 if 'manual_online' not in st.session_state:
     st.session_state.manual_online = None
+if 'balance_initialized' not in st.session_state:
+    st.session_state.balance_initialized = False
 
 def generate_pdf_bill(customer_name, customer_phone, items, total_amt, points, payment_mode, bill_date):
     """Generate PDF bill"""
@@ -132,16 +136,24 @@ def get_balance_from_sheet(mode):
         return 0.0
 
 def get_current_balance(mode):
-    """Get current balance - only from session state"""
+    """Get current balance - only from session state, initialize once from sheets"""
     if mode == "Cash":
-        if st.session_state.manual_cash is None:
-            # Initialize from sheets only once
+        # Only load from sheets if never initialized before
+        if st.session_state.manual_cash is None and not st.session_state.balance_initialized:
             st.session_state.manual_cash = get_balance_from_sheet("Cash")
+            st.session_state.balance_initialized = True
+        # If still None after initialization, set to 0
+        if st.session_state.manual_cash is None:
+            st.session_state.manual_cash = 0.0
         return st.session_state.manual_cash
     elif mode == "Online":
-        if st.session_state.manual_online is None:
-            # Initialize from sheets only once
+        # Only load from sheets if never initialized before
+        if st.session_state.manual_online is None and not st.session_state.balance_initialized:
             st.session_state.manual_online = get_balance_from_sheet("Online")
+            st.session_state.balance_initialized = True
+        # If still None after initialization, set to 0
+        if st.session_state.manual_online is None:
+            st.session_state.manual_online = 0.0
         return st.session_state.manual_online
     return 0.0
 
@@ -232,7 +244,9 @@ menu = st.sidebar.radio("Main Menu", ["📊 Dashboard", "🧾 Billing", "📦 Pu
 st.sidebar.divider()
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
+    # Only clear login state, NOT balance
     st.session_state.logged_in = False
+    # Keep balance intact - do NOT reset manual_cash or manual_online
     st.rerun()
 
 curr_m = datetime.now().month
@@ -304,7 +318,8 @@ if menu == "📊 Dashboard":
     """, unsafe_allow_html=True)
     
     with st.expander("🔧 Balance Settings"):
-        st.success("✅ Live Balance Tracking - All transactions update automatically!")
+        st.success("✅ Live Balance Tracking - Logout/Login se balance reset NAHI hoga!")
+        st.info("💡 Balance browser session mein saved rahega. Sirf browser close karne par reset hoga.")
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Cash Balance")
@@ -1051,4 +1066,3 @@ elif menu == "👑 Royalty Points":
             st.info("No points data available yet. Start billing to earn points!")
     else:
         st.info("No sales data found. Start billing to track royalty points!")
-
