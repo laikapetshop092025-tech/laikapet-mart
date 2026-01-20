@@ -1398,13 +1398,12 @@ elif menu == "👑 Royalty Points":
 
 # --- 14. ADVANCED REPORTS & ANALYTICS ---
 elif menu == "📈 Advanced Reports":
-    try:
-        st.markdown("""
-        <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
-            <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">📈 Advanced Reports & Analytics</h1>
-            <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Deep Insights for Smart Business Decisions</p>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">📈 Advanced Reports & Analytics</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Deep Insights for Smart Business Decisions</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Load all data
     s_df = load_data("Sales")
@@ -1913,9 +1912,3 @@ elif menu == "📈 Advanced Reports":
                     
                     csv = summary.to_csv(index=False).encode('utf-8')
                     st.download_button("📥 Download", csv, f"udhaar_report_{today_dt}.csv", "text/csv")
-    
-    except Exception as e:
-        st.error(f"⚠️ Error generating report: {str(e)}")
-        st.info("💡 Please make sure you have sales data in your sheets")
-        with st.expander("🔧 Technical Details"):
-            st.code(str(e))
