@@ -12,50 +12,59 @@ st.markdown("""
 <style>
     /* Sidebar styling */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
     }
     
-    /* Radio buttons styling */
+    /* Radio buttons styling - Button-like appearance */
     .stRadio > label {
-        background: rgba(255, 255, 255, 0.1);
-        padding: 12px 15px;
-        border-radius: 10px;
-        margin: 5px 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 14px 18px;
+        border-radius: 12px;
+        margin: 8px 0;
         cursor: pointer;
         transition: all 0.3s ease;
-        border: 2px solid transparent;
+        border: 2px solid rgba(255, 255, 255, 0.3);
         display: block;
         color: white !important;
-        font-weight: 500;
+        font-weight: 600;
+        font-size: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
     
     .stRadio > label:hover {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        transform: translateX(5px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        transform: translateX(8px) scale(1.02);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
         border: 2px solid rgba(255,255,255,0.5);
     }
     
-    /* Selected menu item */
-    .stRadio > label[data-baseweb="radio"] > div:first-child {
-        background-color: white !important;
+    /* Selected menu item - Bright highlight */
+    .stRadio > label[aria-checked="true"] {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        box-shadow: 0 6px 25px rgba(250, 112, 154, 0.4);
+        transform: scale(1.05);
+        border: 2px solid white;
     }
     
     /* Logout button styling */
     .stButton > button {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         color: white;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        padding: 14px 20px;
+        border-radius: 12px;
         font-weight: bold;
+        font-size: 15px;
         transition: all 0.3s ease;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        width: 100%;
     }
     
     .stButton > button:hover {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
         transform: translateY(-3px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        border: 2px solid white;
     }
     
     /* Main content area */
@@ -73,8 +82,8 @@ st.markdown("""
     }
     
     .streamlit-expanderHeader:hover {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        transform: scale(1.02);
+        opacity: 0.9;
+        transform: scale(1.01);
         transition: all 0.3s ease;
     }
     
@@ -93,6 +102,12 @@ st.markdown("""
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+    }
+    
+    /* Sidebar divider */
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255, 255, 255, 0.3);
+        margin: 15px 0;
     }
 </style>
 """, unsafe_allow_html=True)
