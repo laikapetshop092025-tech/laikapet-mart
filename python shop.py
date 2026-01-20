@@ -318,23 +318,62 @@ if menu == "📊 Dashboard":
     """, unsafe_allow_html=True)
     
     with st.expander("🔧 Balance Settings"):
-        st.success("✅ Live Balance Tracking - Logout/Login se balance reset NAHI hoga!")
-        st.info("💡 Balance browser session mein saved rahega. Sirf browser close karne par reset hoga.")
+        st.warning("⚠️ **Important**: Set your current correct balance here ONCE")
+        st.info("💡 After setting, this balance will be used for all transactions. Logout/Login will NOT change it.")
+        
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Cash Balance")
-            new_cash = st.number_input("Set Cash", value=float(cash_bal), step=1.0, key="cash_set")
-            if st.button("Set Cash", key="btn_cash"):
-                set_balance("Cash", new_cash)
-                st.success(f"✅ Cash set to ₹{new_cash:,.2f}")
+            st.write(f"Current: ₹{cash_bal:,.2f}")
+            new_cash = st.number_input("Set Correct Cash Balance", value=0.0, step=1.0, key="cash_set")
+            if st.button("✅ Set Cash to ₹" + f"{new_cash:.2f}", key="btn_cash"):
+                st.session_state.manual_cash = new_cash
+                st.session_state.balance_initialized = True
+                save_data("Balances", ["Cash", new_cash])
+                st.success(f"✅ Cash balance permanently set to ₹{new_cash:,.2f}")
                 time.sleep(1)
                 st.rerun()
+        
         with col2:
             st.subheader("Online Balance")
-            new_online = st.number_input("Set Online", value=float(online_bal), step=1.0, key="online_set")
-            if st.button("Set Online", key="btn_online"):
-                set_balance("Online", new_online)
-                st.success(f"✅ Online set to ₹{new_online:,.2f}")
+            st.write(f"Current: ₹{online_bal:,.2f}")
+            new_online = st.number_input("Set Correct Online Balance", value=0.0, step=1.0, key="online_set")
+            if st.button("✅ Set Online to ₹" + f"{new_online:.2f}", key="btn_online"):
+                st.session_state.manual_online = new_online
+                st.session_state.balance_initialized = True
+                save_data("Balances", ["Online", new_online])
+                st.success(f"✅ Online balance permanently set to ₹{new_online:,.2f}")
+                time.sleep(1)
+                st.rerun()
+        
+        st.divider()
+        
+        # Quick set buttons
+        st.markdown("#### 🚀 Quick Actions")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("💵 Cash = ₹0", use_container_width=True):
+                st.session_state.manual_cash = 0.0
+                st.session_state.balance_initialized = True
+                save_data("Balances", ["Cash", 0.0])
+                st.rerun()
+        
+        with col2:
+            if st.button("🏦 Online = ₹920", use_container_width=True):
+                st.session_state.manual_online = 920.0
+                st.session_state.balance_initialized = True
+                save_data("Balances", ["Online", 920.0])
+                st.rerun()
+        
+        with col3:
+            if st.button("🔄 Reset Both to Current", use_container_width=True):
+                st.session_state.manual_cash = 0.0
+                st.session_state.manual_online = 920.0
+                st.session_state.balance_initialized = True
+                save_data("Balances", ["Cash", 0.0])
+                save_data("Balances", ["Online", 920.0])
+                st.success("✅ Cash = ₹0, Online = ₹920")
                 time.sleep(1)
                 st.rerun()
     
