@@ -315,7 +315,7 @@ if 'username' not in st.session_state:
 
 # User credentials database
 USERS = {
-    "Owner": {
+    "Laika": {
         "password": "Ayush@092025",
         "role": "owner",
         "name": "Ayush (Owner)"
@@ -382,7 +382,7 @@ if not st.session_state.logged_in:
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 20px;">
             <b>🔑 Demo Credentials:</b><br>
             <small>
-            Owner: <code>Owner</code> / <code>Ayush@092025</code><br>
+            Owner: <code>Laika</code> / <code>Ayush@092025</code><br>
             Manager: <code>Manager</code> / <code>Manager@123</code><br>
             Staff: <code>Staff1</code> / <code>Staff@123</code>
             </small>
