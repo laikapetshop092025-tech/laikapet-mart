@@ -1256,58 +1256,197 @@ elif menu == "🐾 Pet Register":
 
 # --- 11. CUSTOMER KHATA ---
 elif menu == "📒 Customer Khata":
-    st.header("📒 Customer Khata")
+    st.header("📒 Customer Khata Management")
     
-    with st.form("kh"):
-        n = st.text_input("Customer Name")
-        a = st.number_input("Amount", min_value=0.0)
-        t = st.selectbox("Type", ["Udhaar (+)", "Jama (-)"])
-        m = st.selectbox("Mode", ["Cash", "Online", "N/A"])
-        
-        if st.form_submit_button("💾 Save Entry", type="primary"):
-            if a > 0 and n.strip():
-                # Determine the type
-                if "+" in t:  # Udhaar (customer ne udhaar liya)
-                    final_amt = a  # Positive amount
-                    save_data("CustomerKhata", [n, final_amt, str(today_dt), m])
-                    st.success(f"✅ Udhaar entry added: {n} owes ₹{a:,.2f}")
-                else:  # Jama (customer ne payment kiya)
-                    final_amt = -a  # Negative amount (reduces balance)
-                    save_data("CustomerKhata", [n, final_amt, str(today_dt), m])
-                    
-                    # Update Cash/Online balance if payment received
-                    if m == "Cash":
-                        update_balance(a, "Cash", 'add')
-                        st.success(f"✅ Payment received! ₹{a:,.2f} added to Cash")
-                    elif m == "Online":
-                        update_balance(a, "Online", 'add')
-                        st.success(f"✅ Payment received! ₹{a:,.2f} added to Online")
-                    else:
-                        st.success(f"✅ Payment entry added (Mode: {m})")
-                
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("❌ Please enter valid name and amount!")
-    
+    # Load existing khata data
     k_df = load_data("CustomerKhata")
-    if not k_df.empty and len(k_df.columns) > 1:
-        st.subheader("📊 Customer Balance Summary")
-        sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
-        sum_df.columns = ['Customer', 'Balance']
-        sum_df = sum_df[sum_df['Balance'] != 0].sort_values('Balance', ascending=False)
-        st.table(sum_df)
+    
+    # Create tabs for better organization
+    tab1, tab2, tab3 = st.tabs(["➕ New Entry", "💰 Receive Payment", "📊 View Khata"])
+    
+    # ==================== TAB 1: NEW ENTRY ====================
+    with tab1:
+        st.subheader("➕ Add New Udhaar Entry")
         
-        # Delete option
-        st.divider()
-        with st.expander("🗑️ Delete Khata Entry"):
-            st.dataframe(k_df.tail(10), use_container_width=True)
-            if len(k_df) > 0:
-                del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(k_df)-1, value=0, key="del_khata")
-                st.info(f"Selected: {k_df.iloc[del_idx, 0] if len(k_df.columns) > 0 else 'N/A'}")
-                if st.button("🗑️ Delete Selected Entry"):
-                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
-                    st.info("Go to CustomerKhata sheet and delete the corresponding row")
+        with st.form("kh_new"):
+            n = st.text_input("Customer Name")
+            ph = st.text_input("Phone Number (Optional)")
+            a = st.number_input("Udhaar Amount", min_value=0.0)
+            note = st.text_input("Note (Optional)", placeholder="e.g., Dog food purchase")
+            
+            if st.form_submit_button("💾 Add Udhaar", type="primary"):
+                if a > 0 and n.strip():
+                    customer_entry = f"{n} ({ph})" if ph else n
+                    save_data("CustomerKhata", [customer_entry, a, str(today_dt), "N/A"])
+                    st.success(f"✅ Udhaar added: {n} owes ₹{a:,.2f}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ Please enter valid name and amount!")
+    
+    # ==================== TAB 2: RECEIVE PAYMENT ====================
+    with tab2:
+        st.subheader("💰 Receive Payment & Clear Udhaar")
+        
+        if not k_df.empty and len(k_df.columns) > 1:
+            # Calculate customer balances
+            sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
+            sum_df.columns = ['Customer', 'Balance']
+            # Only show customers with positive balance (who owe money)
+            sum_df = sum_df[sum_df['Balance'] > 0].sort_values('Balance', ascending=False)
+            
+            if not sum_df.empty:
+                st.info(f"💰 Total Outstanding: ₹{sum_df['Balance'].sum():,.2f}")
+                
+                # Select customer
+                customer_list = sum_df['Customer'].tolist()
+                selected_customer = st.selectbox("Select Customer", customer_list)
+                
+                if selected_customer:
+                    # Get current balance
+                    current_balance = float(sum_df[sum_df['Customer'] == selected_customer]['Balance'].iloc[0])
+                    
+                    st.warning(f"📊 Current Balance: ₹{current_balance:,.2f}")
+                    
+                    with st.form("payment_form"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            payment_amount = st.number_input(
+                                "Payment Amount", 
+                                min_value=0.0, 
+                                max_value=float(current_balance),
+                                value=float(current_balance),
+                                help="Enter amount received from customer"
+                            )
+                        
+                        with col2:
+                            payment_mode = st.selectbox("Payment Mode", ["Cash", "Online", "Cheque", "UPI"])
+                        
+                        # Show what will happen
+                        remaining = current_balance - payment_amount
+                        
+                        if payment_amount > 0:
+                            if remaining == 0:
+                                st.success(f"✅ Full payment! Khata will be CLEARED")
+                            else:
+                                st.info(f"📊 Remaining Balance: ₹{remaining:,.2f}")
+                        
+                        submit_payment = st.form_submit_button("💰 Receive Payment", type="primary")
+                        
+                        if submit_payment and payment_amount > 0:
+                            # Add negative entry (payment received)
+                            save_data("CustomerKhata", [selected_customer, -payment_amount, str(today_dt), payment_mode])
+                            
+                            # Update Cash/Online balance
+                            if payment_mode == "Cash":
+                                update_balance(payment_amount, "Cash", 'add')
+                            elif payment_mode == "Online" or payment_mode == "UPI":
+                                update_balance(payment_amount, "Online", 'add')
+                            
+                            if remaining == 0:
+                                st.balloons()
+                                st.success(f"🎉 Payment Received! ₹{payment_amount:,.2f} | Khata CLEARED for {selected_customer}")
+                            else:
+                                st.success(f"✅ Payment Received! ₹{payment_amount:,.2f} | Remaining: ₹{remaining:,.2f}")
+                            
+                            time.sleep(1.5)
+                            st.rerun()
+            else:
+                st.success("✅ No pending udhaar! All customers have cleared their dues.")
+        else:
+            st.info("No khata entries found.")
+    
+    # ==================== TAB 3: VIEW KHATA ====================
+    with tab3:
+        st.subheader("📊 Customer Balance Summary")
+        
+        if not k_df.empty and len(k_df.columns) > 1:
+            # Calculate balances
+            sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
+            sum_df.columns = ['Customer', 'Balance']
+            
+            # Filter: Only show non-zero balances
+            sum_df = sum_df[sum_df['Balance'] != 0].sort_values('Balance', ascending=False)
+            
+            if not sum_df.empty:
+                # Summary metrics
+                total_udhaar = sum_df[sum_df['Balance'] > 0]['Balance'].sum() if len(sum_df[sum_df['Balance'] > 0]) > 0 else 0
+                total_credit = abs(sum_df[sum_df['Balance'] < 0]['Balance'].sum()) if len(sum_df[sum_df['Balance'] < 0]) > 0 else 0
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("💰 Total Udhaar", f"₹{total_udhaar:,.2f}")
+                col2.metric("💚 Credit Balance", f"₹{total_credit:,.2f}")
+                col3.metric("📊 Net", f"₹{(total_udhaar - total_credit):,.2f}")
+                
+                st.divider()
+                
+                # Display balances with color coding
+                for _, row in sum_df.iterrows():
+                    customer = row['Customer']
+                    balance = row['Balance']
+                    
+                    # Extract name and phone
+                    if "(" in customer and ")" in customer:
+                        name = customer.split("(")[0].strip()
+                        phone = customer.split("(")[1].replace(")", "").strip()
+                    else:
+                        name = customer
+                        phone = ""
+                    
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    
+                    with col1:
+                        st.write(f"👤 **{name}**")
+                        if phone:
+                            st.write(f"📱 {phone}")
+                    
+                    with col2:
+                        if balance > 0:
+                            st.error(f"💰 Owes: ₹{balance:,.2f}")
+                        else:
+                            st.success(f"💚 Credit: ₹{abs(balance):,.2f}")
+                    
+                    with col3:
+                        # Quick WhatsApp reminder for customers who owe
+                        if balance > 0 and phone:
+                            message = f"""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते {name} जी!
+
+आपका बकाया: ₹{balance:,.2f}
+
+कृपया जल्द से जल्द भुगतान करें।
+
+धन्यवाद! 🙏
+Laika Pet Mart"""
+                            
+                            import urllib.parse
+                            encoded_msg = urllib.parse.quote(message)
+                            whatsapp_url = f"https://wa.me/91{phone}?text={encoded_msg}"
+                            
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 8px; border: none; border-radius: 5px; cursor: pointer;">💬</button></a>', unsafe_allow_html=True)
+                    
+                    st.divider()
+                
+                # Download option
+                csv = sum_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Khata Report",
+                    data=csv,
+                    file_name=f"customer_khata_{today_dt}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.success("✅ All balances cleared! No pending udhaar.")
+            
+            # Show transaction history
+            st.divider()
+            with st.expander("📜 View Transaction History"):
+                st.dataframe(k_df.tail(20), use_container_width=True)
+        else:
+            st.info("No khata entries found. Start adding transactions!")
+
 
 # --- 12. SUPPLIER DUES ---
 elif menu == "🏢 Supplier Dues":
@@ -2274,6 +2413,23 @@ elif menu == "👥 User Management":
                             changes.append(f"Role: {user_data['role']} → {new_role}")
                         
                         if changes:
+                            # ACTUALLY UPDATE THE USERS DICTIONARY
+                            # If username changed, need to move the entry
+                            if new_username and new_username != edit_username:
+                                # Create new entry with new username
+                                USERS[updated_username] = {
+                                    'password': updated_password,
+                                    'role': updated_role,
+                                    'name': updated_name
+                                }
+                                # Delete old entry
+                                del USERS[edit_username]
+                            else:
+                                # Just update existing entry
+                                USERS[edit_username]['password'] = updated_password
+                                USERS[edit_username]['role'] = updated_role
+                                USERS[edit_username]['name'] = updated_name
+                            
                             st.success("✅ User Updated Successfully!")
                             st.markdown("### 📝 Changes Made:")
                             for change in changes:
@@ -2284,18 +2440,25 @@ elif menu == "👥 User Management":
                                 st.divider()
                                 st.info("📋 Updated Credentials:")
                                 st.code(f"""Username: {updated_username}
-Password: {updated_password if new_password else '[Unchanged]'}
+Password: {updated_password if new_password else '[Password Unchanged - Use Current]'}
 Role: {updated_role.upper()}""")
                             
-                            st.warning("""
-                            ⚠️ **Important:**
-                            - These changes are currently stored in memory only
-                            - For permanent storage, connect to a database
-                            - User will need to re-login with new credentials
+                            st.success("""
+                            ✅ **Changes Applied!**
+                            - User can now login with new credentials
+                            - Changes are active immediately
+                            - For permanent storage across app restarts, save USERS to a database
                             """)
+                            
+                            # If current logged-in user changed their own password/username
+                            if st.session_state.username and edit_username in st.session_state.username:
+                                st.warning("⚠️ You changed your own credentials! Please re-login with new details.")
                             
                             # Clear edit selection
                             st.session_state.edit_user = None
+                            
+                            time.sleep(2)
+                            st.rerun()
                         else:
                             st.info("ℹ️ No changes made")
                 
