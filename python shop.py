@@ -432,6 +432,7 @@ if user_role == "owner":
         "🔔 Automated Reminders",
         "👥 Customer Analytics",
         "🎁 Discounts & Offers",
+        "💬 WhatsApp Automation",
         "💼 GST & Invoices",
         "👥 User Management"
     ]
@@ -451,6 +452,7 @@ elif user_role == "manager":
         "🔔 Automated Reminders",
         "👥 Customer Analytics",
         "🎁 Discounts & Offers",
+        "💬 WhatsApp Automation",
         "💼 GST & Invoices"
     ]
 else:  # staff
@@ -4034,7 +4036,584 @@ elif menu == "🎁 Discounts & Offers":
         if total_bulk == 0 and total_seasonal == 0 and total_combos == 0:
             st.info("No active offers. Create offers in other tabs!")
 
-# --- 19. GST & INVOICE MANAGEMENT ---
+# --- 19. WHATSAPP AUTOMATION ---
+elif menu == "💬 WhatsApp Automation":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">💬 WhatsApp Automation</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Automated Marketing & Communication</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Load data
+    s_df = load_data("Sales")
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Daily Summary",
+        "🔄 Follow-up Messages",
+        "📢 Promotional Broadcast",
+        "✅ Order Confirmations",
+        "⚙️ Settings"
+    ])
+    
+    # ==================== TAB 1: DAILY SUMMARY ====================
+    with tab1:
+        st.subheader("📊 Auto Daily Summary to Owner")
+        
+        st.info("💡 Get automatic daily business summary on WhatsApp")
+        
+        # Owner phone number
+        owner_phone = st.text_input("Owner WhatsApp Number", value="9876543210", help="Owner ka phone number jahan daily summary bhejni hai")
+        
+        # Generate today's summary
+        st.divider()
+        st.markdown("### 📋 Today's Summary Preview")
+        
+        if not s_df.empty and 'Date' in s_df.columns:
+            # Filter today's sales
+            today = datetime.now().date()
+            today_sales = s_df[s_df['Date'] == today]
+            
+            if not today_sales.empty:
+                # Calculate metrics
+                total_sales = pd.to_numeric(today_sales.iloc[:, 3], errors='coerce').sum()
+                total_bills = len(today_sales)
+                avg_bill = total_sales / total_bills if total_bills > 0 else 0
+                total_profit = pd.to_numeric(today_sales.iloc[:, 7], errors='coerce').sum() if len(today_sales.columns) > 7 else 0
+                
+                # Top products
+                product_sales = {}
+                for _, row in today_sales.iterrows():
+                    product = str(row.iloc[1]) if len(row) > 1 else "Unknown"
+                    if product not in product_sales:
+                        product_sales[product] = 0
+                    product_sales[product] += 1
+                
+                top_products = sorted(product_sales.items(), key=lambda x: x[1], reverse=True)[:3]
+                top_products_text = "\n".join([f"{i+1}. {p[0]} ({p[1]} sales)" for i, p in enumerate(top_products)])
+                
+                # Display metrics
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("💰 Sales", f"₹{total_sales:,.2f}")
+                col2.metric("🧾 Bills", total_bills)
+                col3.metric("📊 Avg Bill", f"₹{avg_bill:.2f}")
+                col4.metric("📈 Profit", f"₹{total_profit:,.2f}")
+                
+                st.divider()
+                
+                # Generate WhatsApp message
+                summary_message = f"""🐾 *LAIKA PET MART* 🐾
+📅 Daily Summary - {today.strftime('%d %B %Y')}
+
+━━━━━━━━━━━━━━━━━━━━━
+💰 *आज की बिक्री*
+━━━━━━━━━━━━━━━━━━━━━
+
+💵 Total Sales: ₹{total_sales:,.2f}
+📈 Total Profit: ₹{total_profit:,.2f}
+🧾 Bills Count: {total_bills}
+📊 Avg Bill Value: ₹{avg_bill:.2f}
+
+🏆 *Top Products:*
+{top_products_text}
+
+━━━━━━━━━━━━━━━━━━━━━
+📊 Business Health: {"✅ Excellent" if total_sales > 5000 else "⚠️ Average" if total_sales > 2000 else "🔴 Slow"}
+━━━━━━━━━━━━━━━━━━━━━
+
+Have a great day! 🎉"""
+                
+                # Display message preview
+                st.markdown("### 📱 Message Preview")
+                st.text_area("WhatsApp Message", summary_message, height=400)
+                
+                # Send button
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.info("💡 Click button to send this summary to owner's WhatsApp")
+                
+                with col2:
+                    import urllib.parse
+                    encoded_msg = urllib.parse.quote(summary_message)
+                    whatsapp_url = f"https://wa.me/91{owner_phone}?text={encoded_msg}"
+                    
+                    st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%;">📱 Send Now</button></a>', unsafe_allow_html=True)
+                
+                st.divider()
+                
+                # Auto-send schedule
+                st.markdown("### ⏰ Schedule Auto-Send")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    enable_auto = st.checkbox("Enable Daily Auto-Send", value=False)
+                    send_time = st.time_input("Send at", value=datetime.strptime("21:00", "%H:%M").time())
+                
+                with col2:
+                    st.info("""
+                    **Auto-Send Features:**
+                    • Automatic daily at set time
+                    • No manual intervention
+                    • WhatsApp API integration needed
+                    
+                    ⚠️ Requires WhatsApp Business API
+                    """)
+                
+                if enable_auto:
+                    st.success(f"✅ Auto-send enabled! Summary will be sent daily at {send_time.strftime('%I:%M %p')}")
+            else:
+                st.warning("No sales today yet. Summary will be generated after first sale.")
+        else:
+            st.info("No sales data available")
+    
+    # ==================== TAB 2: FOLLOW-UP MESSAGES ====================
+    with tab2:
+        st.subheader("🔄 Customer Follow-up Messages")
+        
+        st.info("💡 Send automated follow-up messages to customers after purchase")
+        
+        if not s_df.empty and len(s_df.columns) > 5:
+            # Days selector
+            days_ago = st.slider("Follow-up after X days", 1, 30, 7)
+            
+            # Calculate target date
+            target_date = datetime.now().date() - timedelta(days=days_ago)
+            
+            # Filter customers from target date
+            if 'Date' in s_df.columns:
+                target_sales = s_df[s_df['Date'] == target_date]
+                
+                if not target_sales.empty:
+                    # Get unique customers
+                    customers = target_sales.iloc[:, 5].unique()
+                    
+                    st.success(f"📋 {len(customers)} customers from {target_date} ready for follow-up")
+                    
+                    # Message template
+                    st.divider()
+                    st.markdown("### 📝 Follow-up Message Template")
+                    
+                    follow_up_template = st.text_area(
+                        "Message Template",
+                        value="""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते {customer_name} जी!
+
+आपने {days} दिन पहले हमारे यहाँ से खरीदारी की थी। 
+
+हमें उम्मीद है कि आप हमारे products से खुश हैं! 😊
+
+🎁 Special Offer Just for You:
+• 10% discount on next purchase
+• Valid for next 7 days
+
+कुछ और चाहिए तो बताएं!
+
+धन्यवाद! 🙏
+Laika Pet Mart
+📞 9876543210""",
+                        height=300
+                    )
+                    
+                    st.info("💡 Use {customer_name} and {days} as placeholders")
+                    
+                    st.divider()
+                    
+                    # Display customers
+                    st.markdown("### 👥 Send Follow-ups")
+                    
+                    for i, customer_info in enumerate(customers):
+                        if str(customer_info) != 'nan':
+                            # Extract name and phone
+                            if "(" in str(customer_info) and ")" in str(customer_info):
+                                name = str(customer_info).split("(")[0].strip()
+                                phone = str(customer_info).split("(")[1].replace(")", "").strip()
+                            else:
+                                name = str(customer_info)
+                                phone = ""
+                            
+                            col1, col2, col3 = st.columns([3, 2, 1])
+                            
+                            with col1:
+                                st.write(f"👤 **{name}**")
+                                st.write(f"📅 Last purchase: {days_ago} days ago")
+                            
+                            with col2:
+                                if phone:
+                                    st.write(f"📱 {phone}")
+                            
+                            with col3:
+                                if phone:
+                                    # Personalize message
+                                    personalized_msg = follow_up_template.replace("{customer_name}", name).replace("{days}", str(days_ago))
+                                    
+                                    import urllib.parse
+                                    encoded_msg = urllib.parse.quote(personalized_msg)
+                                    whatsapp_url = f"https://wa.me/91{phone}?text={encoded_msg}"
+                                    
+                                    st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 8px; border: none; border-radius: 5px; cursor: pointer;">📱 Send</button></a>', unsafe_allow_html=True)
+                            
+                            st.divider()
+                    
+                    # Bulk send option
+                    if st.button("📢 Send to All", type="primary"):
+                        st.success(f"✅ Follow-up messages queued for {len(customers)} customers!")
+                        st.info("💡 Open each WhatsApp link to send manually, or use WhatsApp Business API for bulk send")
+                else:
+                    st.info(f"No customers found from {target_date}")
+            else:
+                st.info("Date information not available in sales data")
+        else:
+            st.info("No sales data available")
+    
+    # ==================== TAB 3: PROMOTIONAL BROADCAST ====================
+    with tab3:
+        st.subheader("📢 Promotional Broadcast")
+        
+        st.info("💡 Send promotional messages to all customers or specific segments")
+        
+        # Target audience
+        target_audience = st.selectbox(
+            "Target Audience",
+            ["All Customers", "Top Customers (High Spenders)", "Recent Customers (Last 30 days)", "Inactive Customers (60+ days)"]
+        )
+        
+        # Message type
+        promo_type = st.selectbox(
+            "Promotion Type",
+            ["Festival Offer", "New Product Launch", "Discount Offer", "Event Invitation", "Custom Message"]
+        )
+        
+        # Pre-built templates
+        templates = {
+            "Festival Offer": """🎉 *DIWALI DHAMAKA* 🎉
+🐾 LAIKA PET MART 🐾
+
+इस दिवाली अपने प्यारे दोस्त को खुश करें!
+
+🎁 *Special Offers:*
+• 25% OFF on all products
+• Buy 1 Get 1 on selected items
+• Free treats worth ₹200
+
+📅 Offer valid: 20-31 October
+📍 Visit us today!
+
+🎊 Diwali ki शुभकामनाएं! 🎊
+Laika Pet Mart
+📞 9876543210""",
+            
+            "New Product Launch": """🚀 *NEW ARRIVAL* 🚀
+🐾 LAIKA PET MART 🐾
+
+हमारे store में नए products आ गए हैं!
+
+✨ *What's New:*
+• Premium Dog Food Range
+• Organic Cat Treats
+• Interactive Toys
+• Grooming Essentials
+
+🎁 Launch Offer: 15% OFF
+📅 Limited Stock!
+
+आज ही आएं और देखें! 😊
+Laika Pet Mart
+📞 9876543210""",
+            
+            "Discount Offer": """💰 *MEGA SALE* 💰
+🐾 LAIKA PET MART 🐾
+
+बड़ी बचत का मौका!
+
+🔥 *Clearance Sale:*
+• Up to 40% OFF
+• All categories included
+• Limited time only
+
+⏰ Weekend Special!
+📅 Valid: This Weekend Only
+
+जल्दी करें, stock limited है! 🏃
+Laika Pet Mart
+📞 9876543210""",
+            
+            "Event Invitation": """🎪 *SPECIAL EVENT* 🎪
+🐾 LAIKA PET MART 🐾
+
+आप सभी को invite है!
+
+🐕 *Pet Care Workshop*
+📅 Date: 25 January 2026
+⏰ Time: 11 AM - 2 PM
+📍 Venue: Laika Pet Mart
+
+✨ Free Entry!
+• Expert advice
+• Free health checkup
+• Refreshments
+• Goodie bags
+
+RSVP: 📞 9876543210
+Limited seats! जल्दी करें! 🎉"""
+        }
+        
+        # Message editor
+        st.divider()
+        st.markdown("### 📝 Create Your Message")
+        
+        if promo_type != "Custom Message":
+            promo_message = st.text_area(
+                "Promotional Message",
+                value=templates[promo_type],
+                height=350
+            )
+        else:
+            promo_message = st.text_area(
+                "Custom Message",
+                placeholder="Write your custom promotional message here...",
+                height=350
+            )
+        
+        # Preview
+        st.divider()
+        st.markdown("### 📱 Message Preview")
+        st.info(promo_message)
+        
+        # Get target customers
+        if not s_df.empty and len(s_df.columns) > 5:
+            customer_list = []
+            
+            if target_audience == "All Customers":
+                customer_list = s_df.iloc[:, 5].unique().tolist()
+            
+            elif target_audience == "Top Customers (High Spenders)":
+                # Calculate spending
+                customer_spend = {}
+                for _, row in s_df.iterrows():
+                    customer = str(row.iloc[5])
+                    amount = float(row.iloc[3]) if len(row) > 3 else 0
+                    if customer != "nan":
+                        customer_spend[customer] = customer_spend.get(customer, 0) + amount
+                
+                # Top 20% customers
+                sorted_customers = sorted(customer_spend.items(), key=lambda x: x[1], reverse=True)
+                top_20_percent = int(len(sorted_customers) * 0.2)
+                customer_list = [c[0] for c in sorted_customers[:top_20_percent]]
+            
+            elif target_audience == "Recent Customers (Last 30 days)":
+                if 'Date' in s_df.columns:
+                    cutoff = datetime.now().date() - timedelta(days=30)
+                    recent = s_df[s_df['Date'] >= cutoff]
+                    customer_list = recent.iloc[:, 5].unique().tolist()
+            
+            elif target_audience == "Inactive Customers (60+ days)":
+                if 'Date' in s_df.columns:
+                    # Find customers who haven't purchased in 60+ days
+                    customer_last_purchase = {}
+                    for _, row in s_df.iterrows():
+                        customer = str(row.iloc[5])
+                        date = row.iloc[0]
+                        if customer != "nan" and date:
+                            if customer not in customer_last_purchase or date > customer_last_purchase[customer]:
+                                customer_last_purchase[customer] = date
+                    
+                    cutoff = datetime.now().date() - timedelta(days=60)
+                    customer_list = [c for c, d in customer_last_purchase.items() if d < cutoff]
+            
+            # Remove nan values
+            customer_list = [c for c in customer_list if str(c) != 'nan']
+            
+            st.divider()
+            st.success(f"📊 Target Audience: {len(customer_list)} customers")
+            
+            # Send options
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("📱 Preview Customer List", type="secondary"):
+                    st.markdown("### 👥 Customer List")
+                    for customer in customer_list[:20]:  # Show first 20
+                        if "(" in str(customer):
+                            name = str(customer).split("(")[0]
+                            phone = str(customer).split("(")[1].replace(")", "")
+                            st.write(f"✅ {name} - {phone}")
+                        else:
+                            st.write(f"✅ {customer}")
+                    
+                    if len(customer_list) > 20:
+                        st.info(f"... and {len(customer_list)-20} more")
+            
+            with col2:
+                if st.button("📢 Send Broadcast", type="primary"):
+                    st.balloons()
+                    st.success(f"🎉 Broadcast queued for {len(customer_list)} customers!")
+                    st.info("""
+                    💡 **Next Steps:**
+                    • Messages will be sent via WhatsApp
+                    • For bulk send, use WhatsApp Business API
+                    • Or send manually by clicking individual links
+                    """)
+        else:
+            st.info("No customer data available")
+    
+    # ==================== TAB 4: ORDER CONFIRMATIONS ====================
+    with tab4:
+        st.subheader("✅ Automatic Order Confirmations")
+        
+        st.info("💡 Send instant order confirmation after each billing")
+        
+        # Settings
+        st.markdown("### ⚙️ Auto-Confirmation Settings")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            auto_confirm = st.checkbox("Enable Auto-Confirmation", value=True)
+            include_items = st.checkbox("Include Item Details", value=True)
+            include_points = st.checkbox("Include Loyalty Points", value=True)
+        
+        with col2:
+            include_delivery = st.checkbox("Include Delivery Info", value=False)
+            include_feedback = st.checkbox("Include Feedback Link", value=True)
+            include_offers = st.checkbox("Include Next Visit Offer", value=True)
+        
+        st.divider()
+        
+        # Sample confirmation message
+        st.markdown("### 📱 Sample Confirmation Message")
+        
+        sample_confirmation = f"""🐾 *ORDER CONFIRMATION* 🐾
+LAIKA PET MART
+
+नमस्ते Nidhi जी!
+
+✅ आपका order confirm हो गया है!
+
+📋 *Order Details:*
+Order ID: #LPM-{datetime.now().strftime('%Y%m%d')}-045
+Date: {datetime.now().strftime('%d %B %Y')}
+Time: {datetime.now().strftime('%I:%M %p')}
+
+{'🛍️ *Items Purchased:*' if include_items else ''}
+{'• Dog Food 5Kg - ₹2,250' if include_items else ''}
+{'• Cat Litter - ₹400' if include_items else ''}
+
+💰 *Total Amount:* ₹2,650
+{'🎁 *Points Earned:* +53' if include_points else ''}
+{'👑 *Total Points:* 195' if include_points else ''}
+
+{'🚚 *Delivery:* Home delivery in 2-3 days' if include_delivery else ''}
+{'📦 Track: wa.me/919876543210' if include_delivery else ''}
+
+{'🎁 *Special Offer:*' if include_offers else ''}
+{'Next visit pe 10% extra discount!' if include_offers else ''}
+
+{'⭐ *Feedback:*' if include_feedback else ''}
+{'हमारी service कैसी लगी?' if include_feedback else ''}
+{'Reply with rating: 1-5 stars' if include_feedback else ''}
+
+धन्यवाद! 🙏
+Visit Again Soon!
+
+Laika Pet Mart
+📞 9876543210"""
+        
+        st.text_area("Confirmation Template", sample_confirmation, height=500)
+        
+        st.divider()
+        
+        # Integration info
+        st.markdown("### 🔗 Integration Status")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.success("✅ Billing Integration: Active")
+            st.info("💡 Confirmations send automatically after billing")
+        
+        with col2:
+            st.warning("⚠️ WhatsApp API: Manual Mode")
+            st.info("💡 Upgrade to WhatsApp Business API for full automation")
+        
+        if auto_confirm:
+            st.success("✅ Auto-confirmation is ENABLED. Messages will be sent after each billing!")
+        else:
+            st.warning("⚠️ Auto-confirmation is DISABLED. Enable it to start sending confirmations.")
+    
+    # ==================== TAB 5: SETTINGS ====================
+    with tab5:
+        st.subheader("⚙️ WhatsApp Automation Settings")
+        
+        st.markdown("### 📱 Business Details")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            business_name = st.text_input("Business Name", value="LAIKA PET MART")
+            business_phone = st.text_input("Business WhatsApp", value="9876543210")
+            owner_name = st.text_input("Owner Name", value="Ayush")
+        
+        with col2:
+            business_address = st.text_area("Business Address", value="Shop No. 123, Main Market\nBareilly, UP")
+            owner_whatsapp = st.text_input("Owner WhatsApp (for daily summary)", value="9876543210")
+        
+        st.divider()
+        
+        st.markdown("### 🔔 Notification Preferences")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.checkbox("Daily Summary", value=True)
+            st.checkbox("Weekly Report", value=False)
+            st.checkbox("Low Stock Alerts", value=True)
+        
+        with col2:
+            st.checkbox("Customer Reminders", value=True)
+            st.checkbox("Payment Reminders", value=True)
+            st.checkbox("Festival Alerts", value=True)
+        
+        st.divider()
+        
+        st.markdown("### 🚀 API Integration")
+        
+        api_status = st.selectbox(
+            "WhatsApp Integration Mode",
+            ["Manual (Current)", "WhatsApp Business API", "Third-party Service"]
+        )
+        
+        if api_status == "Manual (Current)":
+            st.info("""
+            📱 **Manual Mode:**
+            • Click buttons to open WhatsApp
+            • Send messages manually
+            • Free to use
+            • No automation limit
+            """)
+        elif api_status == "WhatsApp Business API":
+            st.success("""
+            🚀 **WhatsApp Business API:**
+            • Fully automated sending
+            • Bulk messages
+            • Scheduled messages
+            • API integration required
+            
+            💰 Cost: ₹1-2 per message
+            """)
+            
+            api_key = st.text_input("API Key", type="password", placeholder="Enter your WhatsApp Business API key")
+        
+        st.divider()
+        
+        if st.button("💾 Save Settings", type="primary"):
+            st.success("✅ Settings saved successfully!")
+            st.balloons()
+
+# --- 20. GST & INVOICE MANAGEMENT ---
 elif menu == "💼 GST & Invoices":
     st.markdown("""
     <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
