@@ -433,6 +433,7 @@ if user_role == "owner":
         "👥 Customer Analytics",
         "🎁 Discounts & Offers",
         "💬 WhatsApp Automation",
+        "🏭 Supplier Management",
         "💼 GST & Invoices",
         "👥 User Management"
     ]
@@ -453,6 +454,7 @@ elif user_role == "manager":
         "👥 Customer Analytics",
         "🎁 Discounts & Offers",
         "💬 WhatsApp Automation",
+        "🏭 Supplier Management",
         "💼 GST & Invoices"
     ]
 else:  # staff
@@ -4613,7 +4615,577 @@ Laika Pet Mart
             st.success("✅ Settings saved successfully!")
             st.balloons()
 
-# --- 20. GST & INVOICE MANAGEMENT ---
+# --- 20. SUPPLIER MANAGEMENT ---
+elif menu == "🏭 Supplier Management":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🏭 Supplier Management</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Complete Procurement & Supplier System</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize session state for suppliers
+    if 'suppliers' not in st.session_state:
+        st.session_state.suppliers = {
+            'PetFood Suppliers India': {
+                'contact': '9876543210',
+                'email': 'info@petfoodsuppliers.com',
+                'address': 'Delhi',
+                'products': ['Dog Food', 'Cat Food', 'Bird Food'],
+                'rating': 4.5,
+                'total_orders': 25,
+                'on_time_delivery': 92,
+                'quality_score': 4.3,
+                'price_competitiveness': 4.2
+            },
+            'Pet Accessories Co': {
+                'contact': '9123456789',
+                'email': 'sales@petaccessories.com',
+                'address': 'Mumbai',
+                'products': ['Toys', 'Leashes', 'Collars', 'Beds'],
+                'rating': 4.8,
+                'total_orders': 18,
+                'on_time_delivery': 95,
+                'quality_score': 4.7,
+                'price_competitiveness': 4.5
+            },
+            'Veterinary Supplies': {
+                'contact': '9988776655',
+                'email': 'orders@vetsupplies.com',
+                'address': 'Bangalore',
+                'products': ['Medicines', 'Supplements', 'First Aid'],
+                'rating': 4.2,
+                'total_orders': 12,
+                'on_time_delivery': 88,
+                'quality_score': 4.5,
+                'price_competitiveness': 3.8
+            }
+        }
+    
+    if 'purchase_orders' not in st.session_state:
+        st.session_state.purchase_orders = []
+    
+    if 'price_quotes' not in st.session_state:
+        st.session_state.price_quotes = {}
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📝 Purchase Orders",
+        "⭐ Supplier Ratings",
+        "💰 Price Comparison",
+        "🚚 Delivery Tracking",
+        "📊 Supplier Database"
+    ])
+    
+    # ==================== TAB 1: PURCHASE ORDERS ====================
+    with tab1:
+        st.subheader("📝 Purchase Order Generation")
+        
+        # Create new PO
+        with st.expander("➕ Create New Purchase Order", expanded=True):
+            with st.form("new_po"):
+                st.markdown("### 📋 Order Details")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    supplier = st.selectbox("Select Supplier", list(st.session_state.suppliers.keys()))
+                    po_date = st.date_input("Order Date", value=datetime.now().date())
+                    delivery_date = st.date_input("Expected Delivery", value=datetime.now().date() + timedelta(days=7))
+                
+                with col2:
+                    po_number = st.text_input("PO Number", value=f"PO-{datetime.now().strftime('%Y%m%d')}-{len(st.session_state.purchase_orders)+1:03d}")
+                    payment_terms = st.selectbox("Payment Terms", ["Cash on Delivery", "30 Days Credit", "15 Days Credit", "Advance Payment"])
+                    priority = st.selectbox("Priority", ["Normal", "Urgent", "High"])
+                
+                st.divider()
+                st.markdown("### 📦 Order Items")
+                
+                # Add items
+                num_items = st.number_input("Number of Items", min_value=1, max_value=10, value=3)
+                
+                items = []
+                total_amount = 0
+                
+                for i in range(int(num_items)):
+                    st.markdown(f"**Item {i+1}**")
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        item_name = st.text_input(f"Product", key=f"po_item_{i}", placeholder="e.g., Dog Food 10Kg")
+                    with col2:
+                        quantity = st.number_input(f"Quantity", min_value=1, value=10, key=f"po_qty_{i}")
+                    with col3:
+                        rate = st.number_input(f"Rate (₹)", min_value=0.0, value=500.0, key=f"po_rate_{i}")
+                    with col4:
+                        amount = quantity * rate
+                        st.metric("Amount", f"₹{amount:,.2f}")
+                    
+                    if item_name:
+                        items.append({
+                            'product': item_name,
+                            'quantity': quantity,
+                            'rate': rate,
+                            'amount': amount
+                        })
+                        total_amount += amount
+                
+                # Show totals
+                st.divider()
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total Items", len(items))
+                col2.metric("Total Quantity", sum([item['quantity'] for item in items]))
+                col3.metric("💰 Total Amount", f"₹{total_amount:,.2f}")
+                
+                notes = st.text_area("Special Instructions", placeholder="Any special delivery instructions or notes...")
+                
+                if st.form_submit_button("📝 Generate Purchase Order", type="primary"):
+                    if items:
+                        new_po = {
+                            'po_number': po_number,
+                            'supplier': supplier,
+                            'po_date': str(po_date),
+                            'delivery_date': str(delivery_date),
+                            'items': items,
+                            'total_amount': total_amount,
+                            'payment_terms': payment_terms,
+                            'priority': priority,
+                            'notes': notes,
+                            'status': 'Pending',
+                            'created_at': str(datetime.now())
+                        }
+                        
+                        st.session_state.purchase_orders.append(new_po)
+                        st.success(f"✅ Purchase Order {po_number} created successfully!")
+                        st.balloons()
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Please add at least one item!")
+        
+        # Display existing POs
+        st.divider()
+        st.markdown("### 📋 Recent Purchase Orders")
+        
+        if st.session_state.purchase_orders:
+            # Status filter
+            status_filter = st.selectbox("Filter by Status", ["All", "Pending", "Approved", "Delivered", "Cancelled"])
+            
+            filtered_pos = st.session_state.purchase_orders
+            if status_filter != "All":
+                filtered_pos = [po for po in filtered_pos if po['status'] == status_filter]
+            
+            for i, po in enumerate(reversed(filtered_pos)):
+                # Status color
+                status_colors = {
+                    'Pending': '#FFA500',
+                    'Approved': '#4CAF50',
+                    'Delivered': '#2196F3',
+                    'Cancelled': '#F44336'
+                }
+                
+                status_color = status_colors.get(po['status'], '#808080')
+                
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {status_color} 0%, white 100%); padding: 20px; border-radius: 12px; margin-bottom: 15px;">
+                        <h3 style="margin: 0; color: #333;">📝 {po['po_number']} - {po['supplier']}</h3>
+                        <p style="margin: 5px 0; color: #666;">Status: <strong>{po['status']}</strong> | Priority: {po['priority']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.write(f"📅 Order: {po['po_date']}")
+                    col2.write(f"🚚 Delivery: {po['delivery_date']}")
+                    col3.write(f"💰 Amount: ₹{po['total_amount']:,.2f}")
+                    col4.write(f"💳 Terms: {po['payment_terms']}")
+                    
+                    # Items
+                    with st.expander("📦 View Items"):
+                        for item in po['items']:
+                            st.write(f"• {item['product']} - Qty: {item['quantity']} × ₹{item['rate']} = ₹{item['amount']:,.2f}")
+                    
+                    # Actions
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    if po['status'] == 'Pending':
+                        if col1.button("✅ Approve", key=f"approve_{i}"):
+                            po['status'] = 'Approved'
+                            st.rerun()
+                    
+                    if po['status'] == 'Approved':
+                        if col2.button("📦 Mark Delivered", key=f"deliver_{i}"):
+                            po['status'] = 'Delivered'
+                            st.rerun()
+                    
+                    if col3.button("📄 Download PDF", key=f"pdf_{i}"):
+                        st.info("PDF generation feature - Install reportlab")
+                    
+                    if col4.button("❌ Cancel", key=f"cancel_{i}"):
+                        po['status'] = 'Cancelled'
+                        st.rerun()
+                    
+                    st.divider()
+        else:
+            st.info("No purchase orders yet. Create your first PO above!")
+    
+    # ==================== TAB 2: SUPPLIER RATINGS ====================
+    with tab2:
+        st.subheader("⭐ Supplier Rating System")
+        
+        st.info("💡 Rate suppliers on delivery, quality, and pricing")
+        
+        # Overall rankings
+        st.markdown("### 🏆 Supplier Rankings")
+        
+        # Calculate overall scores
+        supplier_scores = []
+        for name, data in st.session_state.suppliers.items():
+            overall_score = (
+                data['rating'] * 0.3 +
+                (data['on_time_delivery'] / 20) * 0.3 +
+                data['quality_score'] * 0.2 +
+                data['price_competitiveness'] * 0.2
+            )
+            supplier_scores.append((name, overall_score, data))
+        
+        # Sort by score
+        supplier_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Display rankings
+        for rank, (name, score, data) in enumerate(supplier_scores, 1):
+            # Medal colors
+            if rank == 1:
+                medal = "🥇"
+                color = "#FFD700"
+            elif rank == 2:
+                medal = "🥈"
+                color = "#C0C0C0"
+            elif rank == 3:
+                medal = "🥉"
+                color = "#CD7F32"
+            else:
+                medal = f"#{rank}"
+                color = "#E0E0E0"
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {color} 0%, white 100%); padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                <h3 style="margin: 0; color: #333;">{medal} {name}</h3>
+                <p style="margin: 5px 0; color: #666;">Overall Score: {score:.2f}/5.0 ⭐</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("⭐ Rating", f"{data['rating']}/5")
+            col2.metric("🚚 On-Time", f"{data['on_time_delivery']}%")
+            col3.metric("✅ Quality", f"{data['quality_score']}/5")
+            col4.metric("💰 Price", f"{data['price_competitiveness']}/5")
+            
+            st.divider()
+        
+        # Rate a supplier
+        st.markdown("### 📝 Rate a Supplier")
+        
+        with st.form("rate_supplier"):
+            supplier_to_rate = st.selectbox("Select Supplier", list(st.session_state.suppliers.keys()))
+            
+            st.markdown("**Rate the following aspects:**")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                overall_rating = st.slider("Overall Rating", 1.0, 5.0, 4.0, 0.1)
+                quality = st.slider("Product Quality", 1.0, 5.0, 4.0, 0.1)
+            
+            with col2:
+                delivery_time = st.slider("On-Time Delivery %", 0, 100, 90)
+                pricing = st.slider("Price Competitiveness", 1.0, 5.0, 4.0, 0.1)
+            
+            feedback = st.text_area("Feedback/Comments", placeholder="Any additional comments...")
+            
+            if st.form_submit_button("💾 Submit Rating", type="primary"):
+                # Update supplier data
+                st.session_state.suppliers[supplier_to_rate]['rating'] = overall_rating
+                st.session_state.suppliers[supplier_to_rate]['quality_score'] = quality
+                st.session_state.suppliers[supplier_to_rate]['on_time_delivery'] = delivery_time
+                st.session_state.suppliers[supplier_to_rate]['price_competitiveness'] = pricing
+                st.session_state.suppliers[supplier_to_rate]['total_orders'] += 1
+                
+                st.success(f"✅ Rating submitted for {supplier_to_rate}!")
+                time.sleep(1)
+                st.rerun()
+    
+    # ==================== TAB 3: PRICE COMPARISON ====================
+    with tab3:
+        st.subheader("💰 Price Comparison Tool")
+        
+        st.info("💡 Compare prices from multiple suppliers for the same product")
+        
+        # Add price quote
+        with st.expander("➕ Add Price Quote", expanded=True):
+            with st.form("add_quote"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    product_name = st.text_input("Product Name", placeholder="e.g., Dog Food Premium 10Kg")
+                    supplier_quote = st.selectbox("Supplier", list(st.session_state.suppliers.keys()))
+                
+                with col2:
+                    price = st.number_input("Price (₹)", min_value=0.0, value=500.0)
+                    unit = st.text_input("Unit", value="10Kg", placeholder="e.g., 10Kg, 1 Unit")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    min_order = st.number_input("Minimum Order Qty", min_value=1, value=10)
+                with col2:
+                    valid_until = st.date_input("Quote Valid Until", value=datetime.now().date() + timedelta(days=30))
+                
+                notes = st.text_input("Notes", placeholder="Delivery time, payment terms, etc.")
+                
+                if st.form_submit_button("💾 Add Quote", type="primary"):
+                    if product_name:
+                        if product_name not in st.session_state.price_quotes:
+                            st.session_state.price_quotes[product_name] = []
+                        
+                        st.session_state.price_quotes[product_name].append({
+                            'supplier': supplier_quote,
+                            'price': price,
+                            'unit': unit,
+                            'min_order': min_order,
+                            'valid_until': str(valid_until),
+                            'notes': notes,
+                            'added_on': str(datetime.now().date())
+                        })
+                        
+                        st.success(f"✅ Quote added for {product_name}!")
+                        time.sleep(1)
+                        st.rerun()
+        
+        # Display price comparisons
+        st.divider()
+        st.markdown("### 📊 Price Comparisons")
+        
+        if st.session_state.price_quotes:
+            product_to_compare = st.selectbox("Select Product", list(st.session_state.price_quotes.keys()))
+            
+            if product_to_compare:
+                quotes = st.session_state.price_quotes[product_to_compare]
+                
+                st.markdown(f"### 💰 Quotes for {product_to_compare}")
+                
+                # Sort by price
+                quotes_sorted = sorted(quotes, key=lambda x: x['price'])
+                
+                # Find best price
+                best_price = quotes_sorted[0]['price'] if quotes_sorted else 0
+                
+                for i, quote in enumerate(quotes_sorted, 1):
+                    is_best = quote['price'] == best_price
+                    
+                    color = "#4CAF50" if is_best else "#E0E0E0"
+                    badge = "🏆 BEST PRICE" if is_best else f"#{i}"
+                    
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {color} 0%, white 100%); padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                        <h4 style="margin: 0; color: #333;">{badge} - {quote['supplier']}</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("💰 Price", f"₹{quote['price']:,.2f}")
+                    col2.metric("📦 Unit", quote['unit'])
+                    col3.metric("📊 Min Order", quote['min_order'])
+                    col4.write(f"📅 Valid: {quote['valid_until']}")
+                    
+                    if quote['notes']:
+                        st.info(f"📝 {quote['notes']}")
+                    
+                    # Savings calculation
+                    if not is_best:
+                        savings = quote['price'] - best_price
+                        savings_pct = (savings / quote['price']) * 100
+                        st.warning(f"💸 ₹{savings:.2f} more expensive ({savings_pct:.1f}% higher than best price)")
+                    
+                    st.divider()
+                
+                # Summary
+                st.markdown("### 📊 Price Analysis")
+                col1, col2, col3 = st.columns(3)
+                
+                prices = [q['price'] for q in quotes]
+                col1.metric("🏆 Best Price", f"₹{min(prices):,.2f}")
+                col2.metric("📊 Average Price", f"₹{sum(prices)/len(prices):,.2f}")
+                col3.metric("💰 Potential Saving", f"₹{max(prices) - min(prices):,.2f}")
+        else:
+            st.info("No price quotes added yet. Add quotes above to start comparing!")
+    
+    # ==================== TAB 4: DELIVERY TRACKING ====================
+    with tab4:
+        st.subheader("🚚 Delivery Tracking")
+        
+        st.info("💡 Track orders from suppliers in real-time")
+        
+        # Filter deliveries
+        delivery_filter = st.selectbox("Filter Orders", ["All Orders", "In Transit", "Delivered", "Delayed"])
+        
+        # Get relevant POs
+        trackable_orders = [po for po in st.session_state.purchase_orders if po['status'] in ['Approved', 'Delivered']]
+        
+        if trackable_orders:
+            st.markdown(f"### 📦 {len(trackable_orders)} Orders in System")
+            
+            for i, po in enumerate(trackable_orders):
+                # Calculate delivery status
+                po_date = datetime.strptime(po['po_date'], '%Y-%m-%d').date()
+                delivery_date = datetime.strptime(po['delivery_date'], '%Y-%m-%d').date()
+                today = datetime.now().date()
+                
+                days_since_order = (today - po_date).days
+                days_until_delivery = (delivery_date - today).days
+                
+                # Status determination
+                if po['status'] == 'Delivered':
+                    status = "✅ Delivered"
+                    status_color = "#4CAF50"
+                elif days_until_delivery < 0:
+                    status = "⚠️ Delayed"
+                    status_color = "#F44336"
+                elif days_until_delivery == 0:
+                    status = "📦 Delivering Today"
+                    status_color = "#FF9800"
+                else:
+                    status = "🚚 In Transit"
+                    status_color = "#2196F3"
+                
+                # Display tracking card
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {status_color} 0%, white 100%); padding: 20px; border-radius: 12px; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #333;">{status} - {po['po_number']}</h3>
+                    <p style="margin: 5px 0; color: #666;">{po['supplier']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("📅 Ordered", po['po_date'])
+                col2.metric("🚚 Expected", po['delivery_date'])
+                col3.metric("⏱️ Days Since", days_since_order)
+                
+                if po['status'] != 'Delivered':
+                    if days_until_delivery >= 0:
+                        col4.metric("⏳ Days Left", days_until_delivery)
+                    else:
+                        col4.metric("⚠️ Days Overdue", abs(days_until_delivery))
+                else:
+                    col4.success("✅ Completed")
+                
+                # Progress bar
+                if po['status'] != 'Delivered':
+                    total_days = (delivery_date - po_date).days
+                    progress = min(100, int((days_since_order / total_days) * 100)) if total_days > 0 else 0
+                    
+                    st.progress(progress / 100)
+                    st.write(f"Progress: {progress}%")
+                
+                # Timeline
+                with st.expander("📅 Order Timeline"):
+                    st.write(f"🟢 Order Placed: {po['po_date']}")
+                    st.write(f"🟡 Processing: {po_date + timedelta(days=1)}")
+                    st.write(f"🔵 Shipped: {po_date + timedelta(days=2)}")
+                    st.write(f"{'🟢' if po['status'] == 'Delivered' else '⚪'} Delivered: {po['delivery_date']}")
+                
+                # Order details
+                with st.expander("📦 Order Details"):
+                    st.write(f"**Items:** {len(po['items'])}")
+                    st.write(f"**Total Amount:** ₹{po['total_amount']:,.2f}")
+                    st.write(f"**Priority:** {po['priority']}")
+                    if po['notes']:
+                        st.write(f"**Notes:** {po['notes']}")
+                
+                # Contact supplier
+                supplier_phone = st.session_state.suppliers[po['supplier']]['contact']
+                
+                message = f"""🐾 *LAIKA PET MART* 🐾
+
+नमस्ते!
+
+PO: {po['po_number']}
+Status check के लिए contact किया है।
+
+Expected Delivery: {po['delivery_date']}
+
+कृपया update दें।
+
+धन्यवाद!
+Laika Pet Mart"""
+                
+                import urllib.parse
+                encoded_msg = urllib.parse.quote(message)
+                whatsapp_url = f"https://wa.me/91{supplier_phone}?text={encoded_msg}"
+                
+                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer;">💬 Contact Supplier</button></a>', unsafe_allow_html=True)
+                
+                st.divider()
+        else:
+            st.info("No orders to track. Create purchase orders first!")
+    
+    # ==================== TAB 5: SUPPLIER DATABASE ====================
+    with tab5:
+        st.subheader("📊 Supplier Database")
+        
+        st.info(f"💡 Managing {len(st.session_state.suppliers)} suppliers")
+        
+        # Add new supplier
+        with st.expander("➕ Add New Supplier"):
+            with st.form("add_supplier"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    new_supplier_name = st.text_input("Supplier Name")
+                    contact = st.text_input("Contact Number")
+                    email = st.text_input("Email")
+                
+                with col2:
+                    address = st.text_input("Address/City")
+                    products = st.text_input("Products Supplied", placeholder="Comma separated")
+                
+                if st.form_submit_button("💾 Add Supplier", type="primary"):
+                    if new_supplier_name:
+                        st.session_state.suppliers[new_supplier_name] = {
+                            'contact': contact,
+                            'email': email,
+                            'address': address,
+                            'products': [p.strip() for p in products.split(',')],
+                            'rating': 4.0,
+                            'total_orders': 0,
+                            'on_time_delivery': 90,
+                            'quality_score': 4.0,
+                            'price_competitiveness': 4.0
+                        }
+                        st.success(f"✅ Supplier {new_supplier_name} added!")
+                        time.sleep(1)
+                        st.rerun()
+        
+        # Display suppliers
+        st.divider()
+        st.markdown("### 📋 All Suppliers")
+        
+        for name, data in st.session_state.suppliers.items():
+            with st.container():
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"### 🏭 {name}")
+                    st.write(f"📱 {data['contact']} | 📧 {data['email']}")
+                    st.write(f"📍 {data['address']}")
+                    st.write(f"📦 Products: {', '.join(data['products'])}")
+                
+                with col2:
+                    st.metric("⭐ Rating", f"{data['rating']}/5")
+                    st.write(f"📊 Orders: {data['total_orders']}")
+                
+                st.divider()
+
+# --- 21. GST & INVOICE MANAGEMENT ---
 elif menu == "💼 GST & Invoices":
     st.markdown("""
     <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
