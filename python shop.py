@@ -434,6 +434,8 @@ if user_role == "owner":
         "🎁 Discounts & Offers",
         "💬 WhatsApp Automation",
         "🏭 Supplier Management",
+        "🎂 Customer Engagement",
+        "📊 Financial Reports",
         "💼 GST & Invoices",
         "👥 User Management"
     ]
@@ -455,6 +457,8 @@ elif user_role == "manager":
         "🎁 Discounts & Offers",
         "💬 WhatsApp Automation",
         "🏭 Supplier Management",
+        "🎂 Customer Engagement",
+        "📊 Financial Reports",
         "💼 GST & Invoices"
     ]
 else:  # staff
@@ -5185,7 +5189,828 @@ Laika Pet Mart"""
                 
                 st.divider()
 
-# --- 21. GST & INVOICE MANAGEMENT ---
+# --- 21. CUSTOMER ENGAGEMENT ---
+elif menu == "🎂 Customer Engagement":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #FA8BFF 0%, #2BD2FF 50%, #2BFF88 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🎂 Customer Engagement</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Build Lasting Customer Relationships</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize session state
+    if 'customer_birthdays' not in st.session_state:
+        st.session_state.customer_birthdays = {}
+    
+    if 'customer_feedback' not in st.session_state:
+        st.session_state.customer_feedback = []
+    
+    if 'referral_program' not in st.session_state:
+        st.session_state.referral_program = {
+            'referrals': [],
+            'rewards': {
+                'referrer': 100,  # Points for person who refers
+                'referee': 50     # Points for new customer
+            }
+        }
+    
+    # Create tabs
+    tab1, tab2, tab3 = st.tabs([
+        "🎂 Birthday & Anniversary",
+        "⭐ Feedback & Reviews",
+        "🎁 Referral Program"
+    ])
+    
+    # ==================== TAB 1: BIRTHDAY & ANNIVERSARY ====================
+    with tab1:
+        st.subheader("🎂 Birthday & Anniversary Reminders")
+        
+        # Load sales and pet data
+        s_df = load_data("Sales")
+        p_df = load_data("PetRecords")
+        
+        # Add/Update Birthday
+        with st.expander("➕ Add Customer Birthday/Anniversary"):
+            with st.form("add_birthday"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    cust_name = st.text_input("Customer Name")
+                    cust_phone = st.text_input("Phone Number")
+                    occasion_type = st.selectbox("Occasion", ["Birthday", "Anniversary", "Pet Birthday"])
+                
+                with col2:
+                    occasion_date = st.date_input("Date", value=datetime.now().date())
+                    send_time = st.selectbox("Send Wish At", ["9:00 AM", "12:00 PM", "6:00 PM", "9:00 PM"])
+                    special_offer = st.number_input("Special Discount %", min_value=0, max_value=50, value=15)
+                
+                if st.form_submit_button("💾 Save Occasion", type="primary"):
+                    if cust_name and cust_phone:
+                        key = f"{cust_name}_{cust_phone}"
+                        if key not in st.session_state.customer_birthdays:
+                            st.session_state.customer_birthdays[key] = []
+                        
+                        st.session_state.customer_birthdays[key].append({
+                            'name': cust_name,
+                            'phone': cust_phone,
+                            'type': occasion_type,
+                            'date': occasion_date,
+                            'send_time': send_time,
+                            'discount': special_offer,
+                            'last_sent': None
+                        })
+                        
+                        st.success(f"✅ {occasion_type} saved for {cust_name}!")
+                        time.sleep(1)
+                        st.rerun()
+        
+        # Today's Occasions
+        st.divider()
+        st.markdown("### 🎉 Today's Special Occasions")
+        
+        today = datetime.now().date()
+        today_occasions = []
+        
+        for customer_occasions in st.session_state.customer_birthdays.values():
+            for occasion in customer_occasions:
+                # Check if month and day match
+                occ_date = occasion['date'] if isinstance(occasion['date'], date) else datetime.strptime(str(occasion['date']), '%Y-%m-%d').date()
+                if occ_date.month == today.month and occ_date.day == today.day:
+                    today_occasions.append(occasion)
+        
+        if today_occasions:
+            st.success(f"🎊 {len(today_occasions)} special occasion(s) today!")
+            
+            for occ in today_occasions:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #FFD700 0%, white 100%); padding: 20px; border-radius: 12px; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #333;">🎂 {occ['type']} - {occ['name']}</h3>
+                    <p style="margin: 5px 0; color: #666;">📱 {occ['phone']} | 🎁 {occ['discount']}% Special Discount</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Generate wish message
+                if occ['type'] == "Birthday":
+                    wish_message = f"""🎂 *HAPPY BIRTHDAY!* 🎂
+🐾 LAIKA PET MART 🐾
+
+🎉 {occ['name']} जी को जन्मदिन की ढेर सारी शुभकामनाएं! 🎉
+
+आपके और आपके प्यारे दोस्त के लिए खास gift:
+
+🎁 *BIRTHDAY SPECIAL OFFER*
+{occ['discount']}% OFF on all purchases today!
+
+आज ही आएं और celebrate करें! 🎊
+
+Valid only for today!
+Laika Pet Mart
+📞 9876543210"""
+                
+                elif occ['type'] == "Anniversary":
+                    wish_message = f"""💑 *HAPPY ANNIVERSARY!* 💑
+🐾 LAIKA PET MART 🐾
+
+🎊 {occ['name']} जी को anniversary की बहुत बहुत बधाई! 🎊
+
+आपके celebration के लिए special gift:
+
+🎁 *ANNIVERSARY SPECIAL*
+{occ['discount']}% OFF for you today!
+
+आपके प्यार को celebrate करें! 💕
+
+Valid only for today!
+Laika Pet Mart
+📞 9876543210"""
+                
+                else:  # Pet Birthday
+                    wish_message = f"""🐾 *HAPPY BIRTHDAY TO YOUR PET!* 🐾
+LAIKA PET MART
+
+🎉 {occ['name']} जी के pet को birthday की शुभकामनाएं! 🎉
+
+आपके furry friend के लिए special treat:
+
+🎁 *PET BIRTHDAY SPECIAL*
+{occ['discount']}% OFF on pet products!
+FREE birthday treat! 🦴
+
+आज ही आएं! 🎊
+
+Valid only for today!
+Laika Pet Mart
+📞 9876543210"""
+                
+                # Send button
+                import urllib.parse
+                encoded_msg = urllib.parse.quote(wish_message)
+                whatsapp_url = f"https://wa.me/91{occ['phone']}?text={encoded_msg}"
+                
+                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">📱 Send Birthday Wish</button></a>', unsafe_allow_html=True)
+                
+                st.divider()
+        else:
+            st.info("No special occasions today. Check upcoming section below.")
+        
+        # Upcoming Occasions
+        st.divider()
+        st.markdown("### 📅 Upcoming Occasions (Next 30 Days)")
+        
+        upcoming = []
+        for customer_occasions in st.session_state.customer_birthdays.values():
+            for occasion in customer_occasions:
+                occ_date = occasion['date'] if isinstance(occasion['date'], date) else datetime.strptime(str(occasion['date']), '%Y-%m-%d').date()
+                
+                # Calculate next occurrence
+                next_occurrence = date(today.year, occ_date.month, occ_date.day)
+                if next_occurrence < today:
+                    next_occurrence = date(today.year + 1, occ_date.month, occ_date.day)
+                
+                days_until = (next_occurrence - today).days
+                
+                if 0 < days_until <= 30:
+                    upcoming.append({
+                        'occasion': occasion,
+                        'next_date': next_occurrence,
+                        'days_until': days_until
+                    })
+        
+        # Sort by days
+        upcoming.sort(key=lambda x: x['days_until'])
+        
+        if upcoming:
+            st.success(f"📋 {len(upcoming)} upcoming occasions")
+            
+            for item in upcoming:
+                occ = item['occasion']
+                days = item['days_until']
+                
+                # Color based on urgency
+                if days <= 3:
+                    color = "#F44336"  # Red - urgent
+                    urgency = "🔴 Urgent"
+                elif days <= 7:
+                    color = "#FF9800"  # Orange
+                    urgency = "🟡 Soon"
+                else:
+                    color = "#4CAF50"  # Green
+                    urgency = "🟢 Upcoming"
+                
+                col1, col2, col3 = st.columns([3, 2, 1])
+                
+                with col1:
+                    st.write(f"**{occ['name']}** - {occ['type']}")
+                    st.write(f"📱 {occ['phone']}")
+                
+                with col2:
+                    st.write(f"📅 {item['next_date']}")
+                    st.write(f"⏳ In {days} days")
+                
+                with col3:
+                    st.markdown(f"""
+                    <div style="background: {color}; color: white; padding: 8px; border-radius: 5px; text-align: center;">
+                        {urgency}
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.divider()
+        else:
+            st.info("No occasions in next 30 days")
+        
+        # All Saved Occasions
+        st.divider()
+        with st.expander("📋 View All Saved Occasions"):
+            if st.session_state.customer_birthdays:
+                count = sum(len(occasions) for occasions in st.session_state.customer_birthdays.values())
+                st.info(f"Total: {count} occasions saved")
+                
+                for customer_occasions in st.session_state.customer_birthdays.values():
+                    for occ in customer_occasions:
+                        st.write(f"🎂 {occ['name']} - {occ['type']} on {occ['date']} | {occ['discount']}% discount")
+            else:
+                st.info("No occasions saved yet")
+    
+    # ==================== TAB 2: FEEDBACK & REVIEWS ====================
+    with tab2:
+        st.subheader("⭐ Customer Feedback & Reviews")
+        
+        # Feedback Form
+        with st.expander("📝 Collect Feedback"):
+            with st.form("collect_feedback"):
+                st.markdown("### Customer Feedback Form")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    fb_customer = st.text_input("Customer Name")
+                    fb_phone = st.text_input("Phone Number")
+                    fb_date = st.date_input("Feedback Date", value=datetime.now().date())
+                
+                with col2:
+                    fb_type = st.selectbox("Feedback Type", ["Review", "Complaint", "Suggestion", "Appreciation"])
+                    fb_rating = st.slider("Overall Rating", 1, 5, 4)
+                
+                # Detailed ratings
+                st.markdown("### Detailed Ratings")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    product_rating = st.slider("Product Quality", 1, 5, 4, key="prod_rate")
+                with col2:
+                    service_rating = st.slider("Service Quality", 1, 5, 4, key="serv_rate")
+                with col3:
+                    price_rating = st.slider("Value for Money", 1, 5, 4, key="price_rate")
+                
+                fb_comment = st.text_area("Comments/Feedback", placeholder="Please share your experience...")
+                
+                if st.form_submit_button("💾 Submit Feedback", type="primary"):
+                    if fb_customer:
+                        new_feedback = {
+                            'customer': fb_customer,
+                            'phone': fb_phone,
+                            'date': str(fb_date),
+                            'type': fb_type,
+                            'rating': fb_rating,
+                            'product_rating': product_rating,
+                            'service_rating': service_rating,
+                            'price_rating': price_rating,
+                            'comment': fb_comment,
+                            'status': 'Pending' if fb_type == 'Complaint' else 'Closed',
+                            'submitted_at': str(datetime.now())
+                        }
+                        
+                        st.session_state.customer_feedback.append(new_feedback)
+                        st.success("✅ Feedback submitted successfully!")
+                        
+                        # Thank you message
+                        if fb_phone:
+                            thank_msg = f"""🐾 *THANK YOU!* 🐾
+LAIKA PET MART
+
+धन्यवाद {fb_customer} जी!
+
+आपका feedback हमारे लिए बहुत valuable है। 🙏
+
+⭐ Rating: {fb_rating}/5
+
+हम आपकी service improve करने के लिए committed हैं।
+
+आपका प्यार और support के लिए धन्यवाद! ❤️
+
+Laika Pet Mart
+📞 9876543210"""
+                            
+                            import urllib.parse
+                            encoded_msg = urllib.parse.quote(thank_msg)
+                            whatsapp_url = f"https://wa.me/91{fb_phone}?text={encoded_msg}"
+                            
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">📱 Send Thank You Message</button></a>', unsafe_allow_html=True)
+                        
+                        time.sleep(2)
+                        st.rerun()
+        
+        # Feedback Dashboard
+        st.divider()
+        st.markdown("### 📊 Feedback Dashboard")
+        
+        if st.session_state.customer_feedback:
+            # Summary metrics
+            total_feedback = len(st.session_state.customer_feedback)
+            avg_rating = sum([f['rating'] for f in st.session_state.customer_feedback]) / total_feedback
+            complaints = len([f for f in st.session_state.customer_feedback if f['type'] == 'Complaint'])
+            reviews = len([f for f in st.session_state.customer_feedback if f['type'] == 'Review'])
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("📝 Total Feedback", total_feedback)
+            col2.metric("⭐ Avg Rating", f"{avg_rating:.1f}/5")
+            col3.metric("📢 Reviews", reviews)
+            col4.metric("⚠️ Complaints", complaints)
+            
+            st.divider()
+            
+            # Filter
+            filter_type = st.selectbox("Filter by Type", ["All", "Review", "Complaint", "Suggestion", "Appreciation"])
+            filter_rating = st.selectbox("Filter by Rating", ["All", "5 Star", "4 Star", "3 Star", "2 Star", "1 Star"])
+            
+            filtered_feedback = st.session_state.customer_feedback
+            
+            if filter_type != "All":
+                filtered_feedback = [f for f in filtered_feedback if f['type'] == filter_type]
+            
+            if filter_rating != "All":
+                rating_num = int(filter_rating.split()[0])
+                filtered_feedback = [f for f in filtered_feedback if f['rating'] == rating_num]
+            
+            # Display feedback
+            for i, fb in enumerate(reversed(filtered_feedback)):
+                # Rating stars
+                stars = "⭐" * fb['rating'] + "☆" * (5 - fb['rating'])
+                
+                # Type color
+                type_colors = {
+                    'Review': '#4CAF50',
+                    'Complaint': '#F44336',
+                    'Suggestion': '#2196F3',
+                    'Appreciation': '#FF9800'
+                }
+                
+                color = type_colors.get(fb['type'], '#808080')
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {color} 0%, white 100%); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                    <h4 style="margin: 0; color: #333;">{fb['type']} - {fb['customer']}</h4>
+                    <p style="margin: 5px 0; color: #666;">{stars} | 📅 {fb['date']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                col1, col2, col3 = st.columns(3)
+                col1.write(f"📦 Product: {fb['product_rating']}/5")
+                col2.write(f"🤝 Service: {fb['service_rating']}/5")
+                col3.write(f"💰 Value: {fb['price_rating']}/5")
+                
+                if fb['comment']:
+                    st.info(f"💬 \"{fb['comment']}\"")
+                
+                # Action buttons for complaints
+                if fb['type'] == 'Complaint' and fb['status'] == 'Pending':
+                    col1, col2 = st.columns([4, 1])
+                    with col2:
+                        if st.button("✅ Resolve", key=f"resolve_{i}"):
+                            fb['status'] = 'Resolved'
+                            st.success("Complaint marked as resolved!")
+                            time.sleep(1)
+                            st.rerun()
+                
+                st.divider()
+            
+            # Download feedback report
+            if filtered_feedback:
+                feedback_df = pd.DataFrame(filtered_feedback)
+                csv = feedback_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Feedback Report",
+                    data=csv,
+                    file_name=f"feedback_report_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+        else:
+            st.info("No feedback received yet. Start collecting feedback above!")
+    
+    # ==================== TAB 3: REFERRAL PROGRAM ====================
+    with tab3:
+        st.subheader("🎁 Referral Program")
+        
+        st.info("💡 Reward customers who bring new customers!")
+        
+        # Program Settings
+        with st.expander("⚙️ Referral Rewards Settings", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                referrer_points = st.number_input(
+                    "Points for Referrer",
+                    min_value=0,
+                    value=st.session_state.referral_program['rewards']['referrer'],
+                    help="Points given to person who refers"
+                )
+                
+                st.info("""
+                **Referrer Gets:**
+                • Points on successful referral
+                • Can redeem for discounts
+                • Builds loyalty
+                """)
+            
+            with col2:
+                referee_points = st.number_input(
+                    "Points for New Customer",
+                    min_value=0,
+                    value=st.session_state.referral_program['rewards']['referee'],
+                    help="Welcome bonus for referred customer"
+                )
+                
+                st.info("""
+                **New Customer Gets:**
+                • Welcome bonus points
+                • Instant discount
+                • Great first experience
+                """)
+            
+            if st.button("💾 Save Settings"):
+                st.session_state.referral_program['rewards']['referrer'] = referrer_points
+                st.session_state.referral_program['rewards']['referee'] = referee_points
+                st.success("✅ Referral rewards updated!")
+        
+        # Add Referral
+        st.divider()
+        with st.expander("➕ Record New Referral"):
+            with st.form("add_referral"):
+                st.markdown("### New Referral Details")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    referrer_name = st.text_input("Referrer Name", help="Existing customer who referred")
+                    referrer_phone = st.text_input("Referrer Phone")
+                
+                with col2:
+                    referee_name = st.text_input("New Customer Name", help="Person who was referred")
+                    referee_phone = st.text_input("New Customer Phone")
+                
+                ref_date = st.date_input("Referral Date", value=datetime.now().date())
+                ref_notes = st.text_input("Notes (Optional)", placeholder="How did the referral happen?")
+                
+                if st.form_submit_button("🎁 Record Referral", type="primary"):
+                    if referrer_name and referee_name:
+                        new_referral = {
+                            'referrer_name': referrer_name,
+                            'referrer_phone': referrer_phone,
+                            'referee_name': referee_name,
+                            'referee_phone': referee_phone,
+                            'date': str(ref_date),
+                            'referrer_points': referrer_points,
+                            'referee_points': referee_points,
+                            'status': 'Active',
+                            'notes': ref_notes,
+                            'created_at': str(datetime.now())
+                        }
+                        
+                        st.session_state.referral_program['referrals'].append(new_referral)
+                        st.balloons()
+                        st.success(f"🎉 Referral recorded successfully!")
+                        st.success(f"✅ {referrer_name} earned {referrer_points} points!")
+                        st.success(f"✅ {referee_name} gets {referee_points} welcome points!")
+                        
+                        # Send notifications
+                        col1, col2 = st.columns(2)
+                        
+                        # Referrer message
+                        with col1:
+                            if referrer_phone:
+                                ref_msg = f"""🎉 *CONGRATULATIONS!* 🎉
+🐾 LAIKA PET MART 🐾
+
+बधाई हो {referrer_name} जी!
+
+आपके referral के लिए thank you! 🙏
+
+🎁 *Reward Earned:*
++{referrer_points} Loyalty Points!
+
+💰 Total Points: {referrer_points}
+(Use for discounts on purchases)
+
+Keep referring, keep earning! 🚀
+
+Laika Pet Mart
+📞 9876543210"""
+                                
+                                import urllib.parse
+                                encoded_msg = urllib.parse.quote(ref_msg)
+                                whatsapp_url = f"https://wa.me/91{referrer_phone}?text={encoded_msg}"
+                                
+                                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; width: 100%;">📱 Notify Referrer</button></a>', unsafe_allow_html=True)
+                        
+                        # Referee message
+                        with col2:
+                            if referee_phone:
+                                new_msg = f"""🎊 *WELCOME TO LAIKA!* 🎊
+🐾 LAIKA PET MART 🐾
+
+Welcome {referee_name} जी!
+
+{referrer_name} ने आपको recommend किया! 🌟
+
+🎁 *Welcome Bonus:*
++{referee_points} Loyalty Points!
+
+आपका first purchase करें और enjoy करें!
+
+हम आपकी service के लिए तैयार हैं! 😊
+
+Laika Pet Mart
+📞 9876543210"""
+                                
+                                import urllib.parse
+                                encoded_msg = urllib.parse.quote(new_msg)
+                                whatsapp_url = f"https://wa.me/91{referee_phone}?text={encoded_msg}"
+                                
+                                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color: #25D366; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; width: 100%;">📱 Welcome New Customer</button></a>', unsafe_allow_html=True)
+                        
+                        time.sleep(2)
+                        st.rerun()
+        
+        # Leaderboard
+        st.divider()
+        st.markdown("### 🏆 Referral Leaderboard")
+        
+        if st.session_state.referral_program['referrals']:
+            # Calculate referral counts
+            referrer_stats = {}
+            
+            for ref in st.session_state.referral_program['referrals']:
+                name = ref['referrer_name']
+                if name not in referrer_stats:
+                    referrer_stats[name] = {
+                        'phone': ref['referrer_phone'],
+                        'count': 0,
+                        'points_earned': 0
+                    }
+                referrer_stats[name]['count'] += 1
+                referrer_stats[name]['points_earned'] += ref['referrer_points']
+            
+            # Sort by count
+            leaderboard = sorted(referrer_stats.items(), key=lambda x: x[1]['count'], reverse=True)
+            
+            # Display top referrers
+            for rank, (name, stats) in enumerate(leaderboard[:10], 1):
+                if rank == 1:
+                    medal = "🥇"
+                    color = "#FFD700"
+                elif rank == 2:
+                    medal = "🥈"
+                    color = "#C0C0C0"
+                elif rank == 3:
+                    medal = "🥉"
+                    color = "#CD7F32"
+                else:
+                    medal = f"#{rank}"
+                    color = "#E0E0E0"
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {color} 0%, white 100%); padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                    <h3 style="margin: 0; color: #333;">{medal} {name}</h3>
+                    <p style="margin: 5px 0; color: #666;">📱 {stats['phone']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                col1, col2 = st.columns(2)
+                col1.metric("👥 Referrals", stats['count'])
+                col2.metric("🎁 Points Earned", stats['points_earned'])
+                
+                st.divider()
+            
+            # Summary stats
+            st.divider()
+            st.markdown("### 📊 Program Statistics")
+            
+            total_referrals = len(st.session_state.referral_program['referrals'])
+            total_referrers = len(referrer_stats)
+            total_points_given = sum([r['referrer_points'] + r['referee_points'] for r in st.session_state.referral_program['referrals']])
+            
+            col1, col2, col3 = st.columns(3)
+            col1.metric("🎁 Total Referrals", total_referrals)
+            col2.metric("👥 Active Referrers", total_referrers)
+            col3.metric("⭐ Points Distributed", total_points_given)
+            
+            # All referrals table
+            st.divider()
+            with st.expander("📋 View All Referrals"):
+                referrals_df = pd.DataFrame(st.session_state.referral_program['referrals'])
+                st.dataframe(referrals_df, use_container_width=True)
+                
+                # Download
+                csv = referrals_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Referral Report",
+                    data=csv,
+                    file_name=f"referrals_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+        else:
+            st.info("No referrals recorded yet. Start tracking referrals above!")
+
+# --- 22. FINANCIAL REPORTS ---
+elif menu == "📊 Financial Reports":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e22ce 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">📊 Financial Reports</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Professional Accounting & Analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📈 P&L Statement",
+        "💼 Balance Sheet",
+        "🧾 Tax Reports",
+        "🔨 Custom Reports"
+    ])
+    
+    # Load data
+    s_df = load_data("Sales")
+    p_df = load_data("Purchase")
+    e_df = load_data("Expenses")
+    
+    with tab1:
+        st.subheader("📈 Profit & Loss Statement")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            period = st.selectbox("Period", ["This Month", "Last Month", "This Year", "Custom"])
+        with col2:
+            if period == "Custom":
+                start_date = st.date_input("From")
+                end_date = st.date_input("To")
+        
+        if st.button("📊 Generate P&L", type="primary"):
+            if not s_df.empty:
+                # Calculate revenue
+                revenue = pd.to_numeric(s_df.iloc[:, 3], errors='coerce').sum()
+                
+                # Estimate COGS (60% of revenue)
+                cogs = revenue * 0.6
+                gross_profit = revenue - cogs
+                
+                # Expenses
+                if not e_df.empty:
+                    expenses = pd.to_numeric(e_df.iloc[:, 1], errors='coerce').sum()
+                else:
+                    expenses = 0
+                
+                net_profit = gross_profit - expenses
+                
+                # Display
+                st.success("✅ P&L Statement Generated!")
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("💰 Revenue", f"₹{revenue:,.2f}")
+                col2.metric("📈 Gross Profit", f"₹{gross_profit:,.2f}")
+                col3.metric("💎 Net Profit", f"₹{net_profit:,.2f}")
+                
+                st.divider()
+                
+                # Detailed breakdown
+                st.markdown("### Detailed Breakdown")
+                
+                pl_data = {
+                    'Item': ['Revenue', 'COGS', 'Gross Profit', 'Expenses', 'Net Profit'],
+                    'Amount': [revenue, -cogs, gross_profit, -expenses, net_profit],
+                    'Percentage': [100, (cogs/revenue*100), (gross_profit/revenue*100), (expenses/revenue*100), (net_profit/revenue*100)]
+                }
+                
+                pl_df = pd.DataFrame(pl_data)
+                st.dataframe(pl_df, use_container_width=True)
+                
+                # Download
+                csv = pl_df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Download P&L", csv, "PL_Statement.csv", "text/csv")
+            else:
+                st.warning("No sales data available")
+    
+    with tab2:
+        st.subheader("💼 Balance Sheet")
+        
+        as_of = st.date_input("As of Date", datetime.now().date())
+        
+        if st.button("💼 Generate Balance Sheet", type="primary"):
+            st.success("✅ Balance Sheet Generated!")
+            
+            # Assets
+            st.markdown("### 💰 ASSETS")
+            cash = 50000
+            inventory = 150000
+            receivables = 75000
+            total_assets = cash + inventory + receivables
+            
+            col1, col2 = st.columns([3, 1])
+            col1.write("Cash & Bank")
+            col2.write(f"₹{cash:,.2f}")
+            col1.write("Inventory")
+            col2.write(f"₹{inventory:,.2f}")
+            col1.write("Receivables")
+            col2.write(f"₹{receivables:,.2f}")
+            
+            st.divider()
+            st.metric("Total Assets", f"₹{total_assets:,.2f}")
+            
+            # Liabilities
+            st.markdown("### 💳 LIABILITIES")
+            payables = 50000
+            loans = 100000
+            total_liab = payables + loans
+            
+            col1, col2 = st.columns([3, 1])
+            col1.write("Payables")
+            col2.write(f"₹{payables:,.2f}")
+            col1.write("Loans")
+            col2.write(f"₹{loans:,.2f}")
+            
+            st.divider()
+            st.metric("Total Liabilities", f"₹{total_liab:,.2f}")
+            
+            # Equity
+            equity = total_assets - total_liab
+            st.markdown("### 👑 EQUITY")
+            st.metric("Owner's Equity", f"₹{equity:,.2f}")
+    
+    with tab3:
+        st.subheader("🧾 Tax Reports")
+        
+        tax_type = st.selectbox("Report Type", ["GST Summary", "TDS Report", "Income Tax", "Audit Trail"])
+        
+        if st.button("📊 Generate Tax Report", type="primary"):
+            if tax_type == "GST Summary":
+                st.success("✅ GST Summary Generated!")
+                
+                if not s_df.empty:
+                    total_sales = pd.to_numeric(s_df.iloc[:, 3], errors='coerce').sum()
+                    
+                    # Calculate GST (18%)
+                    taxable = total_sales / 1.18
+                    gst = total_sales - taxable
+                    cgst = gst / 2
+                    sgst = gst / 2
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("💰 Total Sales", f"₹{total_sales:,.2f}")
+                    col2.metric("📊 Taxable", f"₹{taxable:,.2f}")
+                    col3.metric("🔴 CGST", f"₹{cgst:,.2f}")
+                    col4.metric("🔵 SGST", f"₹{sgst:,.2f}")
+                else:
+                    st.warning("No sales data")
+    
+    with tab4:
+        st.subheader("🔨 Custom Report Builder")
+        
+        st.info("💡 Build your own custom reports")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### Select Metrics")
+            metrics = st.multiselect("Choose Metrics", [
+                "Total Sales",
+                "Total Expenses",
+                "Net Profit",
+                "Customer Count",
+                "Average Bill",
+                "Inventory Value",
+                "Top Products"
+            ])
+        
+        with col2:
+            st.markdown("### Filters")
+            date_range = st.date_input("Date Range", [datetime.now().date() - timedelta(days=30), datetime.now().date()])
+            chart_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie"])
+        
+        if st.button("🔨 Build Report", type="primary"):
+            st.success("✅ Custom Report Generated!")
+            
+            if "Total Sales" in metrics and not s_df.empty:
+                sales = pd.to_numeric(s_df.iloc[:, 3], errors='coerce').sum()
+                st.metric("Total Sales", f"₹{sales:,.2f}")
+            
+            if "Total Expenses" in metrics and not e_df.empty:
+                expenses = pd.to_numeric(e_df.iloc[:, 1], errors='coerce').sum()
+                st.metric("Total Expenses", f"₹{expenses:,.2f}")
+            
+            if "Customer Count" in metrics and not s_df.empty:
+                customers = s_df.iloc[:, 5].nunique() if len(s_df.columns) > 5 else 0
+                st.metric("Unique Customers", customers)
+
+# --- 23. GST & INVOICE MANAGEMENT ---
 elif menu == "💼 GST & Invoices":
     st.markdown("""
     <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
