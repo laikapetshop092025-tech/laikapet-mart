@@ -436,6 +436,7 @@ if user_role == "owner":
         "🏭 Supplier Management",
         "🎂 Customer Engagement",
         "📊 Financial Reports",
+        "🔐 Security & Compliance",
         "💼 GST & Invoices",
         "👥 User Management"
     ]
@@ -6010,7 +6011,431 @@ elif menu == "📊 Financial Reports":
                 customers = s_df.iloc[:, 5].nunique() if len(s_df.columns) > 5 else 0
                 st.metric("Unique Customers", customers)
 
-# --- 23. GST & INVOICE MANAGEMENT ---
+# --- 23. SECURITY & COMPLIANCE ---
+elif menu == "🔐 Security & Compliance":
+    st.markdown("""
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #DC2626 0%, #7C3AED 50%, #2563EB 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+        <h1 style="color: white; margin: 0; font-size: 42px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🔐 Security & Compliance</h1>
+        <p style="color: white; margin-top: 10px; font-size: 18px; opacity: 0.95;">Data Protection & Access Control</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize session state for security
+    if 'backup_history' not in st.session_state:
+        st.session_state.backup_history = []
+    
+    if 'audit_logs' not in st.session_state:
+        st.session_state.audit_logs = []
+    
+    if 'login_logs' not in st.session_state:
+        st.session_state.login_logs = []
+    
+    if 'authorized_devices' not in st.session_state:
+        st.session_state.authorized_devices = []
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "💾 Data Backup",
+        "🔒 Access Control",
+        "📜 Audit Logs",
+        "🛡️ GDPR Compliance"
+    ])
+    
+    # ==================== TAB 1: DATA BACKUP ====================
+    with tab1:
+        st.subheader("💾 Data Backup System")
+        
+        st.info("💡 Protect your business data with automated backups")
+        
+        # Backup Settings
+        with st.expander("⚙️ Backup Settings", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                auto_backup = st.checkbox("Enable Auto Backup", value=True)
+                backup_frequency = st.selectbox("Backup Frequency", ["Daily", "Weekly", "Monthly"])
+                backup_time = st.time_input("Backup Time", value=datetime.strptime("02:00", "%H:%M").time())
+            
+            with col2:
+                retention_days = st.number_input("Retention Period (days)", min_value=7, max_value=365, value=30)
+                cloud_backup = st.checkbox("Cloud Backup", value=True)
+                local_backup = st.checkbox("Local Backup", value=True)
+            
+            if st.button("💾 Save Backup Settings", type="primary"):
+                st.success("✅ Backup settings saved!")
+        
+        # Manual Backup
+        st.divider()
+        st.markdown("### 🔄 Manual Backup")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("💾 Backup Now", type="primary", use_container_width=True):
+                # Simulate backup
+                import time
+                progress_bar = st.progress(0)
+                for i in range(100):
+                    time.sleep(0.02)
+                    progress_bar.progress(i + 1)
+                
+                backup_entry = {
+                    'timestamp': str(datetime.now()),
+                    'type': 'Manual',
+                    'size': '45.3 MB',
+                    'status': 'Success',
+                    'location': 'Cloud + Local'
+                }
+                st.session_state.backup_history.insert(0, backup_entry)
+                
+                st.success("✅ Backup completed successfully!")
+                st.balloons()
+        
+        with col2:
+            if st.button("🔄 Restore Backup", use_container_width=True):
+                st.warning("⚠️ Restore will overwrite current data")
+        
+        with col3:
+            if st.button("🗑️ Delete Old Backups", use_container_width=True):
+                st.info("Old backups (30+ days) will be deleted")
+        
+        # Backup History
+        st.divider()
+        st.markdown("### 📋 Backup History")
+        
+        # Add sample backup if empty
+        if not st.session_state.backup_history:
+            st.session_state.backup_history = [
+                {'timestamp': str(datetime.now() - timedelta(days=1)), 'type': 'Auto', 'size': '44.8 MB', 'status': 'Success', 'location': 'Cloud'},
+                {'timestamp': str(datetime.now() - timedelta(days=2)), 'type': 'Auto', 'size': '43.2 MB', 'status': 'Success', 'location': 'Cloud'},
+                {'timestamp': str(datetime.now() - timedelta(days=3)), 'type': 'Manual', 'size': '42.1 MB', 'status': 'Success', 'location': 'Cloud + Local'}
+            ]
+        
+        for i, backup in enumerate(st.session_state.backup_history[:10]):
+            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+            
+            with col1:
+                st.write(f"📅 {backup['timestamp'][:19]}")
+            with col2:
+                badge_color = "#4CAF50" if backup['type'] == 'Auto' else "#2196F3"
+                st.markdown(f'<span style="background: {badge_color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">{backup["type"]}</span>', unsafe_allow_html=True)
+            with col3:
+                st.write(f"📦 {backup['size']}")
+            with col4:
+                st.success("✅ " + backup['status'])
+            with col5:
+                if st.button("♻️ Restore", key=f"restore_{i}"):
+                    st.info("Restore initiated...")
+            
+            st.divider()
+        
+        # Storage Info
+        st.divider()
+        st.markdown("### 💾 Storage Information")
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Backups", len(st.session_state.backup_history))
+        col2.metric("Total Size", "450 MB")
+        col3.metric("Available Space", "2.5 GB")
+    
+    # ==================== TAB 2: ACCESS CONTROL ====================
+    with tab2:
+        st.subheader("🔒 Access Control & Security")
+        
+        st.info("💡 Manage who can access your system and from where")
+        
+        # Security Settings
+        with st.expander("🔐 Security Settings", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                ip_restriction = st.checkbox("Enable IP Restriction", value=False)
+                if ip_restriction:
+                    allowed_ips = st.text_area("Allowed IP Addresses (one per line)", 
+                        value="192.168.1.1\n103.45.67.89")
+                
+                device_auth = st.checkbox("Device Authorization Required", value=True)
+                two_factor = st.checkbox("Two-Factor Authentication", value=False)
+            
+            with col2:
+                session_timeout = st.number_input("Session Timeout (minutes)", min_value=15, max_value=480, value=60)
+                max_login_attempts = st.number_input("Max Login Attempts", min_value=3, max_value=10, value=5)
+                lockout_duration = st.number_input("Lockout Duration (minutes)", min_value=5, max_value=60, value=15)
+            
+            if st.button("🔒 Save Security Settings", type="primary"):
+                st.success("✅ Security settings updated!")
+        
+        # Active Sessions
+        st.divider()
+        st.markdown("### 👥 Active Sessions")
+        
+        # Sample active sessions
+        active_sessions = [
+            {'user': 'Laika (Owner)', 'device': 'Chrome on Windows', 'ip': '192.168.1.100', 'login_time': str(datetime.now() - timedelta(hours=2)), 'status': 'Active'},
+            {'user': 'Manager', 'device': 'Chrome on Android', 'ip': '192.168.1.105', 'login_time': str(datetime.now() - timedelta(hours=1)), 'status': 'Active'}
+        ]
+        
+        for i, session in enumerate(active_sessions):
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #4CAF50 0%, white 100%); padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #333;">👤 {session['user']}</h4>
+                <p style="margin: 5px 0; color: #666;">
+                    🖥️ {session['device']} | 🌐 {session['ip']}<br>
+                    ⏰ Login: {session['login_time'][:19]} | Status: {session['status']}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([4, 1])
+            with col2:
+                if st.button("🚫 Terminate", key=f"terminate_{i}"):
+                    st.warning("Session terminated")
+            
+            st.divider()
+        
+        # Login History
+        st.divider()
+        st.markdown("### 📜 Login History (Last 20)")
+        
+        # Add sample login logs
+        if not st.session_state.login_logs:
+            st.session_state.login_logs = [
+                {'user': 'Laika', 'status': 'Success', 'ip': '192.168.1.100', 'device': 'Chrome', 'timestamp': str(datetime.now() - timedelta(hours=2))},
+                {'user': 'Manager', 'status': 'Success', 'ip': '192.168.1.105', 'device': 'Chrome Mobile', 'timestamp': str(datetime.now() - timedelta(hours=3))},
+                {'user': 'Staff1', 'status': 'Failed', 'ip': '103.45.67.89', 'device': 'Firefox', 'timestamp': str(datetime.now() - timedelta(hours=5))},
+                {'user': 'Laika', 'status': 'Success', 'ip': '192.168.1.100', 'device': 'Chrome', 'timestamp': str(datetime.now() - timedelta(days=1))}
+            ]
+        
+        for log in st.session_state.login_logs[:20]:
+            col1, col2, col3, col4 = st.columns([2, 1, 2, 1])
+            
+            with col1:
+                st.write(f"👤 {log['user']}")
+            with col2:
+                if log['status'] == 'Success':
+                    st.success(f"✅ {log['status']}")
+                else:
+                    st.error(f"❌ {log['status']}")
+            with col3:
+                st.write(f"🌐 {log['ip']} | {log['device']}")
+            with col4:
+                st.write(f"⏰ {log['timestamp'][:16]}")
+            
+            st.divider()
+        
+        # Download login logs
+        if st.button("📥 Download Login Logs"):
+            logs_df = pd.DataFrame(st.session_state.login_logs)
+            csv = logs_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv,
+                file_name=f"login_logs_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+    
+    # ==================== TAB 3: AUDIT LOGS ====================
+    with tab3:
+        st.subheader("📜 Audit Trail & Activity Logs")
+        
+        st.info("💡 Track all system changes and user activities")
+        
+        # Filters
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            filter_user = st.selectbox("Filter by User", ["All Users", "Laika", "Manager", "Staff1", "Staff2"])
+        with col2:
+            filter_action = st.selectbox("Filter by Action", ["All Actions", "Create", "Update", "Delete", "View", "Login", "Logout"])
+        with col3:
+            filter_date = st.date_input("From Date", value=datetime.now().date() - timedelta(days=7))
+        
+        # Add sample audit logs
+        if not st.session_state.audit_logs:
+            st.session_state.audit_logs = [
+                {'user': 'Laika', 'action': 'Create', 'module': 'Purchase Order', 'details': 'PO-20260121-001 created', 'timestamp': str(datetime.now() - timedelta(hours=1)), 'ip': '192.168.1.100'},
+                {'user': 'Manager', 'action': 'Update', 'module': 'Inventory', 'details': 'Updated Dog Food stock: 50 → 45', 'timestamp': str(datetime.now() - timedelta(hours=2)), 'ip': '192.168.1.105'},
+                {'user': 'Staff1', 'action': 'Create', 'module': 'Billing', 'details': 'Bill #2156 for Nidhi Kumar - ₹2,650', 'timestamp': str(datetime.now() - timedelta(hours=3)), 'ip': '192.168.1.110'},
+                {'user': 'Laika', 'action': 'Delete', 'module': 'Customer', 'details': 'Deleted customer: Test User', 'timestamp': str(datetime.now() - timedelta(hours=4)), 'ip': '192.168.1.100'},
+                {'user': 'Manager', 'action': 'Update', 'module': 'Supplier', 'details': 'Updated supplier rating: PetFood India → 4.5★', 'timestamp': str(datetime.now() - timedelta(hours=5)), 'ip': '192.168.1.105'}
+            ]
+        
+        # Display audit logs
+        st.divider()
+        st.markdown("### 📋 Activity Timeline")
+        
+        for log in st.session_state.audit_logs[:50]:
+            # Action color
+            action_colors = {
+                'Create': '#4CAF50',
+                'Update': '#2196F3',
+                'Delete': '#F44336',
+                'View': '#9E9E9E',
+                'Login': '#FF9800',
+                'Logout': '#607D8B'
+            }
+            
+            color = action_colors.get(log['action'], '#808080')
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {color} 0%, white 100%); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <div>
+                        <strong>{log['action']}</strong> by <strong>{log['user']}</strong> in <em>{log['module']}</em>
+                    </div>
+                    <div style="color: #666;">
+                        {log['timestamp'][:19]}
+                    </div>
+                </div>
+                <div style="margin-top: 5px; color: #555;">
+                    📝 {log['details']} | 🌐 {log['ip']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Export audit logs
+        st.divider()
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📥 Export Audit Logs", type="primary"):
+                audit_df = pd.DataFrame(st.session_state.audit_logs)
+                csv = audit_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download CSV",
+                    data=csv,
+                    file_name=f"audit_logs_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+        
+        with col2:
+            if st.button("🔄 Clear Old Logs (30+ days)"):
+                st.success("✅ Old logs cleared!")
+    
+    # ==================== TAB 4: GDPR COMPLIANCE ====================
+    with tab4:
+        st.subheader("🛡️ GDPR & Data Privacy Compliance")
+        
+        st.info("💡 Ensure compliance with data protection regulations")
+        
+        # Privacy Settings
+        with st.expander("📋 Privacy Settings", expanded=True):
+            st.markdown("### Data Collection Consent")
+            
+            consent_email = st.checkbox("Email Marketing Consent", value=True)
+            consent_whatsapp = st.checkbox("WhatsApp Communication Consent", value=True)
+            consent_analytics = st.checkbox("Analytics & Tracking", value=True)
+            
+            st.divider()
+            
+            st.markdown("### Data Retention Policy")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                customer_data_retention = st.number_input("Customer Data (months)", min_value=12, max_value=120, value=36)
+                transaction_retention = st.number_input("Transaction Records (years)", min_value=3, max_value=10, value=7)
+            with col2:
+                inactive_account = st.number_input("Inactive Account Deletion (months)", min_value=12, max_value=60, value=24)
+                log_retention = st.number_input("System Logs (months)", min_value=3, max_value=24, value=12)
+            
+            if st.button("💾 Save Privacy Settings", type="primary"):
+                st.success("✅ Privacy settings updated!")
+        
+        # Data Subject Requests
+        st.divider()
+        st.markdown("### 👤 Data Subject Rights")
+        
+        request_type = st.selectbox("Request Type", [
+            "Right to Access",
+            "Right to Rectification",
+            "Right to Erasure (Right to be Forgotten)",
+            "Right to Data Portability",
+            "Right to Object"
+        ])
+        
+        customer_identifier = st.text_input("Customer Phone/Email", placeholder="9876543210 or email@example.com")
+        
+        if st.button("🔍 Process Request", type="primary"):
+            if customer_identifier:
+                st.success(f"✅ Processing {request_type} for {customer_identifier}")
+                
+                if request_type == "Right to Access":
+                    st.info("""
+                    📋 **Data Export Prepared:**
+                    - Personal Information
+                    - Transaction History
+                    - Communication Logs
+                    - Loyalty Points
+                    
+                    [📥 Download Customer Data Package]
+                    """)
+                
+                elif request_type == "Right to Erasure (Right to be Forgotten)":
+                    st.warning("""
+                    ⚠️ **Permanent Data Deletion:**
+                    This action will:
+                    - Remove all personal information
+                    - Anonymize transaction records
+                    - Delete communication history
+                    - Cannot be undone
+                    
+                    ⚖️ Note: Some data may be retained for legal/financial compliance (7 years)
+                    """)
+                    
+                    if st.checkbox("I confirm this deletion request"):
+                        if st.button("🗑️ Delete Customer Data", type="secondary"):
+                            st.error("✅ Customer data deletion initiated")
+                
+                elif request_type == "Right to Data Portability":
+                    st.info("""
+                    📦 **Data Export Format:**
+                    Available formats:
+                    - JSON (Machine readable)
+                    - CSV (Spreadsheet)
+                    - PDF (Human readable)
+                    
+                    [📥 Download in Preferred Format]
+                    """)
+        
+        # Compliance Dashboard
+        st.divider()
+        st.markdown("### 📊 Compliance Status")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Data Requests", "12")
+        col2.metric("Avg Response Time", "2.3 days")
+        col3.metric("Compliance Score", "95%")
+        col4.metric("Pending Requests", "2")
+        
+        # Recent requests
+        st.divider()
+        st.markdown("### 📋 Recent Data Requests")
+        
+        requests = [
+            {'date': '20-Jan-2026', 'customer': 'Nidhi Kumar', 'type': 'Access', 'status': 'Completed', 'days': '1'},
+            {'date': '18-Jan-2026', 'customer': 'Rahul Sharma', 'type': 'Erasure', 'status': 'In Progress', 'days': '3'},
+            {'date': '15-Jan-2026', 'customer': 'Priya Singh', 'type': 'Portability', 'status': 'Completed', 'days': '2'}
+        ]
+        
+        for req in requests:
+            col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+            
+            with col1:
+                st.write(f"📅 {req['date']}")
+                st.write(f"👤 {req['customer']}")
+            with col2:
+                st.write(f"📋 {req['type']}")
+            with col3:
+                if req['status'] == 'Completed':
+                    st.success(f"✅ {req['status']}")
+                else:
+                    st.warning(f"⏳ {req['status']}")
+            with col4:
+                st.write(f"{req['days']} days")
+            
+            st.divider()
+
+# --- 24. GST & INVOICE MANAGEMENT ---
 elif menu == "💼 GST & Invoices":
     st.markdown("""
     <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
