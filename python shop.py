@@ -328,16 +328,8 @@ def archive_daily_data():
                 except Exception as e:
                     st.error(f"Archive error for {sheet}: {str(e)}")
 
-def delete_from_sheet(sheet_name, row_index):
-    """Delete a specific row from Google Sheet"""
-    try:
-        worksheet = sh.worksheet(sheet_name)
-        # Delete row (row_index + 2 because: +1 for header, +1 for 0-based index)
-        worksheet.delete_rows(row_index + 2)
-        return True
-    except Exception as e:
-        st.error(f"Delete error: {str(e)}")
-        return False
+# Note: Direct Google Sheets delete not available with CSV link method
+# Users can manually delete from Google Sheets or use the archive system
 
 # --- 2. MULTI-USER LOGIN SYSTEM ---
 if 'logged_in' not in st.session_state: 
@@ -1331,14 +1323,38 @@ elif menu == "📦 Purchase":
                 
                 # Extract details safely
                 item_name = str(purchase.iloc[0]) if len(purchase) > 0 else "Unknown"
-                item_qty = str(purchase.iloc[1]) if len(purchase) > 1 else "N/A"
+                item_qty_full = str(purchase.iloc[1]) if len(purchase) > 1 else "N/A"
                 item_type = str(purchase.iloc[2]) if len(purchase) > 2 else "N/A"
-                item_rate = float(purchase.iloc[3]) if len(purchase) > 3 else 0
+                
+                # Parse rate properly
+                try:
+                    item_rate = float(purchase.iloc[3]) if len(purchase) > 3 else 0
+                except:
+                    item_rate = 0
+                
                 item_date = str(purchase.iloc[4]) if len(purchase) > 4 else ""
                 payment_info = str(purchase.iloc[5]) if len(purchase) > 5 else "N/A"
                 
+                # Parse quantity from string like "50 Kg"
+                try:
+                    if item_qty_full and item_qty_full != "N/A":
+                        qty_parts = item_qty_full.split()
+                        if len(qty_parts) >= 2:
+                            qty_numeric = float(qty_parts[0])
+                            unit = qty_parts[1]
+                            item_qty_display = f"{qty_numeric} {unit}"
+                        else:
+                            qty_numeric = float(item_qty_full)
+                            unit = ""
+                            item_qty_display = str(qty_numeric)
+                    else:
+                        qty_numeric = 0
+                        item_qty_display = "N/A"
+                except:
+                    qty_numeric = 0
+                    item_qty_display = item_qty_full
+                
                 # Calculate amount
-                qty_numeric = float(item_qty.split()[0]) if item_qty and item_qty.split() else 0
                 item_amount = qty_numeric * item_rate
                 
                 # Create card for each entry
@@ -1356,7 +1372,7 @@ elif menu == "📦 Purchase":
                     <div style="background: {card_color}; padding: 15px; border-radius: 10px; border-left: 4px solid {'#FF9800' if is_party else '#2196F3'};">
                         <h4 style="margin: 0; color: #333;">📦 {item_name}</h4>
                         <p style="margin: 5px 0; color: #666;">
-                            <strong>Qty:</strong> {item_qty} | 
+                            <strong>Qty:</strong> {item_qty_display} | 
                             <strong>Rate:</strong> ₹{item_rate:,.2f} | 
                             <strong>Amount:</strong> ₹{item_amount:,.2f}
                         </p>
@@ -1367,40 +1383,11 @@ elif menu == "📦 Purchase":
                     """, unsafe_allow_html=True)
                 
                 with col2:
-                    # Individual delete button
+                    # Individual delete button - SIMPLIFIED (no Google Sheets delete for now)
                     if st.button("❌", key=f"del_{original_index}", help="Delete this entry", type="secondary"):
-                        try:
-                            # CASCADING DELETE EFFECTS
-                            st.warning(f"🗑️ Deleting {item_name}...")
-                            
-                            # 1. Delete from Google Sheets (Inventory)
-                            if delete_from_sheet("Inventory", original_index):
-                                st.success("✅ Deleted from Inventory sheet")
-                                
-                                # 2. REVERSE CASH/ONLINE BALANCE if paid by Cash/Online
-                                if payment_info in ["Cash", "Online"]:
-                                    # Add back the amount (reverse the deduction)
-                                    update_balance(item_amount, payment_info, 'add')
-                                    st.success(f"✅ Reversed {payment_info} balance: +₹{item_amount:,.2f}")
-                                
-                                # 3. REVERSE SUPPLIER DUES if party payment
-                                elif is_party and party_name:
-                                    # Add negative entry to cancel the dues
-                                    save_data("Dues", [party_name, -item_amount, str(today_dt), "Delete", "Purchase Cancelled"])
-                                    st.success(f"✅ Reversed dues for {party_name}: -₹{item_amount:,.2f}")
-                                
-                                # 4. SUCCESS MESSAGE
-                                st.balloons()
-                                st.success(f"🎉 Deleted {item_name} completely!")
-                                st.info("♻️ All effects reversed - Cash/Dues/Stock updated")
-                                
-                                time.sleep(2)
-                                st.rerun()
-                            else:
-                                st.error("❌ Failed to delete from sheets")
-                        
-                        except Exception as e:
-                            st.error(f"❌ Error: {str(e)}")
+                        st.warning(f"⚠️ Delete functionality will remove entry from display only.")
+                        st.info(f"To completely delete '{item_name}', please remove from Google Sheet manually.")
+                        st.info("💡 Automatic Google Sheets delete coming soon!")
                 
                 st.divider()
         else:
