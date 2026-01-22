@@ -873,9 +873,9 @@ elif menu == "🧾 Billing":
     
     with st.expander("🛒 Add Item", expanded=True):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
-        q = st.number_input("Qty", 0.1)
+        q = st.number_input("Qty", min_value=0.1, value=1.0, step=0.1)
         u = st.selectbox("Unit", ["Kg", "Pcs", "Pkt", "Grams"])
-        p = st.number_input("Price", 1.0)
+        p = st.number_input("Price", min_value=0.0, value=1.0, step=1.0)
         
         col1, col2 = st.columns(2)
         with col1:
@@ -884,34 +884,51 @@ elif menu == "🧾 Billing":
             ref_ph = st.text_input("Referral Phone (Optional)", placeholder="For +10 bonus points")
         
         if st.button("➕ Add to Cart"):
-            pur_r = pd.to_numeric(inv_df[inv_df.iloc[:, 0] == it].iloc[0, 3], errors='coerce') if not inv_df.empty and len(inv_df[inv_df.iloc[:, 0] == it]) > 0 else 0
-            
-            # Calculate points ONLY if give_points is checked
-            pts = 0
-            pts_used = 0
-            
-            if give_points:
-                pts = int(((q*p)/100) * (5 if is_weekend else 2))
+            if q and q > 0 and p and p > 0:  # Validate inputs
+                pur_r = pd.to_numeric(inv_df[inv_df.iloc[:, 0] == it].iloc[0, 3], errors='coerce') if not inv_df.empty and len(inv_df[inv_df.iloc[:, 0] == it]) > 0 else 0
                 
-                if rd and pts_bal > 0:
-                    pts_used = -int(pts_bal)
-                    pts += pts_used
+                # Calculate points ONLY if give_points is checked
+                pts = 0
+                pts_used = 0
                 
-                if ref_ph and ref_ph.strip():
-                    pts += 10
-            
-            st.session_state.bill_cart.append({
-                "Item": it, 
-                "Qty": f"{q} {u}", 
-                "Price": p, 
-                "Profit": (p-pur_r)*q, 
-                "Pts": pts,
-                "PtsUsed": pts_used
-            })
-            st.rerun()
+                if give_points:
+                    pts = int(((q*p)/100) * (5 if is_weekend else 2))
+                    
+                    if rd and pts_bal > 0:
+                        pts_used = -int(pts_bal)
+                        pts += pts_used
+                    
+                    if ref_ph and ref_ph.strip():
+                        pts += 10
+                
+                st.session_state.bill_cart.append({
+                    "Item": it, 
+                    "Qty": f"{q} {u}", 
+                    "Price": p, 
+                    "Profit": (p-pur_r)*q, 
+                    "Pts": pts,
+                    "PtsUsed": pts_used
+                })
+                st.rerun()
+            else:
+                st.error("⚠️ Please enter valid Qty and Price!")
     
     if st.session_state.bill_cart:
-        st.table(pd.DataFrame(st.session_state.bill_cart))
+        # Create formatted dataframe for display
+        cart_display = pd.DataFrame(st.session_state.bill_cart)
+        
+        # Format columns for better display
+        if not cart_display.empty:
+            # Ensure all values are properly formatted
+            display_df = pd.DataFrame({
+                'Item': cart_display['Item'],
+                'Qty': cart_display['Qty'],
+                'Price': cart_display['Price'].apply(lambda x: f"₹{x:,.2f}"),
+                'Profit': cart_display['Profit'].apply(lambda x: f"₹{x:,.2f}"),
+                'Points': cart_display['Pts']
+            })
+            st.table(display_df)
+        
         total_amt = sum([item['Price'] for item in st.session_state.bill_cart])
         total_pts = sum([item['Pts'] for item in st.session_state.bill_cart])
         
@@ -1159,17 +1176,42 @@ elif menu == "📦 Purchase":
         q = st.number_input("Quantity", min_value=0.1, value=1.0)
         u = st.selectbox("Unit", ["Kg", "Pcs", "Pkt", "Grams"])
         r = st.number_input("Rate per Unit", min_value=0.0, value=0.0)
-        m = st.selectbox("Paid From", ["Cash", "Online", "Pocket", "Hand"])
+        
+        # Payment option
+        st.markdown("### 💰 Payment Details")
+        payment_type = st.radio(
+            "Payment Type",
+            ["💵 Cash/Online (Pay Now)", "🏢 Party/Supplier (Udhaar)"],
+            horizontal=True
+        )
+        
+        if payment_type == "💵 Cash/Online (Pay Now)":
+            m = st.selectbox("Paid From", ["Cash", "Online"])
+            party_name = None
+        else:
+            m = "Party"
+            party_name = st.text_input("Party/Supplier Name", placeholder="Enter supplier name")
         
         if st.button("➕ Save Purchase", type="primary"):
             if q > 0 and r > 0 and n.strip():
                 total_cost = q * r
-                save_data("Inventory", [n, f"{q} {u}", "Stock", r, str(today_dt), m])
+                
+                # Save to Inventory with party info
+                payment_info = m if not party_name else f"Party: {party_name}"
+                save_data("Inventory", [n, f"{q} {u}", "Stock", r, str(today_dt), payment_info])
                 
                 if m in ["Cash", "Online"]:
+                    # Deduct from balance
                     update_balance(total_cost, m, 'subtract')
+                    st.success(f"✅ Stock added! Paid ₹{total_cost:,.2f} from {m}")
                 else:
-                    st.success(f"✅ Stock added! (Paid from {m})")
+                    # Add to Supplier Dues
+                    if party_name and party_name.strip():
+                        save_data("Dues", [party_name, total_cost, str(today_dt), f"Purchase: {n}"])
+                        st.success(f"✅ Stock added! ₹{total_cost:,.2f} added to {party_name}'s dues")
+                    else:
+                        st.error("⚠️ Please enter Party/Supplier name!")
+                        st.stop()
                 
                 time.sleep(1)
                 st.rerun()
@@ -1199,36 +1241,51 @@ elif menu == "📦 Purchase":
                         "Enter Row # to delete (from table above)", 
                         min_value=0, 
                         max_value=len(today_purchases)-1, 
-                        value=0
+                        value=0,
+                        step=1
                     )
                     
-                    # Show what will be deleted
-                    selected_item = today_purchases.iloc[del_row_num]
-                    st.info(f"Will delete: **{selected_item.iloc[0]}** - {selected_item.iloc[1]} @ ₹{selected_item.iloc[3]}")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("🗑️ DELETE FROM EVERYWHERE", type="primary"):
-                            # Find actual row index in full sheet
-                            actual_index = i_df.index[i_df.eq(selected_item).all(1)].tolist()[0]
-                            
-                            # Delete from Google Sheet
-                            if delete_from_sheet("Inventory", actual_index):
-                                st.success("✅ Deleted from Google Sheets!")
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error("❌ Failed to delete from Google Sheets")
-                    
-                    with col2:
-                        st.warning("⚠️ This action cannot be undone!")
+                    # Show what will be deleted - with safe indexing
+                    try:
+                        selected_item = today_purchases.iloc[del_row_num]
+                        item_name = selected_item.iloc[0] if len(selected_item) > 0 else "Unknown"
+                        item_qty = selected_item.iloc[1] if len(selected_item) > 1 else "N/A"
+                        item_price = selected_item.iloc[3] if len(selected_item) > 3 else "0"
+                        
+                        st.info(f"Will delete: **{item_name}** - {item_qty} @ ₹{item_price}")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("🗑️ DELETE FROM EVERYWHERE", type="primary"):
+                                try:
+                                    # Find actual row index in full sheet
+                                    # Get the original index from today_purchases
+                                    actual_index = today_purchases.index[del_row_num]
+                                    
+                                    # Delete from Google Sheet (add 2 because: 1 for header, 1 for 0-indexing)
+                                    sheet_row = actual_index + 2
+                                    
+                                    if delete_from_sheet("Inventory", actual_index):
+                                        st.success("✅ Deleted from Google Sheets!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to delete from Google Sheets")
+                                except Exception as e:
+                                    st.error(f"❌ Error deleting: {str(e)}")
+                        
+                        with col2:
+                            st.warning("⚠️ This action cannot be undone!")
+                    except IndexError as e:
+                        st.error(f"❌ Invalid row number selected: {str(e)}")
         else:
-            st.info("No purchases made today")
+            st.info("📭 No purchases made today")
         
         # Show all time purchases
         st.divider()
-        st.subheader("📜 All Purchases History")
-        st.dataframe(i_df, use_container_width=True)
+        with st.expander("📜 View All Purchases History"):
+            st.dataframe(i_df, use_container_width=True)
+            st.info(f"Total entries: {len(i_df)}")
 
 # --- 8. LIVE STOCK ---
 elif menu == "📋 Live Stock":
@@ -1680,6 +1737,30 @@ elif menu == "🏢 Supplier Dues":
                             st.metric("💵 Total Paid", f"₹{total_paid:,.2f}")
                             st.metric("⚖️ Balance", f"₹{abs(balance):,.2f}", 
                                      delta=f"{'We Owe' if balance > 0 else 'They Owe'}")
+                            
+                            # Quick payment option if balance > 0 (we owe them)
+                            if balance > 0:
+                                st.divider()
+                                st.markdown("#### 💵 Quick Payment")
+                                
+                                with st.form(f"pay_{supplier_name}"):
+                                    pay_amt = st.number_input("Amount to Pay", min_value=0.0, max_value=float(balance), value=float(balance), step=0.01)
+                                    pay_mode = st.selectbox("Payment Mode", ["Cash", "Online", "Cheque", "UPI"], key=f"mode_{supplier_name}")
+                                    
+                                    if st.form_submit_button("💰 Pay Now", type="primary", use_container_width=True):
+                                        if pay_amt > 0:
+                                            # Add negative entry (payment)
+                                            save_data("Dues", [supplier_name, -pay_amt, str(today_dt), pay_mode, "Payment"])
+                                            
+                                            # Deduct from balance
+                                            if pay_mode == "Cash":
+                                                update_balance(pay_amt, "Cash", 'subtract')
+                                            elif pay_mode == "Online":
+                                                update_balance(pay_amt, "Online", 'subtract')
+                                            
+                                            st.success(f"✅ Paid ₹{pay_amt:,.2f} to {supplier_name}")
+                                            time.sleep(1)
+                                            st.rerun()
                 
                 # Overall summary
                 st.divider()
