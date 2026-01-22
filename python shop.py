@@ -294,16 +294,50 @@ def update_balance(amount, mode, operation='add'):
         return False
 
 def archive_daily_data():
+    """Archive yesterday's data to Google Sheets and clear from current view"""
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
     archive_sheet = f"Archive_{yesterday.strftime('%d%b%Y')}"
-    for sheet in ["Sales", "Inventory", "Expenses"]:
+    
+    # Archive these sheets
+    for sheet in ["Sales", "Purchase", "Expenses", "Inventory"]:
         df = load_data(sheet)
         if not df.empty and 'Date' in df.columns:
+            # Get yesterday's data
             old_data = df[df['Date'] < today]
+            
             if not old_data.empty:
+                # Save to archive
                 for _, row in old_data.iterrows():
                     save_data(archive_sheet, row.tolist())
+                
+                # Keep only today's data on screen (remove old data)
+                new_data = df[df['Date'] >= today]
+                
+                # Update Google Sheet with only current data
+                try:
+                    worksheet = sh.worksheet(sheet)
+                    # Clear old data
+                    worksheet.clear()
+                    # Write header
+                    worksheet.append_row(df.columns.tolist())
+                    # Write only current data
+                    if not new_data.empty:
+                        for _, row in new_data.iterrows():
+                            worksheet.append_row(row.tolist())
+                except Exception as e:
+                    st.error(f"Archive error for {sheet}: {str(e)}")
+
+def delete_from_sheet(sheet_name, row_index):
+    """Delete a specific row from Google Sheet"""
+    try:
+        worksheet = sh.worksheet(sheet_name)
+        # Delete row (row_index + 2 because: +1 for header, +1 for 0-based index)
+        worksheet.delete_rows(row_index + 2)
+        return True
+    except Exception as e:
+        st.error(f"Delete error: {str(e)}")
+        return False
 
 # --- 2. MULTI-USER LOGIN SYSTEM ---
 if 'logged_in' not in st.session_state: 
@@ -1142,19 +1176,59 @@ elif menu == "📦 Purchase":
     
     i_df = load_data("Inventory")
     if not i_df.empty:
-        st.subheader("📋 Recent Purchases")
-        st.dataframe(i_df.tail(10), use_container_width=True)
+        st.subheader("📋 Today's Purchases")
         
-        # Delete option
+        # Filter today's purchases only
+        today_purchases = i_df[i_df.iloc[:, 4] == str(today_dt)] if len(i_df.columns) > 4 else i_df
+        
+        if not today_purchases.empty:
+            st.dataframe(today_purchases, use_container_width=True)
+            
+            # Delete option
+            st.divider()
+            with st.expander("🗑️ Delete Purchase Entry"):
+                st.warning("⚠️ This will delete from both screen AND Google Sheets!")
+                
+                # Create a display with row numbers
+                display_df = today_purchases.reset_index(drop=True)
+                display_df.insert(0, 'Row #', range(len(display_df)))
+                st.dataframe(display_df, use_container_width=True)
+                
+                if len(today_purchases) > 0:
+                    del_row_num = st.number_input(
+                        "Enter Row # to delete (from table above)", 
+                        min_value=0, 
+                        max_value=len(today_purchases)-1, 
+                        value=0
+                    )
+                    
+                    # Show what will be deleted
+                    selected_item = today_purchases.iloc[del_row_num]
+                    st.info(f"Will delete: **{selected_item.iloc[0]}** - {selected_item.iloc[1]} @ ₹{selected_item.iloc[3]}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🗑️ DELETE FROM EVERYWHERE", type="primary"):
+                            # Find actual row index in full sheet
+                            actual_index = i_df.index[i_df.eq(selected_item).all(1)].tolist()[0]
+                            
+                            # Delete from Google Sheet
+                            if delete_from_sheet("Inventory", actual_index):
+                                st.success("✅ Deleted from Google Sheets!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to delete from Google Sheets")
+                    
+                    with col2:
+                        st.warning("⚠️ This action cannot be undone!")
+        else:
+            st.info("No purchases made today")
+        
+        # Show all time purchases
         st.divider()
-        with st.expander("🗑️ Delete Purchase Entry"):
-            st.warning("⚠️ Select row to delete")
-            if len(i_df) > 0:
-                del_idx = st.number_input("Row number to delete (from above table)", min_value=0, max_value=len(i_df)-1, value=0)
-                st.info(f"Selected: {i_df.iloc[del_idx, 0] if len(i_df.columns) > 0 else 'N/A'}")
-                if st.button("🗑️ Delete Selected Purchase"):
-                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
-                    st.info("Go to Inventory sheet and delete the corresponding row")
+        st.subheader("📜 All Purchases History")
+        st.dataframe(i_df, use_container_width=True)
 
 # --- 8. LIVE STOCK ---
 elif menu == "📋 Live Stock":
@@ -1243,19 +1317,49 @@ elif menu == "💰 Expenses":
     
     e_df = load_data("Expenses")
     if not e_df.empty: 
-        st.subheader("📋 Recent Expenses")
-        st.dataframe(e_df.tail(15), use_container_width=True)
+        st.subheader("📋 Today's Expenses")
         
-        # Delete option
+        # Filter today's expenses
+        today_expenses = e_df[e_df.iloc[:, 0] == str(today_dt)] if len(e_df.columns) > 0 else e_df
+        
+        if not today_expenses.empty:
+            st.dataframe(today_expenses, use_container_width=True)
+            
+            # Delete option
+            st.divider()
+            with st.expander("🗑️ Delete Expense Entry"):
+                st.warning("⚠️ This will delete from both screen AND Google Sheets!")
+                
+                display_df = today_expenses.reset_index(drop=True)
+                display_df.insert(0, 'Row #', range(len(display_df)))
+                st.dataframe(display_df, use_container_width=True)
+                
+                if len(today_expenses) > 0:
+                    del_row_num = st.number_input("Enter Row # to delete", min_value=0, max_value=len(today_expenses)-1, value=0, key="del_exp")
+                    
+                    selected_item = today_expenses.iloc[del_row_num]
+                    st.info(f"Will delete: **{selected_item.iloc[1]}** - ₹{selected_item.iloc[2]}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🗑️ DELETE FROM EVERYWHERE", type="primary", key="del_exp_btn"):
+                            actual_index = e_df.index[e_df.eq(selected_item).all(1)].tolist()[0]
+                            
+                            if delete_from_sheet("Expenses", actual_index):
+                                st.success("✅ Deleted from Google Sheets!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to delete")
+                    
+                    with col2:
+                        st.warning("⚠️ Cannot be undone!")
+        else:
+            st.info("No expenses today")
+        
         st.divider()
-        with st.expander("🗑️ Delete Expense Entry"):
-            st.warning("⚠️ Select row to delete")
-            if len(e_df) > 0:
-                del_idx = st.number_input("Row number to delete", min_value=0, max_value=len(e_df)-1, value=0, key="del_exp")
-                st.info(f"Selected: {e_df.iloc[del_idx, 1] if len(e_df.columns) > 1 else 'N/A'} - ₹{e_df.iloc[del_idx, 2] if len(e_df.columns) > 2 else 0}")
-                if st.button("🗑️ Delete Selected Expense"):
-                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets")
-                    st.info("Go to Expenses sheet and delete the corresponding row")
+        st.subheader("📜 All Expenses History")
+        st.dataframe(e_df, use_container_width=True)
 
 # --- 10. PET REGISTER ---
 elif menu == "🐾 Pet Register":
