@@ -316,7 +316,7 @@ if 'username' not in st.session_state:
 # User credentials database
 USERS = {
     "Prateek": {
-        "password": "Prateek@092025",
+        "password": "Prateek092025",
         "role": "ceo",
         "name": "Prateek (CEO)"
     },
@@ -358,7 +358,7 @@ if not st.session_state.logged_in:
         """, unsafe_allow_html=True)
         
         u = st.text_input("👤 Username", key="login_username").strip()
-        p = st.text_input("🔒 Password", type="password", key="login_password")
+        p = st.text_input("🔒 Password", type="password", key="login_password").strip()
         
         # Show available users hint
         with st.expander("ℹ️ Available User Roles"):
@@ -369,15 +369,25 @@ if not st.session_state.logged_in:
             """)
         
         if st.button("🚀 LOGIN", use_container_width=True, type="primary"):
-            if u in USERS and USERS[u]["password"] == p:
-                st.session_state.logged_in = True
-                st.session_state.user_role = USERS[u]["role"]
-                st.session_state.username = USERS[u]["name"]
-                st.success(f"✅ Welcome {USERS[u]['name']}!")
-                time.sleep(1)
-                st.rerun()
+            # Debug info (remove after testing)
+            if u:
+                if u in USERS:
+                    if USERS[u]["password"] == p:
+                        st.session_state.logged_in = True
+                        st.session_state.user_role = USERS[u]["role"]
+                        st.session_state.username = USERS[u]["name"]
+                        st.success(f"✅ Welcome {USERS[u]['name']}!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Wrong password!")
+                        # Debug - show password length for troubleshooting
+                        st.warning(f"Debug: Password length entered: {len(p)}, Expected length: {len(USERS[u]['password'])}")
+                else:
+                    st.error(f"❌ Username '{u}' not found!")
+                    st.info(f"Available users: {', '.join(USERS.keys())}")
             else:
-                st.error("❌ Invalid username or password!")
+                st.error("❌ Please enter username and password!")
         
         st.markdown("</div>", unsafe_allow_html=True)
         
