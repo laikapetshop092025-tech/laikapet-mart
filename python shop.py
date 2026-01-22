@@ -1171,113 +1171,238 @@ Total GST: ₹{gst_amount:.2f}"""
 elif menu == "📦 Purchase":
     st.header("📦 Purchase Entry")
     
-    with st.expander("📥 Add Stock", expanded=True):
-        n = st.text_input("Item Name")
-        q = st.number_input("Quantity", min_value=0.1, value=1.0)
-        u = st.selectbox("Unit", ["Kg", "Pcs", "Pkt", "Grams"])
-        r = st.number_input("Rate per Unit", min_value=0.0, value=0.0)
-        
-        # Payment option
-        st.markdown("### 💰 Payment Details")
+    # Initialize purchase cart
+    if 'purchase_cart' not in st.session_state:
+        st.session_state.purchase_cart = []
+    
+    # Payment selection at top
+    st.markdown("### 💰 Payment Method")
+    col1, col2 = st.columns(2)
+    
+    with col1:
         payment_type = st.radio(
             "Payment Type",
-            ["💵 Cash/Online (Pay Now)", "🏢 Party/Supplier (Udhaar)"],
-            horizontal=True
+            ["💵 Cash/Online", "🏢 Party/Supplier"],
+            horizontal=True,
+            key="payment_radio"
         )
-        
-        if payment_type == "💵 Cash/Online (Pay Now)":
-            m = st.selectbox("Paid From", ["Cash", "Online"])
-            party_name = None
+    
+    with col2:
+        if payment_type == "💵 Cash/Online":
+            payment_mode = st.selectbox("Pay From", ["Cash", "Online"], key="pay_mode")
+            supplier_name = None
         else:
-            m = "Party"
-            party_name = st.text_input("Party/Supplier Name", placeholder="Enter supplier name")
+            payment_mode = "Party"
+            supplier_name = st.text_input("Party/Supplier Name", placeholder="Enter supplier name", key="supplier_input")
+    
+    st.divider()
+    
+    # Add items to cart
+    with st.expander("🛒 Add Items to Purchase", expanded=True):
+        col1, col2, col3, col4 = st.columns(4)
         
-        if st.button("➕ Save Purchase", type="primary"):
-            if q > 0 and r > 0 and n.strip():
-                total_cost = q * r
-                
-                # Save to Inventory with party info
-                payment_info = m if not party_name else f"Party: {party_name}"
-                save_data("Inventory", [n, f"{q} {u}", "Stock", r, str(today_dt), payment_info])
-                
-                if m in ["Cash", "Online"]:
-                    # Deduct from balance
-                    update_balance(total_cost, m, 'subtract')
-                    st.success(f"✅ Stock added! Paid ₹{total_cost:,.2f} from {m}")
+        with col1:
+            item_name = st.text_input("Item Name", key="item_name")
+        with col2:
+            qty = st.number_input("Quantity", min_value=0.1, value=1.0, step=0.1, key="qty_input")
+        with col3:
+            unit = st.selectbox("Unit", ["Kg", "Pcs", "Pkt", "Grams", "Ltr"], key="unit_input")
+        with col4:
+            rate = st.number_input("Rate/Unit", min_value=0.0, value=0.0, step=1.0, key="rate_input")
+        
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if st.button("➕ Add to Cart", type="primary", use_container_width=True):
+                if item_name.strip() and qty > 0 and rate > 0:
+                    st.session_state.purchase_cart.append({
+                        'Item': item_name,
+                        'Qty': qty,
+                        'Unit': unit,
+                        'Rate': rate,
+                        'Amount': qty * rate
+                    })
+                    st.success(f"✅ Added {item_name}")
+                    time.sleep(0.5)
+                    st.rerun()
                 else:
-                    # Add to Supplier Dues
-                    if party_name and party_name.strip():
-                        save_data("Dues", [party_name, total_cost, str(today_dt), f"Purchase: {n}"])
-                        st.success(f"✅ Stock added! ₹{total_cost:,.2f} added to {party_name}'s dues")
-                    else:
-                        st.error("⚠️ Please enter Party/Supplier name!")
-                        st.stop()
-                
-                time.sleep(1)
+                    st.error("⚠️ Fill all fields properly!")
+        
+        with col2:
+            if st.button("🗑️ Clear Cart", use_container_width=True):
+                st.session_state.purchase_cart = []
                 st.rerun()
     
+    # Display cart
+    if st.session_state.purchase_cart:
+        st.divider()
+        st.markdown("### 🛒 Purchase Cart")
+        
+        # Create display dataframe
+        cart_df = pd.DataFrame(st.session_state.purchase_cart)
+        cart_df['Qty_Display'] = cart_df['Qty'].astype(str) + ' ' + cart_df['Unit']
+        cart_df['Rate_Display'] = '₹' + cart_df['Rate'].astype(str)
+        cart_df['Amount_Display'] = '₹' + cart_df['Amount'].apply(lambda x: f"{x:,.2f}")
+        
+        display_df = cart_df[['Item', 'Qty_Display', 'Rate_Display', 'Amount_Display']]
+        display_df.columns = ['Item', 'Quantity', 'Rate', 'Amount']
+        
+        st.dataframe(display_df, use_container_width=True)
+        
+        # Calculate total
+        total_amount = sum([item['Amount'] for item in st.session_state.purchase_cart])
+        total_items = len(st.session_state.purchase_cart)
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("📦 Total Items", total_items)
+        col2.metric("💰 Total Amount", f"₹{total_amount:,.2f}")
+        col3.metric("📊 Payment", payment_type.split()[0])
+        
+        # Remove item option
+        with st.expander("🗑️ Remove Item"):
+            if total_items > 0:
+                item_to_remove = st.selectbox(
+                    "Select item to remove",
+                    [f"{i}: {item['Item']} - {item['Qty']} {item['Unit']}" for i, item in enumerate(st.session_state.purchase_cart)]
+                )
+                
+                if st.button("🗑️ Remove Selected Item", type="secondary"):
+                    remove_idx = int(item_to_remove.split(':')[0])
+                    removed_item = st.session_state.purchase_cart.pop(remove_idx)
+                    st.success(f"✅ Removed {removed_item['Item']}")
+                    time.sleep(0.5)
+                    st.rerun()
+        
+        st.divider()
+        
+        # Final save button
+        if payment_type == "🏢 Party/Supplier" and (not supplier_name or not supplier_name.strip()):
+            st.error("⚠️ Please enter Party/Supplier name above!")
+        else:
+            if st.button("💾 SAVE PURCHASE", type="primary", use_container_width=True):
+                # Save all items to Inventory
+                for item in st.session_state.purchase_cart:
+                    payment_info = payment_mode if not supplier_name else f"Party: {supplier_name}"
+                    save_data("Inventory", [
+                        item['Item'],
+                        f"{item['Qty']} {item['Unit']}",
+                        "Stock",
+                        item['Rate'],
+                        str(today_dt),
+                        payment_info
+                    ])
+                
+                # Handle payment
+                if payment_mode in ["Cash", "Online"]:
+                    # Deduct from balance
+                    update_balance(total_amount, payment_mode, 'subtract')
+                    st.success(f"✅ Purchase saved! Paid ₹{total_amount:,.2f} from {payment_mode}")
+                else:
+                    # Add to Supplier Dues
+                    if supplier_name and supplier_name.strip():
+                        # Create itemized note
+                        items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
+                        save_data("Dues", [supplier_name, total_amount, str(today_dt), f"Purchase: {items_note}"])
+                        st.success(f"✅ Purchase saved! ₹{total_amount:,.2f} added to {supplier_name}'s dues")
+                
+                # Clear cart
+                st.session_state.purchase_cart = []
+                st.balloons()
+                time.sleep(2)
+                st.rerun()
+    else:
+        st.info("🛒 Cart is empty. Add items above to start purchase.")
+    
+    # Show today's purchases
     i_df = load_data("Inventory")
     if not i_df.empty:
+        st.divider()
         st.subheader("📋 Today's Purchases")
         
         # Filter today's purchases only
         today_purchases = i_df[i_df.iloc[:, 4] == str(today_dt)] if len(i_df.columns) > 4 else i_df
         
         if not today_purchases.empty:
-            st.dataframe(today_purchases, use_container_width=True)
+            st.info(f"💡 {len(today_purchases)} purchase(s) today - Click ❌ to delete any entry")
             
-            # Delete option
-            st.divider()
-            with st.expander("🗑️ Delete Purchase Entry"):
-                st.warning("⚠️ This will delete from both screen AND Google Sheets!")
+            # Display each purchase with individual delete button
+            for idx in range(len(today_purchases)):
+                purchase = today_purchases.iloc[idx]
+                original_index = today_purchases.index[idx]
                 
-                # Create a display with row numbers
-                display_df = today_purchases.reset_index(drop=True)
-                display_df.insert(0, 'Row #', range(len(display_df)))
-                st.dataframe(display_df, use_container_width=True)
+                # Extract details safely
+                item_name = str(purchase.iloc[0]) if len(purchase) > 0 else "Unknown"
+                item_qty = str(purchase.iloc[1]) if len(purchase) > 1 else "N/A"
+                item_type = str(purchase.iloc[2]) if len(purchase) > 2 else "N/A"
+                item_rate = float(purchase.iloc[3]) if len(purchase) > 3 else 0
+                item_date = str(purchase.iloc[4]) if len(purchase) > 4 else ""
+                payment_info = str(purchase.iloc[5]) if len(purchase) > 5 else "N/A"
                 
-                if len(today_purchases) > 0:
-                    del_row_num = st.number_input(
-                        "Enter Row # to delete (from table above)", 
-                        min_value=0, 
-                        max_value=len(today_purchases)-1, 
-                        value=0,
-                        step=1
-                    )
+                # Calculate amount
+                qty_numeric = float(item_qty.split()[0]) if item_qty and item_qty.split() else 0
+                item_amount = qty_numeric * item_rate
+                
+                # Create card for each entry
+                col1, col2 = st.columns([9, 1])
+                
+                with col1:
+                    # Determine payment type
+                    is_party = "Party:" in payment_info
+                    party_name = payment_info.replace("Party: ", "") if is_party else None
                     
-                    # Show what will be deleted - with safe indexing
-                    try:
-                        selected_item = today_purchases.iloc[del_row_num]
-                        item_name = selected_item.iloc[0] if len(selected_item) > 0 else "Unknown"
-                        item_qty = selected_item.iloc[1] if len(selected_item) > 1 else "N/A"
-                        item_price = selected_item.iloc[3] if len(selected_item) > 3 else "0"
+                    # Display card with color based on payment
+                    card_color = "#FFF3CD" if is_party else "#D1ECF1"
+                    
+                    st.markdown(f"""
+                    <div style="background: {card_color}; padding: 15px; border-radius: 10px; border-left: 4px solid {'#FF9800' if is_party else '#2196F3'};">
+                        <h4 style="margin: 0; color: #333;">📦 {item_name}</h4>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>Qty:</strong> {item_qty} | 
+                            <strong>Rate:</strong> ₹{item_rate:,.2f} | 
+                            <strong>Amount:</strong> ₹{item_amount:,.2f}
+                        </p>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>Payment:</strong> {payment_info if not is_party else f'🏢 {party_name} (Udhaar)'}
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    # Individual delete button
+                    if st.button("❌", key=f"del_{original_index}", help="Delete this entry", type="secondary"):
+                        try:
+                            # CASCADING DELETE EFFECTS
+                            st.warning(f"🗑️ Deleting {item_name}...")
+                            
+                            # 1. Delete from Google Sheets (Inventory)
+                            if delete_from_sheet("Inventory", original_index):
+                                st.success("✅ Deleted from Inventory sheet")
+                                
+                                # 2. REVERSE CASH/ONLINE BALANCE if paid by Cash/Online
+                                if payment_info in ["Cash", "Online"]:
+                                    # Add back the amount (reverse the deduction)
+                                    update_balance(item_amount, payment_info, 'add')
+                                    st.success(f"✅ Reversed {payment_info} balance: +₹{item_amount:,.2f}")
+                                
+                                # 3. REVERSE SUPPLIER DUES if party payment
+                                elif is_party and party_name:
+                                    # Add negative entry to cancel the dues
+                                    save_data("Dues", [party_name, -item_amount, str(today_dt), "Delete", "Purchase Cancelled"])
+                                    st.success(f"✅ Reversed dues for {party_name}: -₹{item_amount:,.2f}")
+                                
+                                # 4. SUCCESS MESSAGE
+                                st.balloons()
+                                st.success(f"🎉 Deleted {item_name} completely!")
+                                st.info("♻️ All effects reversed - Cash/Dues/Stock updated")
+                                
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to delete from sheets")
                         
-                        st.info(f"Will delete: **{item_name}** - {item_qty} @ ₹{item_price}")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button("🗑️ DELETE FROM EVERYWHERE", type="primary"):
-                                try:
-                                    # Find actual row index in full sheet
-                                    # Get the original index from today_purchases
-                                    actual_index = today_purchases.index[del_row_num]
-                                    
-                                    # Delete from Google Sheet (add 2 because: 1 for header, 1 for 0-indexing)
-                                    sheet_row = actual_index + 2
-                                    
-                                    if delete_from_sheet("Inventory", actual_index):
-                                        st.success("✅ Deleted from Google Sheets!")
-                                        time.sleep(1)
-                                        st.rerun()
-                                    else:
-                                        st.error("❌ Failed to delete from Google Sheets")
-                                except Exception as e:
-                                    st.error(f"❌ Error deleting: {str(e)}")
-                        
-                        with col2:
-                            st.warning("⚠️ This action cannot be undone!")
-                    except IndexError as e:
-                        st.error(f"❌ Invalid row number selected: {str(e)}")
+                        except Exception as e:
+                            st.error(f"❌ Error: {str(e)}")
+                
+                st.divider()
         else:
             st.info("📭 No purchases made today")
         
