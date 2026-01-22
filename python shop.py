@@ -865,6 +865,22 @@ elif menu == "🧾 Billing":
     
     with st.expander("🛒 Add Item", expanded=True):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
+        
+        # Show available stock for selected product
+        if it and it != "No Stock" and not inv_df.empty:
+            # Get all entries for this product
+            product_stock = inv_df[inv_df.iloc[:, 0] == it]
+            
+            if not product_stock.empty:
+                # Get latest quantity entry (last row for this product)
+                latest_qty = product_stock.iloc[-1, 1] if len(product_stock.columns) > 1 else "N/A"
+                latest_rate = product_stock.iloc[-1, 3] if len(product_stock.columns) > 3 else "N/A"
+                
+                # Display stock info
+                st.info(f"📦 **Available Stock:** {latest_qty} | **Purchase Rate:** ₹{latest_rate}")
+            else:
+                st.warning("⚠️ No stock information available")
+        
         q = st.number_input("Qty", min_value=0.1, value=1.0, step=0.1)
         u = st.selectbox("Unit", ["Kg", "Pcs", "Pkt", "Grams"])
         p = st.number_input("Price", min_value=0.0, value=1.0, step=1.0)
