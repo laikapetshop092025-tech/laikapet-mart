@@ -1336,23 +1336,46 @@ elif menu == "📦 Purchase":
                 payment_info = str(purchase.iloc[5]) if len(purchase) > 5 else "N/A"
                 
                 # Parse quantity from string like "50 Kg"
+                qty_numeric = 0
+                item_qty_display = "N/A"
+                
                 try:
-                    if item_qty_full and item_qty_full != "N/A":
-                        qty_parts = item_qty_full.split()
-                        if len(qty_parts) >= 2:
-                            qty_numeric = float(qty_parts[0])
-                            unit = qty_parts[1]
-                            item_qty_display = f"{qty_numeric} {unit}"
+                    # First check what type of data we have
+                    qty_val = purchase.iloc[1] if len(purchase) > 1 else None
+                    
+                    # If it's already a number
+                    if isinstance(qty_val, (int, float)):
+                        qty_numeric = float(qty_val)
+                        item_qty_display = f"{qty_numeric}"
+                    # If it's a string
+                    elif isinstance(qty_val, str):
+                        qty_str = str(qty_val).strip()
+                        # Try splitting "50 Kg"
+                        if ' ' in qty_str:
+                            parts = qty_str.split(maxsplit=1)
+                            try:
+                                qty_numeric = float(parts[0])
+                                item_qty_display = f"{qty_numeric} {parts[1]}"
+                            except ValueError:
+                                qty_numeric = 0
+                                item_qty_display = qty_str
                         else:
-                            qty_numeric = float(item_qty_full)
-                            unit = ""
-                            item_qty_display = str(qty_numeric)
+                            # Just a number
+                            try:
+                                qty_numeric = float(qty_str)
+                                item_qty_display = str(qty_numeric)
+                            except ValueError:
+                                qty_numeric = 0
+                                item_qty_display = qty_str
                     else:
-                        qty_numeric = 0
-                        item_qty_display = "N/A"
-                except:
+                        # Try pandas conversion
+                        qty_numeric = pd.to_numeric(qty_val, errors='coerce')
+                        if pd.isna(qty_numeric):
+                            qty_numeric = 0
+                        item_qty_display = str(qty_val)
+                except Exception as e:
                     qty_numeric = 0
-                    item_qty_display = item_qty_full
+                    item_qty_display = f"ERROR: {str(qty_val)}"
                 
                 # Calculate amount
                 item_amount = qty_numeric * item_rate
@@ -1381,6 +1404,16 @@ elif menu == "📦 Purchase":
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    # DEBUG - Show raw data
+                    with st.expander("🔍 Debug Info"):
+                        st.write("**Raw Data from Sheet:**")
+                        st.write(f"Qty Column: `{repr(purchase.iloc[1])}`")
+                        st.write(f"Qty Type: {type(purchase.iloc[1])}")
+                        st.write(f"Rate Column: `{repr(purchase.iloc[3])}`")
+                        st.write(f"Rate Type: {type(purchase.iloc[3])}")
+                        st.write(f"Parsed Qty: {qty_numeric}")
+                        st.write(f"Parsed Rate: {item_rate}")
                 
                 with col2:
                     # Individual delete button - SIMPLIFIED (no Google Sheets delete for now)
