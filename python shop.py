@@ -315,6 +315,11 @@ if 'username' not in st.session_state:
 
 # User credentials database
 USERS = {
+    "Prateek": {
+        "password": "Prateek@092025",
+        "role": "ceo",
+        "name": "Prateek (CEO)"
+    },
     "Laika": {
         "password": "Ayush@092025",
         "role": "owner",
@@ -416,8 +421,8 @@ if 'selected_menu' not in st.session_state:
 # Define menu items based on user role
 user_role = st.session_state.user_role or "staff"  # Default to staff if None
 
-if user_role == "owner":
-    # Owner has access to everything
+if user_role == "ceo" or user_role == "owner":
+    # CEO and Owner have access to everything
     menu_items = [
         "📊 Dashboard",
         "🧾 Billing", 
@@ -2271,7 +2276,7 @@ elif menu == "👥 User Management":
             new_username = st.text_input("Username", placeholder="e.g., Staff3")
             new_name = st.text_input("Full Name", placeholder="e.g., Rahul Kumar")
             new_password = st.text_input("Password", type="password", placeholder="Min 8 characters")
-            new_role = st.selectbox("Role", ["staff", "manager", "owner"])
+            new_role = st.selectbox("Role", ["ceo", "owner", "manager", "staff"])
             
             st.info(f"""
             **Role Permissions:**
@@ -2368,10 +2373,13 @@ elif menu == "👥 User Management":
                 )
                 
                 # Role change
+                role_options = ["ceo", "owner", "manager", "staff"]
+                current_role_index = role_options.index(user_data['role']) if user_data['role'] in role_options else 3
+                
                 new_role = st.selectbox(
                     "Role",
-                    ["staff", "manager", "owner"],
-                    index=["staff", "manager", "owner"].index(user_data['role'])
+                    role_options,
+                    index=current_role_index
                 )
                 
                 col1, col2 = st.columns(2)
