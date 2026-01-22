@@ -1454,7 +1454,22 @@ elif menu == "📋 Live Stock":
     i_df = load_data("Inventory")
     
     if not i_df.empty and len(i_df.columns) > 3:
-        i_df['qty_v'] = pd.to_numeric(i_df.iloc[:, 1].astype(str).str.split().str[0], errors='coerce').fillna(0)
+        # Better qty parsing - handle "Stock", "20.0 Kg", numbers, etc.
+        def parse_qty(val):
+            try:
+                val_str = str(val).strip()
+                # If it's "Stock" or empty, return 0
+                if val_str.lower() == 'stock' or val_str == '' or val_str == 'nan':
+                    return 0
+                # If it has space (like "20.0 Kg"), take first part
+                if ' ' in val_str:
+                    return float(val_str.split()[0])
+                # Otherwise try direct conversion
+                return float(val_str)
+            except:
+                return 0
+        
+        i_df['qty_v'] = i_df.iloc[:, 1].apply(parse_qty)
         i_df['rate_v'] = pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)
         i_df['value'] = i_df['qty_v'] * i_df['rate_v']
         t_v = i_df['value'].sum()
