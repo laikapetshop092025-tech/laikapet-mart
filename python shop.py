@@ -1223,24 +1223,58 @@ elif menu == "📦 Purchase":
         # Load inventory for stock checking
         inv_df = load_data("Inventory")
         
+        # Initialize new item flag in session state
+        if 'adding_new_item' not in st.session_state:
+            st.session_state.adding_new_item = False
+        if 'new_item_name_temp' not in st.session_state:
+            st.session_state.new_item_name_temp = ""
+        
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             # Check if we have existing items
             if not inv_df.empty:
                 existing_items = inv_df.iloc[:, 0].unique().tolist()
-                item_selection = st.selectbox("Item Name", [""] + existing_items + ["➕ Add New Item"], key="item_select")
                 
-                # If "+ Add New Item" selected, show text input
-                if item_selection == "➕ Add New Item":
-                    item_name = st.text_input("Enter New Item Name", key="new_item_name", placeholder="Type new product name")
+                # If not adding new item, show dropdown
+                if not st.session_state.adding_new_item:
+                    item_selection = st.selectbox(
+                        "Item Name", 
+                        [""] + existing_items + ["➕ Add New Item"], 
+                        key="item_select"
+                    )
+                    
+                    # Check if user selected "Add New Item"
+                    if item_selection == "➕ Add New Item":
+                        st.session_state.adding_new_item = True
+                        st.session_state.new_item_name_temp = ""
+                        st.rerun()
+                    else:
+                        item_name = item_selection
                 else:
-                    item_name = item_selection
+                    # Show text input for new item with back button
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        new_name = st.text_input(
+                            "New Item Name", 
+                            value=st.session_state.new_item_name_temp,
+                            key="new_item_input",
+                            placeholder="Type new product name"
+                        )
+                        st.session_state.new_item_name_temp = new_name
+                        item_name = new_name
+                    with col_b:
+                        st.write("")
+                        st.write("")
+                        if st.button("🔙", help="Back to dropdown"):
+                            st.session_state.adding_new_item = False
+                            st.session_state.new_item_name_temp = ""
+                            st.rerun()
             else:
                 item_name = st.text_input("Item Name", key="item_name")
         
         # Show current stock if item exists
-        if item_name and item_name != "" and item_name != "➕ Add New Item" and not inv_df.empty:
+        if item_name and item_name != "" and not st.session_state.adding_new_item and not inv_df.empty:
             product_stock = inv_df[inv_df.iloc[:, 0] == item_name]
             
             if not product_stock.empty:
@@ -1249,8 +1283,8 @@ elif menu == "📦 Purchase":
                 last_unit = product_stock.iloc[-1, 2] if len(product_stock.columns) > 2 else ""
                 
                 st.info(f"📦 **Current Stock:** {current_qty} {last_unit}")
-            else:
-                st.success("✨ **New Item** - No existing stock")
+        elif st.session_state.adding_new_item and item_name:
+            st.success("✨ **New Item** - No existing stock")
         
         with col2:
             qty = st.number_input("Quantity", min_value=0.1, value=1.0, step=0.1, key="qty_input")
@@ -1274,8 +1308,8 @@ elif menu == "📦 Purchase":
         col1, col2 = st.columns([1, 3])
         with col1:
             if st.button("➕ Add to Cart", type="primary", use_container_width=True):
-                # Validate: item_name should not be empty or the selection option itself
-                if item_name and item_name.strip() and item_name != "➕ Add New Item" and qty > 0 and rate > 0:
+                # Validate: item_name should not be empty
+                if item_name and item_name.strip() and qty > 0 and rate > 0:
                     st.session_state.purchase_cart.append({
                         'Item': item_name.strip(),
                         'Qty': qty,
@@ -1283,11 +1317,17 @@ elif menu == "📦 Purchase":
                         'Rate': rate,
                         'Amount': qty * rate
                     })
+                    
+                    # Reset new item state
+                    if st.session_state.adding_new_item:
+                        st.session_state.adding_new_item = False
+                        st.session_state.new_item_name_temp = ""
+                    
                     st.success(f"✅ Added {item_name}")
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    if not item_name or item_name == "➕ Add New Item" or not item_name.strip():
+                    if not item_name or not item_name.strip():
                         st.error("⚠️ Please enter item name!")
                     else:
                         st.error("⚠️ Fill all fields properly!")
