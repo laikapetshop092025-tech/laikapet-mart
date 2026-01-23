@@ -855,22 +855,21 @@ elif menu == "🧾 Billing":
     with st.expander("🛒 Add Item", expanded=True):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
         
-        # Show available stock for selected product (NEW STRUCTURE)
+        # Show available stock for selected product (WITHOUT purchase rate)
         if it and it != "No Stock" and not inv_df.empty:
             # Get all entries for this product
             product_stock = inv_df[inv_df.iloc[:, 0] == it]
             
             if not product_stock.empty:
-                # Get latest entry - B=Qty(number), C=Unit, D=Rate
-                latest_qty_num = product_stock.iloc[-1, 1] if len(product_stock.columns) > 1 else 0
+                # Calculate total stock - sum all quantities
+                total_qty = pd.to_numeric(product_stock.iloc[:, 1], errors='coerce').sum()
                 latest_unit = product_stock.iloc[-1, 2] if len(product_stock.columns) > 2 else ""
-                latest_rate = product_stock.iloc[-1, 3] if len(product_stock.columns) > 3 else 0
                 
-                # Combine Qty + Unit
-                display_qty = f"{latest_qty_num} {latest_unit}".strip()
-                
-                # Display stock info
-                st.success(f"✅ **Available Stock:** {display_qty} | **Purchase Rate:** ₹{latest_rate}")
+                # Display ONLY stock quantity (no purchase rate)
+                if total_qty > 0:
+                    st.success(f"📦 **Available Stock:** {total_qty} {latest_unit}")
+                else:
+                    st.warning("⚠️ Out of Stock!")
             else:
                 st.warning("⚠️ No stock information available")
         
@@ -880,7 +879,28 @@ elif menu == "🧾 Billing":
         
         col1, col2 = st.columns(2)
         with col1:
-            rd = st.checkbox(f"Redeem {int(pts_bal)} Points?", disabled=(pts_bal <= 0))
+            # Check current cart total
+            current_cart_total = sum([item['Price'] for item in st.session_state.bill_cart]) if st.session_state.bill_cart else 0
+            
+            # Disable redeem if: no points OR cart total < 100
+            can_redeem = pts_bal > 0 and current_cart_total >= 100
+            
+            if current_cart_total < 100 and pts_bal > 0:
+                help_text = "Minimum ₹100 purchase required to redeem points"
+            else:
+                help_text = "Use your loyalty points"
+            
+            rd = st.checkbox(
+                f"Redeem {int(pts_bal)} Points?", 
+                disabled=(not can_redeem),
+                help=help_text
+            )
+            
+            # Show message if minimum not met
+            if pts_bal > 0 and current_cart_total < 100:
+                remaining = 100 - current_cart_total
+                st.caption(f"⚠️ Add ₹{remaining:.0f} more to redeem points")
+        
         with col2:
             ref_ph = st.text_input("Referral Phone (Optional)", placeholder="For +10 bonus points")
         
@@ -1200,10 +1220,36 @@ elif menu == "📦 Purchase":
     
     # Add items to cart
     with st.expander("🛒 Add Items to Purchase", expanded=True):
+        # Load inventory for stock checking
+        inv_df = load_data("Inventory")
+        
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            item_name = st.text_input("Item Name", key="item_name")
+            # Check if we have existing items
+            if not inv_df.empty:
+                existing_items = inv_df.iloc[:, 0].unique().tolist()
+                item_name = st.selectbox("Item Name", [""] + existing_items + ["+ Add New Item"], key="item_select")
+                
+                # If "+ Add New Item" selected, show text input
+                if item_name == "+ Add New Item":
+                    item_name = st.text_input("Enter New Item Name", key="new_item_name")
+            else:
+                item_name = st.text_input("Item Name", key="item_name")
+        
+        # Show current stock if item exists
+        if item_name and item_name != "" and item_name != "+ Add New Item" and not inv_df.empty:
+            product_stock = inv_df[inv_df.iloc[:, 0] == item_name]
+            
+            if not product_stock.empty:
+                # Get current stock - B=Qty, C=Unit
+                current_qty = pd.to_numeric(product_stock.iloc[:, 1], errors='coerce').sum()
+                last_unit = product_stock.iloc[-1, 2] if len(product_stock.columns) > 2 else ""
+                
+                st.info(f"📦 **Current Stock:** {current_qty} {last_unit}")
+            else:
+                st.success("✨ **New Item** - No existing stock")
+        
         with col2:
             qty = st.number_input("Quantity", min_value=0.1, value=1.0, step=0.1, key="qty_input")
         with col3:
@@ -1211,10 +1257,22 @@ elif menu == "📦 Purchase":
         with col4:
             rate = st.number_input("Rate/Unit", min_value=0.0, value=0.0, step=1.0, key="rate_input")
         
+        # Show stock calculation when qty is entered
+        if item_name and item_name not in ["", "+ Add New Item"] and qty > 0 and not inv_df.empty:
+            product_stock = inv_df[inv_df.iloc[:, 0] == item_name]
+            if not product_stock.empty:
+                current_qty_num = pd.to_numeric(product_stock.iloc[:, 1], errors='coerce').sum()
+                new_stock = current_qty_num + qty
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("📦 Current", f"{current_qty_num} {unit}")
+                col2.metric("➕ Adding", f"{qty} {unit}")
+                col3.metric("✅ New Total", f"{new_stock} {unit}", delta=f"+{qty}")
+        
         col1, col2 = st.columns([1, 3])
         with col1:
             if st.button("➕ Add to Cart", type="primary", use_container_width=True):
-                if item_name.strip() and qty > 0 and rate > 0:
+                if item_name and item_name not in ["", "+ Add New Item"] and qty > 0 and rate > 0:
                     st.session_state.purchase_cart.append({
                         'Item': item_name,
                         'Qty': qty,
