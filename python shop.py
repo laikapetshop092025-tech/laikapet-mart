@@ -1206,14 +1206,63 @@ Total GST: ₹{gst_amount:.2f}"""
                     
                     st.divider()
             
-            # Delete option for today's bills
+            # Delete option - Individual delete buttons for each bill item
             st.divider()
-            with st.expander("🗑️ Delete Bill Entry"):
-                st.warning("⚠️ This will delete entries from Google Sheets")
-                del_customer = st.selectbox("Select Customer", list(customer_bills.keys()), key="del_bill_customer")
-                if st.button("🗑️ Delete Selected Bill", key="del_bill_btn"):
-                    st.error("Delete feature requires direct sheet access - Please delete manually from Google Sheets for now")
-                    st.info(f"Go to Sales sheet and delete rows for: {del_customer}")
+            st.markdown("### 🗑️ Delete Bill Entries")
+            st.warning("⚠️ Deleting will reverse all effects - removes from sheet AND adjusts balance")
+            
+            # Show all today's sales with delete buttons
+            for customer_name, bill_data in customer_bills.items():
+                with st.expander(f"📋 {customer_name} - ₹{bill_data['total']:,.2f}"):
+                    # Show bill details
+                    st.write(f"**Items:** {bill_data['items']}")
+                    st.write(f"**Total:** ₹{bill_data['total']:,.2f}")
+                    st.write(f"**Payment:** {bill_data['payment']}")
+                    st.write(f"**Points:** {bill_data['points']}")
+                    
+                    # Delete button
+                    if st.button(f"🗑️ Delete This Bill", key=f"del_bill_{customer_name}"):
+                        try:
+                            # Get customer phone from name
+                            cust_phone = customer_name.split('(')[-1].replace(')', '')
+                            
+                            # Find and delete all entries for this customer today
+                            s_df = load_data("Sales")
+                            if not s_df.empty and len(s_df.columns) > 5:
+                                # Filter entries for this customer today
+                                customer_entries = s_df[
+                                    (s_df.iloc[:, 0] == str(today_dt)) & 
+                                    (s_df.iloc[:, 5].astype(str).str.contains(cust_phone, na=False))
+                                ]
+                                
+                                if not customer_entries.empty:
+                                    st.info(f"Found {len(customer_entries)} entries to delete")
+                                    
+                                    # REVERSE PAYMENT BALANCE
+                                    payment_mode = bill_data['payment']
+                                    bill_amount = bill_data['total']
+                                    
+                                    if payment_mode == "Cash":
+                                        update_balance(bill_amount, "Cash", 'subtract')
+                                        st.success(f"✅ Reversed Cash: -₹{bill_amount:,.2f}")
+                                    elif payment_mode == "Online":
+                                        update_balance(bill_amount, "Online", 'subtract')
+                                        st.success(f"✅ Reversed Online: -₹{bill_amount:,.2f}")
+                                    elif payment_mode == "Udhaar":
+                                        # Remove from Customer Khata (add negative entry)
+                                        save_data("CustomerKhata", [customer_name, -bill_amount, str(today_dt), "Bill Deleted"])
+                                        st.success(f"✅ Reversed Udhaar: -₹{bill_amount:,.2f}")
+                                    
+                                    st.warning("⚠️ Manual deletion from Google Sheets required")
+                                    st.info(f"Go to Sales sheet → Delete rows with: {customer_name} on {today_dt}")
+                                    st.info("Balance has been reversed automatically ✅")
+                                    
+                                    time.sleep(2)
+                                    st.rerun()
+                                else:
+                                    st.error("No entries found for this customer today")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
         else:
             st.info("No bills generated today yet.")
     else:
