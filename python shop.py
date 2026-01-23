@@ -535,7 +535,8 @@ if menu == "📊 Dashboard":
     col1.metric("💰 Total Sale", f"₹{month_sale:,.2f}")
     col2.metric("🛒 Total Purchase", f"₹{month_purchase:,.2f}")
     col3.metric("💸 Total Expense", f"₹{month_expense:,.2f}")
-    col4.metric("📊 Profit", f"₹{month_profit:,.2f}")elif menu == "🧾 Billing":
+    col4.metric("📊 Profit", f"₹{month_profit:,.2f}")
+elif menu == "🧾 Billing":
     st.header("🧾 Billing & Royalty Club")
     inv_df = load_data("Inventory")
     s_df = load_data("Sales")
@@ -1883,4 +1884,5 @@ elif menu == "🔐 Security & Compliance":
 # ========================================
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
