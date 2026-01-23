@@ -843,25 +843,14 @@ elif menu == "🧾 Billing":
         else:
             st.metric("👑 Available Points", 0)
     
-    # GST Option Checkbox and Loyalty Points Option
+    # Payment options - simplified
     col1, col2, col3 = st.columns(3)
     with col1:
         pay_m = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar"])
     with col2:
-        gst_bill = st.checkbox("📄 GST Bill Required?", value=False, help="Check if customer needs GST invoice")
-    with col3:
         give_points = st.checkbox("👑 Give Loyalty Points?", value=True, help="Uncheck if customer should not receive points")
-    
-    # Show GST fields only if checkbox is checked
-    if gst_bill:
-        st.info("📄 GST Invoice Details Required")
-        col1, col2 = st.columns(2)
-        with col1:
-            c_gstin = st.text_input("Customer GSTIN (Optional)", placeholder="Enter if available", help="Leave empty for B2C")
-            c_address = st.text_area("Billing Address", placeholder="Required for GST invoice")
-        with col2:
-            gst_rate = st.selectbox("GST Rate %", [5, 12, 18, 28], index=2, help="Select applicable GST rate")
-            st.info(f"Selected: {gst_rate}% GST\nCGST: {gst_rate/2}% | SGST: {gst_rate/2}%")
+    with col3:
+        gst_bill = st.checkbox("📄 GST Invoice?", value=False, help="For GST customers")
     
     with st.expander("🛒 Add Item", expanded=True):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
@@ -873,11 +862,24 @@ elif menu == "🧾 Billing":
             
             if not product_stock.empty:
                 # Get latest quantity entry (last row for this product)
-                latest_qty = product_stock.iloc[-1, 1] if len(product_stock.columns) > 1 else "N/A"
-                latest_rate = product_stock.iloc[-1, 3] if len(product_stock.columns) > 3 else "N/A"
+                raw_qty = product_stock.iloc[-1, 1] if len(product_stock.columns) > 1 else "N/A"
+                raw_rate = product_stock.iloc[-1, 3] if len(product_stock.columns) > 3 else "N/A"
                 
-                # Display stock info
-                st.info(f"📦 **Available Stock:** {latest_qty} | **Purchase Rate:** ₹{latest_rate}")
+                # Parse qty properly
+                try:
+                    qty_str = str(raw_qty).strip()
+                    if qty_str.lower() == 'stock' or qty_str == 'nan':
+                        display_qty = "Not Available"
+                    else:
+                        display_qty = qty_str
+                except:
+                    display_qty = str(raw_qty)
+                
+                # Display stock info with better formatting
+                if display_qty == "Not Available":
+                    st.warning(f"⚠️ **Stock info not available** | **Purchase Rate:** ₹{raw_rate}")
+                else:
+                    st.success(f"✅ **Available Stock:** {display_qty} | **Purchase Rate:** ₹{raw_rate}")
             else:
                 st.warning("⚠️ No stock information available")
         
@@ -946,21 +948,21 @@ elif menu == "🧾 Billing":
         # Show GST calculation if GST bill is selected
         if gst_bill:
             st.divider()
-            st.markdown("### 💼 GST Invoice Calculation")
+            st.markdown("### 💼 With GST (18%)")
             
-            # Calculate GST amounts
-            taxable_amount = total_amt / (1 + gst_rate/100)
+            # Calculate GST amounts (fixed 18%)
+            gst_rate = 18
+            taxable_amount = total_amt / 1.18
             gst_amount = total_amt - taxable_amount
             cgst = gst_amount / 2
             sgst = gst_amount / 2
             
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("💰 Taxable Amount", f"₹{taxable_amount:.2f}")
-            col2.metric(f"🔴 CGST ({gst_rate/2}%)", f"₹{cgst:.2f}")
-            col3.metric(f"🔵 SGST ({gst_rate/2}%)", f"₹{sgst:.2f}")
-            col4.metric("📊 Total GST", f"₹{gst_amount:.2f}")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("💰 Taxable", f"₹{taxable_amount:.2f}")
+            col2.metric("🔴 CGST (9%)", f"₹{cgst:.2f}")
+            col3.metric("🔵 SGST (9%)", f"₹{sgst:.2f}")
             
-            st.success(f"💳 **Grand Total (with GST): ₹{total_amt:,.2f}**")
+            st.success(f"💳 **Total with GST: ₹{total_amt:,.2f}**")
         else:
             st.subheader(f"💰 Total: ₹{total_amt:,.2f}")
         
