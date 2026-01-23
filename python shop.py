@@ -1192,9 +1192,13 @@ Total GST: ₹{gst_amount:.2f}"""
 elif menu == "📦 Purchase":
     st.header("📦 Purchase Entry")
     
-    # Initialize purchase cart
+    # Initialize ALL session states at top
     if 'purchase_cart' not in st.session_state:
         st.session_state.purchase_cart = []
+    if 'adding_new_item' not in st.session_state:
+        st.session_state.adding_new_item = False
+    if 'new_item_name_temp' not in st.session_state:
+        st.session_state.new_item_name_temp = ""
     
     # Payment selection at top
     st.markdown("### 💰 Payment Method")
@@ -1223,13 +1227,10 @@ elif menu == "📦 Purchase":
         # Load inventory for stock checking
         inv_df = load_data("Inventory")
         
-        # Initialize new item flag in session state
-        if 'adding_new_item' not in st.session_state:
-            st.session_state.adding_new_item = False
-        if 'new_item_name_temp' not in st.session_state:
-            st.session_state.new_item_name_temp = ""
-        
         col1, col2, col3, col4 = st.columns(4)
+        
+        # Initialize item_name to avoid undefined variable error
+        item_name = ""
         
         with col1:
             # Check if we have existing items
