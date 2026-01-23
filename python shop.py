@@ -1237,57 +1237,54 @@ elif menu == "📦 Purchase":
             if not inv_df.empty:
                 existing_items = inv_df.iloc[:, 0].unique().tolist()
                 
-                # If not adding new item, show dropdown
-                if not st.session_state.adding_new_item:
-                    item_selection = st.selectbox(
-                        "Item Name", 
-                        ["(Select Item)"] + existing_items + ["━━━━━━━━━━", "➕ ADD NEW ITEM"], 
-                        key="item_select"
-                    )
-                    
-                    # Check if user selected "Add New Item"
-                    if item_selection == "➕ ADD NEW ITEM":
-                        st.session_state.adding_new_item = True
-                        st.session_state.new_item_name_temp = ""
-                        st.rerun()
-                    elif item_selection == "━━━━━━━━━━" or item_selection == "(Select Item)":
-                        item_name = ""
-                    else:
-                        item_name = item_selection
+                # SHOW BOTH: Dropdown AND Text Input
+                st.markdown("**Select OR Type:**")
+                
+                # Dropdown for existing items
+                item_from_dropdown = st.selectbox(
+                    "Existing Items", 
+                    ["(Select existing item)"] + existing_items,
+                    key="item_dropdown",
+                    label_visibility="collapsed"
+                )
+                
+                st.markdown("**OR**")
+                
+                # Text input for new items
+                item_from_text = st.text_input(
+                    "Type new item name",
+                    key="new_item_text",
+                    placeholder="Type new product name here",
+                    label_visibility="collapsed"
+                )
+                
+                # Priority: Text input > Dropdown
+                if item_from_text and item_from_text.strip():
+                    item_name = item_from_text.strip()
+                    is_new_item = item_name not in existing_items
+                elif item_from_dropdown and item_from_dropdown != "(Select existing item)":
+                    item_name = item_from_dropdown
+                    is_new_item = False
                 else:
-                    # Show text input for new item with back button
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        new_name = st.text_input(
-                            "New Item Name", 
-                            value=st.session_state.new_item_name_temp,
-                            key="new_item_input",
-                            placeholder="Type new product name"
-                        )
-                        st.session_state.new_item_name_temp = new_name
-                        item_name = new_name
-                    with col_b:
-                        st.write("")
-                        st.write("")
-                        if st.button("🔙", help="Back to dropdown"):
-                            st.session_state.adding_new_item = False
-                            st.session_state.new_item_name_temp = ""
-                            st.rerun()
+                    item_name = ""
+                    is_new_item = False
             else:
-                item_name = st.text_input("Item Name", key="item_name")
+                # No existing items, just show text input
+                item_name = st.text_input("Item Name", key="item_name_only")
+                is_new_item = True
         
-        # Show current stock if item exists
-        if item_name and item_name != "" and not st.session_state.adding_new_item and not inv_df.empty:
+        # Show current stock OR new item message
+        if item_name and item_name != "" and not inv_df.empty:
             product_stock = inv_df[inv_df.iloc[:, 0] == item_name]
             
-            if not product_stock.empty:
-                # Get current stock - B=Qty, C=Unit
+            if not product_stock.empty and not is_new_item:
+                # Existing item - show stock
                 current_qty = pd.to_numeric(product_stock.iloc[:, 1], errors='coerce').sum()
                 last_unit = product_stock.iloc[-1, 2] if len(product_stock.columns) > 2 else ""
                 
                 st.info(f"📦 **Current Stock:** {current_qty} {last_unit}")
-        elif st.session_state.adding_new_item and item_name:
-            st.success("✨ **New Item** - No existing stock")
+            elif is_new_item or item_name not in [item['Item'] for item in st.session_state.purchase_cart]:
+                st.success("✨ **New Item** - First time purchase")
         
         with col2:
             qty = st.number_input("Quantity", min_value=0.1, value=1.0, step=0.1, key="qty_input")
@@ -1297,7 +1294,7 @@ elif menu == "📦 Purchase":
             rate = st.number_input("Rate/Unit", min_value=0.0, value=0.0, step=1.0, key="rate_input")
         
         # Show stock calculation when qty is entered
-        if item_name and item_name not in ["", "➕ Add New Item"] and qty > 0 and not inv_df.empty:
+        if item_name and item_name != "" and qty > 0 and not inv_df.empty and not is_new_item:
             product_stock = inv_df[inv_df.iloc[:, 0] == item_name]
             if not product_stock.empty:
                 current_qty_num = pd.to_numeric(product_stock.iloc[:, 1], errors='coerce').sum()
@@ -1321,17 +1318,12 @@ elif menu == "📦 Purchase":
                         'Amount': qty * rate
                     })
                     
-                    # Reset new item state
-                    if st.session_state.adding_new_item:
-                        st.session_state.adding_new_item = False
-                        st.session_state.new_item_name_temp = ""
-                    
                     st.success(f"✅ Added {item_name}")
-                    time.sleep(0.5)
+                    time.sleep(0.3)
                     st.rerun()
                 else:
                     if not item_name or not item_name.strip():
-                        st.error("⚠️ Please enter item name!")
+                        st.error("⚠️ Please select or type item name!")
                     else:
                         st.error("⚠️ Fill all fields properly!")
         
