@@ -1229,16 +1229,18 @@ elif menu == "📦 Purchase":
             # Check if we have existing items
             if not inv_df.empty:
                 existing_items = inv_df.iloc[:, 0].unique().tolist()
-                item_name = st.selectbox("Item Name", [""] + existing_items + ["+ Add New Item"], key="item_select")
+                item_selection = st.selectbox("Item Name", [""] + existing_items + ["➕ Add New Item"], key="item_select")
                 
                 # If "+ Add New Item" selected, show text input
-                if item_name == "+ Add New Item":
-                    item_name = st.text_input("Enter New Item Name", key="new_item_name")
+                if item_selection == "➕ Add New Item":
+                    item_name = st.text_input("Enter New Item Name", key="new_item_name", placeholder="Type new product name")
+                else:
+                    item_name = item_selection
             else:
                 item_name = st.text_input("Item Name", key="item_name")
         
         # Show current stock if item exists
-        if item_name and item_name != "" and item_name != "+ Add New Item" and not inv_df.empty:
+        if item_name and item_name != "" and item_name != "➕ Add New Item" and not inv_df.empty:
             product_stock = inv_df[inv_df.iloc[:, 0] == item_name]
             
             if not product_stock.empty:
@@ -1258,7 +1260,7 @@ elif menu == "📦 Purchase":
             rate = st.number_input("Rate/Unit", min_value=0.0, value=0.0, step=1.0, key="rate_input")
         
         # Show stock calculation when qty is entered
-        if item_name and item_name not in ["", "+ Add New Item"] and qty > 0 and not inv_df.empty:
+        if item_name and item_name not in ["", "➕ Add New Item"] and qty > 0 and not inv_df.empty:
             product_stock = inv_df[inv_df.iloc[:, 0] == item_name]
             if not product_stock.empty:
                 current_qty_num = pd.to_numeric(product_stock.iloc[:, 1], errors='coerce').sum()
@@ -1272,9 +1274,10 @@ elif menu == "📦 Purchase":
         col1, col2 = st.columns([1, 3])
         with col1:
             if st.button("➕ Add to Cart", type="primary", use_container_width=True):
-                if item_name and item_name not in ["", "+ Add New Item"] and qty > 0 and rate > 0:
+                # Validate: item_name should not be empty or the selection option itself
+                if item_name and item_name.strip() and item_name != "➕ Add New Item" and qty > 0 and rate > 0:
                     st.session_state.purchase_cart.append({
-                        'Item': item_name,
+                        'Item': item_name.strip(),
                         'Qty': qty,
                         'Unit': unit,
                         'Rate': rate,
@@ -1284,7 +1287,10 @@ elif menu == "📦 Purchase":
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.error("⚠️ Fill all fields properly!")
+                    if not item_name or item_name == "➕ Add New Item" or not item_name.strip():
+                        st.error("⚠️ Please enter item name!")
+                    else:
+                        st.error("⚠️ Fill all fields properly!")
         
         with col2:
             if st.button("🗑️ Clear Cart", use_container_width=True):
