@@ -368,6 +368,24 @@ if menu == "📊 Dashboard":
     online_bal = get_current_balance("Online")
     total_bal = cash_bal + online_bal
     
+    # Customer Udhaar Calculation
+    k_df = load_data("CustomerKhata")
+    if not k_df.empty and len(k_df.columns) > 1:
+        customer_udhaar = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum()
+        total_customer_udhaar = customer_udhaar[customer_udhaar > 0].sum()
+    else:
+        total_customer_udhaar = 0
+    
+    # Stock Value Calculation
+    inv_df = load_data("Inventory")
+    if not inv_df.empty and len(inv_df.columns) > 3:
+        inv_df['qty_val'] = pd.to_numeric(inv_df.iloc[:, 1], errors='coerce').fillna(0)
+        inv_df['rate_val'] = pd.to_numeric(inv_df.iloc[:, 3], errors='coerce').fillna(0)
+        inv_df['total_val'] = inv_df['qty_val'] * inv_df['rate_val']
+        total_stock_value = inv_df['total_val'].sum()
+    else:
+        total_stock_value = 0
+    
     st.markdown(f"""
     <div style="display: flex; gap: 15px; margin-bottom: 30px;">
         <div style="flex: 1; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
@@ -381,6 +399,14 @@ if menu == "📊 Dashboard":
         <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 16px;">⚡ Total</p>
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_bal:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">📒 Customer Udhaar</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_customer_udhaar:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
+            <p style="margin: 0; font-size: 16px;">📦 Stock Value</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_stock_value:,.2f}</h2>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -418,19 +444,98 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
     
+    # Today's Sales
     if not s_df.empty and 'Date' in s_df.columns:
         s_today = s_df[s_df['Date'] == today_dt]
         today_sale = pd.to_numeric(s_today.iloc[:, 3], errors='coerce').sum() if not s_today.empty else 0
     else:
         today_sale = 0
     
-    col1, col2 = st.columns(2)
+    # Today's Purchases
+    p_df = load_data("Inventory")
+    if not p_df.empty and len(p_df.columns) > 5:
+        try:
+            p_df['pur_date'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce').dt.date
+            p_today = p_df[p_df['pur_date'] == today_dt]
+            today_purchase = pd.to_numeric(p_today.iloc[:, 4], errors='coerce').sum() if not p_today.empty else 0
+        except:
+            today_purchase = 0
+    else:
+        today_purchase = 0
+    
+    # Today's Expenses
+    if not e_df.empty and len(e_df.columns) > 2:
+        try:
+            e_df['exp_date'] = pd.to_datetime(e_df.iloc[:, 0], errors='coerce').dt.date
+            e_today = e_df[e_df['exp_date'] == today_dt]
+            today_expense = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty else 0
+        except:
+            today_expense = 0
+    else:
+        today_expense = 0
+    
+    # Today's Profit
+    if not s_df.empty and len(s_df.columns) > 7 and 'Date' in s_df.columns:
+        s_today_profit = s_df[s_df['Date'] == today_dt]
+        today_profit = pd.to_numeric(s_today_profit.iloc[:, 7], errors='coerce').sum() if not s_today_profit.empty else 0
+    else:
+        today_profit = 0
+    
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("💰 Total Sale", f"₹{today_sale:,.2f}")
-    col2.metric("📊 Status", "Active")
-# ========================================
-# MENU 2: BILLING (WITH BUG FIXES)
-# ========================================
-elif menu == "🧾 Billing":
+    col2.metric("🛒 Total Purchase", f"₹{today_purchase:,.2f}")
+    col3.metric("💸 Total Expense", f"₹{today_expense:,.2f}")
+    col4.metric("📊 Profit", f"₹{today_profit:,.2f}")
+    
+    st.divider()
+    
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 15px; margin-bottom: 25px;">
+        <h2 style="color: white; margin: 0; text-align: center;">📅 This Month Report - {curr_m_name} {datetime.now().year}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # This Month's Sales
+    if not s_df.empty and 'Date' in s_df.columns:
+        s_month = s_df[s_df['Date'].apply(lambda x: x.month == curr_m if isinstance(x, date) else False)]
+        month_sale = pd.to_numeric(s_month.iloc[:, 3], errors='coerce').sum() if not s_month.empty else 0
+    else:
+        month_sale = 0
+    
+    # This Month's Purchases
+    if not p_df.empty and len(p_df.columns) > 5:
+        try:
+            p_df['pur_date'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce').dt.date
+            p_month = p_df[p_df['pur_date'].apply(lambda x: x.month == curr_m if isinstance(x, date) else False)]
+            month_purchase = pd.to_numeric(p_month.iloc[:, 4], errors='coerce').sum() if not p_month.empty else 0
+        except:
+            month_purchase = 0
+    else:
+        month_purchase = 0
+    
+    # This Month's Expenses
+    if not e_df.empty and len(e_df.columns) > 2:
+        try:
+            e_df['exp_date'] = pd.to_datetime(e_df.iloc[:, 0], errors='coerce').dt.date
+            e_month = e_df[e_df['exp_date'].apply(lambda x: x.month == curr_m if isinstance(x, date) else False)]
+            month_expense = pd.to_numeric(e_month.iloc[:, 2], errors='coerce').sum() if not e_month.empty else 0
+        except:
+            month_expense = 0
+    else:
+        month_expense = 0
+    
+    # This Month's Profit
+    if not s_df.empty and len(s_df.columns) > 7 and 'Date' in s_df.columns:
+        s_month_profit = s_df[s_df['Date'].apply(lambda x: x.month == curr_m if isinstance(x, date) else False)]
+        month_profit = pd.to_numeric(s_month_profit.iloc[:, 7], errors='coerce').sum() if not s_month_profit.empty else 0
+    else:
+        month_profit = 0
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("💰 Total Sale", f"₹{month_sale:,.2f}")
+    col2.metric("🛒 Total Purchase", f"₹{month_purchase:,.2f}")
+    col3.metric("💸 Total Expense", f"₹{month_expense:,.2f}")
+    col4.metric("📊 Profit", f"₹{month_profit:,.2f}")elif menu == "🧾 Billing":
     st.header("🧾 Billing & Royalty Club")
     inv_df = load_data("Inventory")
     s_df = load_data("Sales")
@@ -1778,3 +1883,4 @@ elif menu == "🔐 Security & Compliance":
 # ========================================
 else:
     st.info(f"Module: {menu} - Feature under development")
+
