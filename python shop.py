@@ -855,31 +855,22 @@ elif menu == "🧾 Billing":
     with st.expander("🛒 Add Item", expanded=True):
         it = st.selectbox("Product", inv_df.iloc[:, 0].unique() if not inv_df.empty else ["No Stock"])
         
-        # Show available stock for selected product
+        # Show available stock for selected product (NEW STRUCTURE)
         if it and it != "No Stock" and not inv_df.empty:
             # Get all entries for this product
             product_stock = inv_df[inv_df.iloc[:, 0] == it]
             
             if not product_stock.empty:
-                # Get latest quantity entry (last row for this product)
-                raw_qty = product_stock.iloc[-1, 1] if len(product_stock.columns) > 1 else "N/A"
-                raw_rate = product_stock.iloc[-1, 3] if len(product_stock.columns) > 3 else "N/A"
+                # Get latest entry - B=Qty(number), C=Unit, D=Rate
+                latest_qty_num = product_stock.iloc[-1, 1] if len(product_stock.columns) > 1 else 0
+                latest_unit = product_stock.iloc[-1, 2] if len(product_stock.columns) > 2 else ""
+                latest_rate = product_stock.iloc[-1, 3] if len(product_stock.columns) > 3 else 0
                 
-                # Parse qty properly
-                try:
-                    qty_str = str(raw_qty).strip()
-                    if qty_str.lower() == 'stock' or qty_str == 'nan':
-                        display_qty = "Not Available"
-                    else:
-                        display_qty = qty_str
-                except:
-                    display_qty = str(raw_qty)
+                # Combine Qty + Unit
+                display_qty = f"{latest_qty_num} {latest_unit}".strip()
                 
-                # Display stock info with better formatting
-                if display_qty == "Not Available":
-                    st.warning(f"⚠️ **Stock info not available** | **Purchase Rate:** ₹{raw_rate}")
-                else:
-                    st.success(f"✅ **Available Stock:** {display_qty} | **Purchase Rate:** ₹{raw_rate}")
+                # Display stock info
+                st.success(f"✅ **Available Stock:** {display_qty} | **Purchase Rate:** ₹{latest_rate}")
             else:
                 st.warning("⚠️ No stock information available")
         
@@ -1289,16 +1280,22 @@ elif menu == "📦 Purchase":
             st.error("⚠️ Please enter Party/Supplier name above!")
         else:
             if st.button("💾 SAVE PURCHASE", type="primary", use_container_width=True):
-                # Save all items to Inventory
+                # Save all items to Inventory with NEW structure
                 for item in st.session_state.purchase_cart:
                     payment_info = payment_mode if not supplier_name else f"Party: {supplier_name}"
+                    
+                    # Calculate total value
+                    total_value = item['Qty'] * item['Rate']
+                    
+                    # NEW STRUCTURE: A=Item, B=Qty(number), C=Unit, D=Rate, E=TotalValue, F=Date, G=Payment
                     save_data("Inventory", [
-                        item['Item'],
-                        f"{item['Qty']} {item['Unit']}",
-                        "Stock",
-                        item['Rate'],
-                        str(today_dt),
-                        payment_info
+                        item['Item'],           # A: Item
+                        item['Qty'],            # B: Qty (number only)
+                        item['Unit'],           # C: Unit
+                        item['Rate'],           # D: Rate
+                        total_value,            # E: Total Value
+                        str(today_dt),          # F: Date
+                        payment_info            # G: Payment
                     ])
                 
                 # Handle payment
@@ -1455,23 +1452,10 @@ elif menu == "📋 Live Stock":
     st.header("📋 Live Stock")
     i_df = load_data("Inventory")
     
-    if not i_df.empty and len(i_df.columns) > 3:
-        # Better qty parsing - handle "Stock", "20.0 Kg", numbers, etc.
-        def parse_qty(val):
-            try:
-                val_str = str(val).strip()
-                # If it's "Stock" or empty, return 0
-                if val_str.lower() == 'stock' or val_str == '' or val_str == 'nan':
-                    return 0
-                # If it has space (like "20.0 Kg"), take first part
-                if ' ' in val_str:
-                    return float(val_str.split()[0])
-                # Otherwise try direct conversion
-                return float(val_str)
-            except:
-                return 0
-        
-        i_df['qty_v'] = i_df.iloc[:, 1].apply(parse_qty)
+    if not i_df.empty and len(i_df.columns) > 4:
+        # NEW STRUCTURE: B=Qty(number), C=Unit, D=Rate, E=TotalValue
+        # Parse qty directly as it's already a number
+        i_df['qty_v'] = pd.to_numeric(i_df.iloc[:, 1], errors='coerce').fillna(0)
         i_df['rate_v'] = pd.to_numeric(i_df.iloc[:, 3], errors='coerce').fillna(0)
         i_df['value'] = i_df['qty_v'] * i_df['rate_v']
         t_v = i_df['value'].sum()
@@ -1479,12 +1463,16 @@ elif menu == "📋 Live Stock":
         st.subheader(f"💰 Total Stock Value: ₹{t_v:,.2f}")
         
         stock_summary = i_df.groupby(i_df.columns[0]).agg({
-            i_df.columns[1]: 'last',
-            i_df.columns[3]: 'last',
+            i_df.columns[1]: 'last',  # Qty (number)
+            i_df.columns[2]: 'last',  # Unit
+            i_df.columns[3]: 'last',  # Rate
             'qty_v': 'last',
             'value': 'last'
         }).reset_index()
-        stock_summary.columns = ['Item', 'Quantity', 'Rate', 'Qty_Numeric', 'Value']
+        stock_summary.columns = ['Item', 'Qty_Num', 'Unit', 'Rate', 'Qty_Numeric', 'Value']
+        
+        # Combine Qty + Unit for display
+        stock_summary['Quantity'] = stock_summary['Qty_Num'].astype(str) + ' ' + stock_summary['Unit'].astype(str)
         
         # Separate low stock items
         low_stock_items = []
