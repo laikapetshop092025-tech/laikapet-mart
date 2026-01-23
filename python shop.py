@@ -935,20 +935,36 @@ elif menu == "🧾 Billing":
                 st.error("⚠️ Please enter valid Qty and Price!")
     
     if st.session_state.bill_cart:
-        # Create formatted dataframe for display
-        cart_display = pd.DataFrame(st.session_state.bill_cart)
+        st.divider()
+        st.markdown("### 🛒 Cart Items")
         
-        # Format columns for better display
-        if not cart_display.empty:
-            # Ensure all values are properly formatted
-            display_df = pd.DataFrame({
-                'Item': cart_display['Item'],
-                'Qty': cart_display['Qty'],
-                'Price': cart_display['Price'].apply(lambda x: f"₹{x:,.2f}"),
-                'Profit': cart_display['Profit'].apply(lambda x: f"₹{x:,.2f}"),
-                'Points': cart_display['Pts']
-            })
-            st.table(display_df)
+        # Display each item with delete button
+        for idx, item in enumerate(st.session_state.bill_cart):
+            col1, col2 = st.columns([9, 1])
+            
+            with col1:
+                # Calculate item total
+                item_total = item['Price']
+                
+                st.markdown(f"""
+                <div style="background: #f0f2f6; padding: 12px; border-radius: 8px; margin: 5px 0;">
+                    <strong>📦 {item['Item']}</strong><br>
+                    <span style="color: #666;">
+                    Qty: {item['Qty']} | Price: ₹{item['Price']:,.2f} | 
+                    Profit: ₹{item['Profit']:,.2f} | Points: {item['Pts']}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.write("")
+                if st.button("❌", key=f"del_bill_{idx}", help="Remove from cart"):
+                    st.session_state.bill_cart.pop(idx)
+                    st.success(f"✅ Removed {item['Item']}")
+                    time.sleep(0.3)
+                    st.rerun()
+        
+        st.divider()
         
         total_amt = sum([item['Price'] for item in st.session_state.bill_cart])
         total_pts = sum([item['Pts'] for item in st.session_state.bill_cart])
