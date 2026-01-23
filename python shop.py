@@ -1260,7 +1260,7 @@ elif menu == "📦 Purchase":
                 
                 # Priority: Text input > Dropdown
                 if item_from_text and item_from_text.strip():
-                    item_name = item_from_text.strip()
+                    item_name = item_from_text.strip().upper()  # Convert to UPPERCASE
                     is_new_item = item_name not in existing_items
                 elif item_from_dropdown and item_from_dropdown != "(Select existing item)":
                     item_name = item_from_dropdown
@@ -1270,7 +1270,8 @@ elif menu == "📦 Purchase":
                     is_new_item = False
             else:
                 # No existing items, just show text input
-                item_name = st.text_input("Item Name", key="item_name_only")
+                item_from_text = st.text_input("Item Name", key="item_name_only")
+                item_name = item_from_text.strip().upper() if item_from_text else ""  # Convert to UPPERCASE
                 is_new_item = True
         
         # Show current stock OR new item message
