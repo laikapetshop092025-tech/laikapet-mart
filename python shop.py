@@ -1011,18 +1011,35 @@ elif menu == "🧾 Billing":
         
         if st.button("✅ Save Bill & Send WhatsApp", type="primary"):
             # Save all items to Sales
+            items_saved = 0
             for item in st.session_state.bill_cart:
-                save_data("Sales", [str(today_dt), item['Item'], item['Qty'], item['Price'], pay_m, f"{c_name}({c_ph})", item['Pts'], item['Profit']])
+                if save_data("Sales", [str(today_dt), item['Item'], item['Qty'], item['Price'], pay_m, f"{c_name}({c_ph})", item['Pts'], item['Profit']]):
+                    items_saved += 1
             
             # Update balance based on payment mode
+            balance_updated = False
             if pay_m == "Cash":
-                update_balance(total_amt, "Cash", 'add')
+                balance_updated = update_balance(total_amt, "Cash", 'add')
+                payment_msg = f"💵 Cash: +₹{total_amt:,.2f}"
             elif pay_m == "Online":
-                update_balance(total_amt, "Online", 'add')
+                balance_updated = update_balance(total_amt, "Online", 'add')
+                payment_msg = f"💳 Online: +₹{total_amt:,.2f}"
             else:  # Udhaar
                 # Add to Customer Khata automatically
                 save_data("CustomerKhata", [f"{c_name}({c_ph})", total_amt, str(today_dt), "Udhaar"])
-                st.success(f"✅ Bill saved as Udhaar! Added to Customer Khata: {c_name}")
+                balance_updated = True
+                payment_msg = f"📝 Udhaar: ₹{total_amt:,.2f} (Added to Customer Khata)"
+            
+            # Show detailed success message
+            st.success(f"""
+✅ **Bill Saved Successfully!**
+
+📊 **Transaction Summary:**
+- Items Saved: {items_saved}/{len(st.session_state.bill_cart)}
+- {payment_msg}
+- Total Amount: ₹{total_amt:,.2f}
+- Customer: {c_name} ({c_ph})
+            """)
             
             # Generate WhatsApp message
             items_text = "\n".join([f"• {item['Item']} - {item['Qty']} - ₹{item['Price']}" for item in st.session_state.bill_cart])
@@ -1074,8 +1091,6 @@ Total GST: ₹{gst_amount:.2f}"""
             import urllib.parse
             encoded_msg = urllib.parse.quote(message)
             whatsapp_url = f"https://wa.me/91{c_ph}?text={encoded_msg}"
-            
-            st.success("✅ Bill saved successfully!")
             
             # Generate PDF
             pdf_data = generate_pdf_bill(c_name, c_ph, st.session_state.bill_cart, total_amt, total_pts, pay_m, str(today_dt))
