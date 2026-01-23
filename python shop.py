@@ -1241,15 +1241,17 @@ elif menu == "📦 Purchase":
                 if not st.session_state.adding_new_item:
                     item_selection = st.selectbox(
                         "Item Name", 
-                        [""] + existing_items + ["➕ Add New Item"], 
+                        ["(Select Item)"] + existing_items + ["━━━━━━━━━━", "➕ ADD NEW ITEM"], 
                         key="item_select"
                     )
                     
                     # Check if user selected "Add New Item"
-                    if item_selection == "➕ Add New Item":
+                    if item_selection == "➕ ADD NEW ITEM":
                         st.session_state.adding_new_item = True
                         st.session_state.new_item_name_temp = ""
                         st.rerun()
+                    elif item_selection == "━━━━━━━━━━" or item_selection == "(Select Item)":
+                        item_name = ""
                     else:
                         item_name = item_selection
                 else:
