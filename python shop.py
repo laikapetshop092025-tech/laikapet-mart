@@ -908,12 +908,15 @@ elif menu == "🧾 Billing":
             if q and q > 0 and p and p > 0:  # Validate inputs
                 pur_r = pd.to_numeric(inv_df[inv_df.iloc[:, 0] == it].iloc[0, 3], errors='coerce') if not inv_df.empty and len(inv_df[inv_df.iloc[:, 0] == it]) > 0 else 0
                 
+                # Calculate TOTAL price (qty × unit_price)
+                total_price = q * p
+                
                 # Calculate points ONLY if give_points is checked
                 pts = 0
                 pts_used = 0
                 
                 if give_points:
-                    pts = int(((q*p)/100) * (5 if is_weekend else 2))
+                    pts = int((total_price/100) * (5 if is_weekend else 2))
                     
                     if rd and pts_bal > 0:
                         pts_used = -int(pts_bal)
@@ -925,7 +928,8 @@ elif menu == "🧾 Billing":
                 st.session_state.bill_cart.append({
                     "Item": it, 
                     "Qty": f"{q} {u}", 
-                    "Price": p, 
+                    "Price": total_price,  # Total price (qty × unit_price)
+                    "UnitPrice": p,  # Unit price for reference
                     "Profit": (p-pur_r)*q, 
                     "Pts": pts,
                     "PtsUsed": pts_used
@@ -943,14 +947,16 @@ elif menu == "🧾 Billing":
             col1, col2 = st.columns([9, 1])
             
             with col1:
-                # Calculate item total
-                item_total = item['Price']
+                # Get unit price if available
+                unit_price = item.get('UnitPrice', item['Price'])
+                total_price = item['Price']
                 
                 st.markdown(f"""
                 <div style="background: #f0f2f6; padding: 12px; border-radius: 8px; margin: 5px 0;">
                     <strong>📦 {item['Item']}</strong><br>
                     <span style="color: #666;">
-                    Qty: {item['Qty']} | Price: ₹{item['Price']:,.2f} | 
+                    Qty: {item['Qty']} | Unit Price: ₹{unit_price:,.2f} | 
+                    <strong style="color: #1f77b4;">Total: ₹{total_price:,.2f}</strong><br>
                     Profit: ₹{item['Profit']:,.2f} | Points: {item['Pts']}
                     </span>
                 </div>
