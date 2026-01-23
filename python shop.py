@@ -1223,7 +1223,7 @@ Total GST: ₹{gst_amount:.2f}"""
                     # Show bill details
                     st.write(f"**Items:** {bill_data['items']}")
                     st.write(f"**Total:** ₹{bill_data['total']:,.2f}")
-                    st.write(f"**Payment:** {bill_data['payment']}")
+                    st.write(f"**Payment:** {bill_data['mode']}")
                     st.write(f"**Points:** {bill_data['points']}")
                     
                     # Delete button
@@ -1245,7 +1245,7 @@ Total GST: ₹{gst_amount:.2f}"""
                                     st.info(f"Found {len(customer_entries)} entries to delete")
                                     
                                     # REVERSE PAYMENT BALANCE
-                                    payment_mode = bill_data['payment']
+                                    payment_mode = bill_data['mode']
                                     bill_amount = bill_data['total']
                                     
                                     if payment_mode == "Cash":
@@ -1489,14 +1489,13 @@ elif menu == "📦 Purchase":
                     # Deduct from balance
                     update_balance(total_amount, payment_mode, 'subtract')
                     st.success(f"✅ Purchase saved! Paid ₹{total_amount:,.2f} from {payment_mode}")
-                else:
+               else:
                     # Add to Supplier Dues
                     if supplier_name and supplier_name.strip():
                         # Create itemized note
                         items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
                         save_data("Dues", [supplier_name, total_amount, str(today_dt), f"Purchase: {items_note}"])
                         st.success(f"✅ Purchase saved! ₹{total_amount:,.2f} added to {supplier_name}'s dues")
-                
                 # Clear cart
                 st.session_state.purchase_cart = []
                 st.balloons()
@@ -7383,3 +7382,4 @@ elif menu == "💼 GST & Invoices":
                 st.success("✅ GST settings saved successfully!")
                 st.info("⚠️ Note: Settings are stored in session. For permanent storage, connect to database.")
             st.info("Note: Some features require additional setup")
+
