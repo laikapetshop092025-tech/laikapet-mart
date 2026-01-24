@@ -2310,49 +2310,71 @@ elif menu == "📈 Advanced Reports":
             st.subheader("🏆 Best Selling Products")
             
             # Group by product
-            product_sales = s_df.groupby(s_df.columns[1]).agg({
-                s_df.columns[3]: 'sum',
-                s_df.columns[1]: 'count'
-            }).reset_index()
-            
-            product_sales.columns = ['Product', 'Revenue', 'Units_Sold']
-            product_sales['Revenue'] = pd.to_numeric(product_sales['Revenue'], errors='coerce')
-            product_sales = product_sales.sort_values('Revenue', ascending=False).head(15)
-            
-            for idx, row in product_sales.iterrows():
-                col1, col2, col3 = st.columns([2, 1, 1])
-                with col1:
-                    st.write(f"**{row['Product']}**")
-                with col2:
-                    st.metric("Revenue", f"₹{row['Revenue']:,.0f}")
-                with col3:
-                    st.metric("Units", f"{row['Units_Sold']}")
+            try:
+                product_sales = s_df.groupby(s_df.columns[1], as_index=False).agg({
+                    s_df.columns[3]: 'sum'
+                })
+                
+                product_sales['Units_Sold'] = s_df.groupby(s_df.columns[1]).size().values
+                product_sales.columns = ['Product', 'Revenue', 'Units_Sold']
+                product_sales['Revenue'] = pd.to_numeric(product_sales['Revenue'], errors='coerce')
+                product_sales = product_sales.sort_values('Revenue', ascending=False).head(15)
+                
+                if not product_sales.empty:
+                    for idx, row in product_sales.iterrows():
+                        col1, col2, col3 = st.columns([2, 1, 1])
+                        with col1:
+                            st.write(f"**{row['Product']}**")
+                        with col2:
+                            st.metric("Revenue", f"₹{row['Revenue']:,.0f}")
+                        with col3:
+                            st.metric("Units", f"{row['Units_Sold']}")
+                else:
+                    st.info("No sales data available")
+            except Exception as e:
+                st.error(f"Error loading best sellers: {str(e)}")
+                st.info("Please check if sales data is available")
         
         with tab2:
             st.subheader("🐌 Slow Moving Products")
             
-            inv_df = load_data("Inventory")
-            if not inv_df.empty:
-                product_movement = s_df.groupby(s_df.columns[1]).size().reset_index(name='transactions')
-                
-                slow_movers = product_movement.sort_values('transactions').head(10)
-                
-                for idx, row in slow_movers.iterrows():
-                    st.warning(f"⚠️ **{row[s_df.columns[1]]}** - Only {row['transactions']} transactions")
+            try:
+                inv_df = load_data("Inventory")
+                if not inv_df.empty and not s_df.empty:
+                    product_movement = s_df.groupby(s_df.columns[1]).size()
+                    product_movement_df = product_movement.reset_index()
+                    product_movement_df.columns = ['Product', 'Transactions']
+                    
+                    slow_movers = product_movement_df.sort_values('Transactions').head(10)
+                    
+                    if not slow_movers.empty:
+                        for idx, row in slow_movers.iterrows():
+                            st.warning(f"⚠️ **{row['Product']}** - Only {row['Transactions']} transactions")
+                    else:
+                        st.info("No slow moving products found")
+                else:
+                    st.info("Inventory or sales data not available")
+            except Exception as e:
+                st.error(f"Error loading slow moving products: {str(e)}")
         
         with tab3:
             st.subheader("💰 Profit Analysis")
             
-            if len(s_df.columns) > 7:
-                total_profit = pd.to_numeric(s_df.iloc[:, 7], errors='coerce').sum()
-                total_revenue = pd.to_numeric(s_df.iloc[:, 3], errors='coerce').sum()
-                
-                profit_margin = (total_profit / total_revenue * 100) if total_revenue > 0 else 0
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Total Revenue", f"₹{total_revenue:,.2f}")
-                col2.metric("Total Profit", f"₹{total_profit:,.2f}")
-                col3.metric("Profit Margin", f"{profit_margin:.1f}%")
+            try:
+                if len(s_df.columns) > 7:
+                    total_profit = pd.to_numeric(s_df.iloc[:, 7], errors='coerce').sum()
+                    total_revenue = pd.to_numeric(s_df.iloc[:, 3], errors='coerce').sum()
+                    
+                    profit_margin = (total_profit / total_revenue * 100) if total_revenue > 0 else 0
+                    
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Total Revenue", f"₹{total_revenue:,.2f}")
+                    col2.metric("Total Profit", f"₹{total_profit:,.2f}")
+                    col3.metric("Profit Margin", f"{profit_margin:.1f}%")
+                else:
+                    st.info("Profit data not available in sales records")
+            except Exception as e:
+                st.error(f"Error loading profit analysis: {str(e)}")
     else:
         st.info("No sales data available")
 
