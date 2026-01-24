@@ -1093,34 +1093,41 @@ elif menu == "🧾 Billing":
         # Royalty Points Section with Checkboxes
         st.markdown("### 👑 Royalty Points & Rewards")
         
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            give_points = st.checkbox("✅ Give Royalty Points", value=True, key="give_points")
-        
-        with col2:
-            if give_points:
-                is_referral = st.checkbox("🎁 Referral Bonus (+10 points)", value=False, key="is_referral")
-            else:
-                is_referral = False
-        
-        with col3:
-            if give_points:
-                st.info("Weekday: 2% | Weekend: 5%")
-        
-        # Calculate Royalty Points
-        if give_points:
-            base_points = int(total * 0.05) if is_weekend else int(total * 0.02)
-            referral_bonus = 10 if is_referral else 0
-            points = base_points + referral_bonus
+        # Check if purchase is above ₹100
+        if total >= 100:
+            col1, col2, col3 = st.columns(3)
             
-            if is_referral:
-                st.success(f"👑 **Total Points: {points}** (Base: {base_points} + Referral Bonus: {referral_bonus})")
+            with col1:
+                give_points = st.checkbox("✅ Give Royalty Points", value=True, key="give_points")
+            
+            with col2:
+                if give_points:
+                    is_referral = st.checkbox("🎁 Referral Bonus (+10 points)", value=False, key="is_referral")
+                else:
+                    is_referral = False
+            
+            with col3:
+                if give_points:
+                    st.info("Weekday: 2% | Weekend: 5%")
+            
+            # Calculate Royalty Points
+            if give_points:
+                base_points = int(total * 0.05) if is_weekend else int(total * 0.02)
+                referral_bonus = 10 if is_referral else 0
+                points = base_points + referral_bonus
+                
+                if is_referral:
+                    st.success(f"👑 **Total Points: {points}** (Base: {base_points} + Referral Bonus: {referral_bonus})")
+                else:
+                    st.success(f"👑 **Total Points: {points}**")
             else:
-                st.success(f"👑 **Total Points: {points}**")
+                points = 0
+                st.info("No points will be awarded for this sale")
         else:
+            # Purchase below ₹100 - No points
             points = 0
-            st.info("No points will be awarded for this sale")
+            st.warning(f"⚠️ Minimum ₹100 purchase required for points. Current: ₹{total:,.2f}")
+            st.info("💡 Add more items to qualify for royalty points!")
         
         st.divider()
         
@@ -1142,6 +1149,19 @@ elif menu == "🧾 Billing":
                         gst_info = f"GST: {gst_rate} | GSTIN: {customer_gstin} | Type: {invoice_type}"
                     else:
                         gst_info = "No GST"
+                    
+                    # Calculate cumulative points for this customer
+                    s_df_points = load_data("Sales")
+                    current_total_points = 0
+                    
+                    if not s_df_points.empty and len(s_df_points.columns) > 6:
+                        # Get all previous sales for this customer
+                        customer_sales = s_df_points[s_df_points.iloc[:, 5].str.contains(cust_name, case=False, na=False)]
+                        if not customer_sales.empty:
+                            current_total_points = pd.to_numeric(customer_sales.iloc[:, 6], errors='coerce').sum()
+                    
+                    # New total points after this sale
+                    new_total_points = current_total_points + points
                     
                     # Save each item in cart
                     for cart_item in st.session_state.bill_cart:
@@ -1220,10 +1240,85 @@ elif menu == "🧾 Billing":
                         st.success(f"🧾 GST Invoice Generated!")
                         st.info(f"📋 GSTIN: {customer_gstin} | Rate: {gst_rate} | Type: {invoice_type}")
                     
-                    st.success(f"✅ Sale completed! {customer_info} earned {points} points 👑")
+                    # Show cumulative points
+                    if points > 0:
+                        st.success(f"✅ Sale completed! {customer_info} earned {points} points this time! 👑")
+                        st.info(f"📊 Total Points: {new_total_points} (Previous: {current_total_points} + New: {points})")
+                    else:
+                        st.success(f"✅ Sale completed!")
+                    
+                    # WhatsApp Message Feature
+                    if cust_phone and cust_phone.strip():
+                        st.divider()
+                        st.markdown("### 📱 Send WhatsApp Message")
+                        
+                        # Clean phone number (remove spaces, dashes, etc.)
+                        clean_phone = ''.join(filter(str.isdigit, cust_phone))
+                        
+                        # Add country code if not present
+                        if not clean_phone.startswith('91') and len(clean_phone) == 10:
+                            clean_phone = '91' + clean_phone
+                        
+                        # Create WhatsApp message
+                        items_list = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.bill_cart])
+                        
+                        message = f"""🐾 *LAIKA PET MART* 🐾
+
+Hello {cust_name}! 
+
+Thank you for shopping with us! 💚
+
+*Bill Details:*
+━━━━━━━━━━━━━━━━
+📦 Items: {items_list}
+💰 Total Amount: ₹{total:,.2f}
+💳 Payment: {payment_mode}
+"""
+                        
+                        if points > 0:
+                            message += f"""
+👑 *Royalty Points Earned:* {points} points
+📊 *Total Points:* {new_total_points} points
+
+💡 Keep collecting points for rewards!
+"""
+                        else:
+                            message += f"""
+💡 Purchase ₹100+ to earn royalty points!
+"""
+                        
+                        if enable_gst:
+                            message += f"""
+🧾 GST Invoice: Yes
+📋 GSTIN: {customer_gstin}
+"""
+                        
+                        message += f"""
+━━━━━━━━━━━━━━━━
+📅 Date: {today_dt.strftime('%d %B %Y')}
+
+Thank you! Visit again soon! 🙏"""
+                        
+                        # URL encode the message
+                        import urllib.parse
+                        encoded_message = urllib.parse.quote(message)
+                        
+                        whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_message}"
+                        
+                        col1, col2 = st.columns([1, 3])
+                        
+                        with col1:
+                            st.success(f"📱 {cust_phone}")
+                        
+                        with col2:
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background: #25D366; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%;">💬 Send WhatsApp Message</button></a>', unsafe_allow_html=True)
+                        
+                        with st.expander("📄 Preview Message"):
+                            st.text(message)
+                    
                     st.session_state.bill_cart = []
                     st.balloons()
-                    time.sleep(2)
+                    time.sleep(3)
                     st.rerun()
             else:
                 st.error("⚠️ Please enter customer name!")
@@ -1774,52 +1869,94 @@ elif menu == "💰 Expenses":
         st.dataframe(e_df, use_container_width=True)
 
 # ========================================
-# MENU 6: PET REGISTER
+# MENU 6: PET REGISTER (Simplified - Only for Pets Being Sold)
 # ========================================
 elif menu == "🐾 Pet Register":
-    st.header("🐾 Pet Registration & Records")
+    st.header("🐾 Pet Register - Pets for Sale")
     
-    tab1, tab2 = st.tabs(["➕ Add New Pet", "📋 View All Pets"])
+    tab1, tab2 = st.tabs(["➕ Add Pet for Sale", "📋 Available Pets"])
     
     with tab1:
         with st.form("pet_reg"):
-            st.subheader("Register New Pet")
+            st.subheader("Register Pet for Sale")
             
             col1, col2 = st.columns(2)
+            
             with col1:
-                pet_name = st.text_input("Pet Name")
-                pet_type = st.selectbox("Pet Type", ["Dog", "Cat", "Bird", "Rabbit", "Hamster", "Fish", "Other"])
-                pet_breed = st.text_input("Breed")
-                pet_age = st.number_input("Age (years)", min_value=0.0, step=0.5)
+                pet_type = st.selectbox("Pet Type", ["Dog", "Cat", "Rabbit", "Bird", "Hamster", "Other"])
+                pet_breed = st.text_input("Breed *", placeholder="e.g., German Shepherd, Persian Cat")
+                pet_age = st.number_input("Age (months)", min_value=0, max_value=120, step=1)
+                pet_price = st.number_input("Selling Price (₹) *", min_value=0, step=100)
             
             with col2:
-                owner_name = st.text_input("Owner Name")
-                owner_phone = st.text_input("Owner Phone")
-                owner_address = st.text_area("Owner Address")
-                vaccination_status = st.selectbox("Vaccination Status", ["Up to date", "Due", "Not vaccinated"])
+                pet_gender = st.selectbox("Gender", ["Male", "Female"])
+                pet_color = st.text_input("Color", placeholder="e.g., Brown, White, Black")
+                
+                # Vaccination details
+                st.markdown("**💉 Vaccination:**")
+                last_vaccine_date = st.date_input("Last Vaccine Date", value=today_dt)
+                next_vaccine_date = st.date_input("Next Vaccine Due", value=today_dt + timedelta(days=30))
             
-            notes = st.text_area("Additional Notes")
+            notes = st.text_area("Additional Notes (Optional)", placeholder="Health status, special features, etc.")
             
-            if st.form_submit_button("💾 Register Pet", type="primary"):
-                if pet_name and owner_name and owner_phone:
+            if st.form_submit_button("💾 Add Pet", type="primary"):
+                if pet_breed and pet_price > 0:
                     save_data("PetRegister", [
-                        str(today_dt), pet_name, pet_type, pet_breed, pet_age,
-                        owner_name, owner_phone, owner_address, vaccination_status, notes
+                        str(today_dt),
+                        pet_type,
+                        pet_breed,
+                        pet_age,
+                        pet_gender,
+                        pet_color,
+                        pet_price,
+                        "Available",
+                        str(last_vaccine_date),
+                        str(next_vaccine_date),
+                        notes
                     ])
-                    st.success(f"✅ {pet_name} registered successfully!")
+                    st.success(f"✅ {pet_type} ({pet_breed}) added for sale at ₹{pet_price}!")
+                    st.info(f"💉 Next vaccine due: {next_vaccine_date.strftime('%d %B %Y')}")
+                    st.balloons()
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error("⚠️ Please fill Pet Name, Owner Name, and Owner Phone!")
+                    st.error("⚠️ Please fill Breed and Price!")
     
     with tab2:
         pets_df = load_data("PetRegister")
         
         if not pets_df.empty:
-            st.subheader(f"📊 Total Registered Pets: {len(pets_df)}")
+            st.subheader(f"📊 Total Pets Available: {len(pets_df)}")
+            
+            # Check for upcoming vaccinations
+            upcoming_vaccines = []
+            if len(pets_df.columns) > 9:
+                for idx, row in pets_df.iterrows():
+                    try:
+                        next_vaccine = pd.to_datetime(row.iloc[9], errors='coerce').date() if len(row) > 9 else None
+                        if next_vaccine:
+                            days_until = (next_vaccine - today_dt).days
+                            if 0 <= days_until <= 7:  # Due within 7 days
+                                upcoming_vaccines.append({
+                                    'pet': f"{row.iloc[1]} - {row.iloc[2]}",
+                                    'date': next_vaccine,
+                                    'days': days_until
+                                })
+                    except:
+                        pass
+            
+            # Show vaccine alerts
+            if upcoming_vaccines:
+                st.warning(f"⚠️ {len(upcoming_vaccines)} pet(s) have vaccination due soon!")
+                for vac in upcoming_vaccines:
+                    if vac['days'] == 0:
+                        st.error(f"🚨 **{vac['pet']}** - Vaccine DUE TODAY!")
+                    else:
+                        st.warning(f"💉 **{vac['pet']}** - Vaccine due in {vac['days']} day(s) ({vac['date'].strftime('%d %b')})")
+                st.divider()
             
             # Search functionality
-            search = st.text_input("🔍 Search by Pet Name or Owner Name/Phone")
+            search = st.text_input("🔍 Search by Type or Breed")
             
             if search:
                 mask = pets_df.apply(lambda row: search.lower() in str(row).lower(), axis=1)
@@ -1827,35 +1964,85 @@ elif menu == "🐾 Pet Register":
             else:
                 filtered_df = pets_df
             
-            # Display pets
+            # Display pets in grid
             for idx, row in filtered_df.iterrows():
-                with st.expander(f"🐾 {row.iloc[1] if len(row) > 1 else 'Pet'} - {row.iloc[2] if len(row) > 2 else ''} ({row.iloc[5] if len(row) > 5 else 'Owner'})"):
+                pet_type = row.iloc[1] if len(row) > 1 else "Pet"
+                pet_breed = row.iloc[2] if len(row) > 2 else "Unknown"
+                pet_price = row.iloc[6] if len(row) > 6 else 0
+                
+                # Check vaccine status
+                vaccine_alert = ""
+                if len(row) > 9:
+                    try:
+                        next_vaccine = pd.to_datetime(row.iloc[9], errors='coerce').date()
+                        if next_vaccine:
+                            days_until = (next_vaccine - today_dt).days
+                            if days_until == 0:
+                                vaccine_alert = "🚨 VACCINE DUE TODAY!"
+                            elif 0 < days_until <= 7:
+                                vaccine_alert = f"⚠️ Vaccine in {days_until} days"
+                    except:
+                        pass
+                
+                title = f"🐾 {pet_type} - {pet_breed} - ₹{pet_price:,.0f}"
+                if vaccine_alert:
+                    title += f" {vaccine_alert}"
+                
+                with st.expander(title):
                     col1, col2, col3 = st.columns([2, 2, 1])
                     
                     with col1:
-                        st.write("**Pet Information:**")
-                        st.write(f"Name: {row.iloc[1] if len(row) > 1 else 'N/A'}")
-                        st.write(f"Type: {row.iloc[2] if len(row) > 2 else 'N/A'}")
-                        st.write(f"Breed: {row.iloc[3] if len(row) > 3 else 'N/A'}")
-                        st.write(f"Age: {row.iloc[4] if len(row) > 4 else 'N/A'} years")
-                        st.write(f"Vaccination: {row.iloc[8] if len(row) > 8 else 'N/A'}")
+                        st.write("**Pet Details:**")
+                        st.write(f"Type: {pet_type}")
+                        st.write(f"Breed: {pet_breed}")
+                        st.write(f"Age: {row.iloc[3] if len(row) > 3 else 'N/A'} months")
                     
                     with col2:
-                        st.write("**Owner Information:**")
-                        st.write(f"Name: {row.iloc[5] if len(row) > 5 else 'N/A'}")
-                        st.write(f"Phone: {row.iloc[6] if len(row) > 6 else 'N/A'}")
-                        st.write(f"Address: {row.iloc[7] if len(row) > 7 else 'N/A'}")
+                        st.write("**Sale Information:**")
+                        st.write(f"Gender: {row.iloc[4] if len(row) > 4 else 'N/A'}")
+                        st.write(f"Color: {row.iloc[5] if len(row) > 5 else 'N/A'}")
+                        st.write(f"**Price: ₹{pet_price:,.0f}**")
+                        st.write(f"Status: {row.iloc[7] if len(row) > 7 else 'Available'}")
+                        
+                        # Vaccination info
+                        if len(row) > 9:
+                            st.divider()
+                            st.write("**💉 Vaccination:**")
+                            try:
+                                last_vac = pd.to_datetime(row.iloc[8], errors='coerce').date() if len(row) > 8 else None
+                                next_vac = pd.to_datetime(row.iloc[9], errors='coerce').date() if len(row) > 9 else None
+                                
+                                if last_vac:
+                                    st.info(f"Last: {last_vac.strftime('%d %b %Y')}")
+                                if next_vac:
+                                    days_until = (next_vac - today_dt).days
+                                    if days_until < 0:
+                                        st.error(f"Next: {next_vac.strftime('%d %b %Y')} (OVERDUE)")
+                                    elif days_until == 0:
+                                        st.error(f"Next: {next_vac.strftime('%d %b %Y')} (TODAY)")
+                                    elif days_until <= 7:
+                                        st.warning(f"Next: {next_vac.strftime('%d %b %Y')} ({days_until} days)")
+                                    else:
+                                        st.success(f"Next: {next_vac.strftime('%d %b %Y')}")
+                            except:
+                                pass
                     
                     with col3:
+                        st.write("**Actions:**")
+                        
+                        if st.button("✅ Sold", key=f"sold_pet_{idx}", type="primary"):
+                            st.success(f"✅ Mark {pet_breed} as SOLD!")
+                            st.warning("⚠️ Please update status to 'SOLD' in Google Sheets")
+                            st.info(f"🔍 Search: {pet_breed} - {today_dt}")
+                        
                         if st.button("🗑️ Delete", key=f"del_pet_{idx}", type="secondary"):
                             st.warning("⚠️ Please manually delete this entry from Google Sheets PetRegister tab")
-                            st.info(f"🔍 Search for: {row.iloc[1]} - {row.iloc[5]}")
-                            st.success("✅ Deletion confirmed. Remove from Google Sheets to complete.")
+                            st.info(f"🔍 Search for: {pet_breed}")
                     
-                    if len(row) > 9 and str(row.iloc[9]).strip():
-                        st.write("**Notes:**", row.iloc[9])
+                    if len(row) > 10 and str(row.iloc[10]).strip():
+                        st.write("**Notes:**", row.iloc[10])
         else:
-            st.info("No pets registered yet. Add your first pet in the 'Add New Pet' tab!")
+            st.info("No pets registered yet. Add your first pet in the 'Add Pet for Sale' tab!")
 
 # ========================================
 # MENU 8: CUSTOMER DUE (renamed from Customer Khata)
