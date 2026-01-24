@@ -478,8 +478,55 @@ if menu == "📊 Dashboard":
     else:
         today_expense = 0
     
-    # Today's REAL Profit (Sale - Purchase Cost - Expenses)
-    today_profit = today_sale - today_purchase - today_expense
+    # Today's REAL Profit (Item-wise calculation from actual purchase rates)
+    today_profit = 0
+    today_profit_details = []
+    
+    if not s_df.empty and 'Date' in s_df.columns:
+        s_today = s_df[s_df['Date'] == today_dt]
+        
+        if not s_today.empty:
+            inv_df_profit = load_data("Inventory")
+            
+            for idx, sale_row in s_today.iterrows():
+                item_name = sale_row.iloc[1] if len(sale_row) > 1 else ""
+                sale_amount = pd.to_numeric(sale_row.iloc[3], errors='coerce') if len(sale_row) > 3 else 0
+                qty_str = str(sale_row.iloc[2]) if len(sale_row) > 2 else "0"
+                
+                # Extract quantity
+                qty_parts = qty_str.split()
+                sold_qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
+                
+                # Get actual purchase rate from inventory
+                if not inv_df_profit.empty and item_name:
+                    item_rows = inv_df_profit[inv_df_profit.iloc[:, 0] == item_name]
+                    
+                    if not item_rows.empty:
+                        # Get average purchase rate
+                        avg_rate = pd.to_numeric(item_rows.iloc[:, 3], errors='coerce').mean()
+                        purchase_cost = sold_qty * avg_rate
+                        item_profit = sale_amount - purchase_cost
+                        
+                        today_profit += item_profit
+                        today_profit_details.append({
+                            'item': item_name,
+                            'sale': sale_amount,
+                            'cost': purchase_cost,
+                            'profit': item_profit
+                        })
+                    else:
+                        # If no purchase record, use 70% cost estimate
+                        purchase_cost = sale_amount * 0.7
+                        item_profit = sale_amount * 0.3
+                        today_profit += item_profit
+                else:
+                    # Fallback
+                    purchase_cost = sale_amount * 0.7
+                    item_profit = sale_amount * 0.3
+                    today_profit += item_profit
+    
+    # Subtract expenses from profit
+    today_profit = today_profit - today_expense
     
     # Colorful Cards for Today
     st.markdown(f"""
@@ -502,6 +549,134 @@ if menu == "📊 Dashboard":
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Show Item-wise Profit Breakdown
+    if today_profit_details:
+        with st.expander("📊 Today's Item-wise Profit Breakdown", expanded=False):
+            st.markdown("### 🔍 How Today's Profit is Calculated")
+            
+            total_gross_profit = 0
+            
+            for detail in today_profit_details:
+                item = detail['item']
+                sale = detail['sale']
+                cost = detail['cost']
+                profit = detail['profit']
+                total_gross_profit += profit
+                
+                profit_percent = (profit / sale * 100) if sale > 0 else 0
+                
+                col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+                
+                with col1:
+                    st.write(f"**{item}**")
+                with col2:
+                    st.success(f"Sale: ₹{sale:,.0f}")
+                with col3:
+                    st.info(f"Cost: ₹{cost:,.0f}")
+                with col4:
+                    st.warning(f"Profit: ₹{profit:,.0f}")
+                with col5:
+                    st.metric("Margin", f"{profit_percent:.1f}%")
+                
+                st.divider()
+            
+            st.markdown("### 💰 Summary")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Total Gross Profit", f"₹{total_gross_profit:,.2f}")
+            with col2:
+                st.metric("Less: Expenses", f"₹{today_expense:,.2f}")
+            with col3:
+                st.metric("Net Profit", f"₹{today_profit:,.2f}", 
+                         delta=f"₹{total_gross_profit - today_expense:,.2f}")
+            
+            st.info(f"💡 **Formula:** Net Profit = (Sale Price - Purchase Cost) - Expenses")
+            st.success(f"✅ **Calculation:** (₹{total_gross_profit:,.2f} gross profit) - (₹{today_expense:,.2f} expenses) = ₹{today_profit:,.2f}")
+    
+    # Manual Correction Settings for Today's Report
+    with st.expander("🔧 Today's Report Settings (Manual Corrections)"):
+        st.success("✅ Auto-calculated from transactions, but you can manually adjust if needed")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("💰 Sales")
+            st.write(f"Current (Auto): ₹{today_sale:,.2f}")
+            manual_today_sale = st.number_input("Correct Today's Sale", value=float(today_sale), step=1.0, key="manual_today_sale")
+            
+            st.divider()
+            
+            st.subheader("🛒 Purchases")
+            st.write(f"Current (Auto): ₹{today_purchase:,.2f}")
+            manual_today_purchase = st.number_input("Correct Today's Purchase", value=float(today_purchase), step=1.0, key="manual_today_purchase")
+        
+        with col2:
+            st.subheader("💸 Expenses")
+            st.write(f"Current (Auto): ₹{today_expense:,.2f}")
+            manual_today_expense = st.number_input("Correct Today's Expense", value=float(today_expense), step=1.0, key="manual_today_expense")
+            
+            st.divider()
+            
+            st.subheader("📊 Profit (Auto-calculated)")
+            manual_profit = manual_today_sale - manual_today_purchase - manual_today_expense
+            st.metric("Corrected Profit", f"₹{manual_profit:,.2f}")
+        
+        st.divider()
+        
+        if manual_today_sale != today_sale or manual_today_purchase != today_purchase or manual_today_expense != today_expense:
+            st.warning("⚠️ You have made manual corrections!")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.info(f"**Sale:** ₹{today_sale:,.2f} → ₹{manual_today_sale:,.2f}")
+            with col2:
+                st.info(f"**Purchase:** ₹{today_purchase:,.2f} → ₹{manual_today_purchase:,.2f}")
+            with col3:
+                st.info(f"**Expense:** ₹{today_expense:,.2f} → ₹{manual_today_expense:,.2f}")
+            
+            st.markdown("### 📊 Corrected Summary")
+            
+            st.markdown(f"""
+            <div style="display: flex; gap: 15px; margin-top: 20px;">
+                <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">💰 Corrected Sale</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_today_sale:,.2f}</h2>
+                </div>
+                <div style="flex: 1; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">🛒 Corrected Purchase</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_today_purchase:,.2f}</h2>
+                </div>
+                <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">💸 Corrected Expense</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_today_expense:,.2f}</h2>
+                </div>
+                <div style="flex: 1; background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">✨ Corrected Profit</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_profit:,.2f}</h2>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("💾 Save Corrected Values", type="primary", use_container_width=True):
+                # Save corrections to a special sheet for reference
+                save_data("DailyCorrections", [
+                    str(today_dt),
+                    manual_today_sale,
+                    manual_today_purchase,
+                    manual_today_expense,
+                    manual_profit,
+                    f"Auto: Sale={today_sale}, Purchase={today_purchase}, Expense={today_expense}"
+                ])
+                st.success("✅ Manual corrections saved for today's report!")
+                st.balloons()
+                time.sleep(1)
+                st.rerun()
+        else:
+            st.success("✅ All values match auto-calculated amounts")
     
     st.divider()
     
@@ -540,8 +715,60 @@ if menu == "📊 Dashboard":
     else:
         month_expense = 0
     
-    # This Month's REAL Profit (Sale - Purchase Cost - Expenses)
-    month_profit = month_sale - month_purchase - month_expense
+    # This Month's REAL Profit (Item-wise calculation from actual purchase rates)
+    month_profit = 0
+    month_profit_details = []
+    
+    if not s_df.empty and 'Date' in s_df.columns:
+        s_month = s_df[s_df['Date'].apply(lambda x: x.month == curr_m if isinstance(x, date) else False)]
+        
+        if not s_month.empty:
+            inv_df_profit = load_data("Inventory")
+            
+            for idx, sale_row in s_month.iterrows():
+                item_name = sale_row.iloc[1] if len(sale_row) > 1 else ""
+                sale_amount = pd.to_numeric(sale_row.iloc[3], errors='coerce') if len(sale_row) > 3 else 0
+                qty_str = str(sale_row.iloc[2]) if len(sale_row) > 2 else "0"
+                
+                # Extract quantity
+                qty_parts = qty_str.split()
+                sold_qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
+                
+                # Get actual purchase rate from inventory
+                if not inv_df_profit.empty and item_name:
+                    item_rows = inv_df_profit[inv_df_profit.iloc[:, 0] == item_name]
+                    
+                    if not item_rows.empty:
+                        avg_rate = pd.to_numeric(item_rows.iloc[:, 3], errors='coerce').mean()
+                        purchase_cost = sold_qty * avg_rate
+                        item_profit = sale_amount - purchase_cost
+                        
+                        month_profit += item_profit
+                        
+                        # Add to details (group by item)
+                        existing = next((x for x in month_profit_details if x['item'] == item_name), None)
+                        if existing:
+                            existing['sale'] += sale_amount
+                            existing['cost'] += purchase_cost
+                            existing['profit'] += item_profit
+                        else:
+                            month_profit_details.append({
+                                'item': item_name,
+                                'sale': sale_amount,
+                                'cost': purchase_cost,
+                                'profit': item_profit
+                            })
+                    else:
+                        purchase_cost = sale_amount * 0.7
+                        item_profit = sale_amount * 0.3
+                        month_profit += item_profit
+                else:
+                    purchase_cost = sale_amount * 0.7
+                    item_profit = sale_amount * 0.3
+                    month_profit += item_profit
+    
+    # Subtract expenses from profit
+    month_profit = month_profit - month_expense
     
     # Colorful Cards for Monthly
     st.markdown(f"""
@@ -564,6 +791,139 @@ if menu == "📊 Dashboard":
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Show Monthly Item-wise Profit Breakdown
+    if month_profit_details:
+        with st.expander(f"📊 {curr_m_name}'s Item-wise Profit Breakdown", expanded=False):
+            st.markdown(f"### 🔍 How {curr_m_name}'s Profit is Calculated")
+            
+            # Sort by profit descending
+            month_profit_details.sort(key=lambda x: x['profit'], reverse=True)
+            
+            total_gross_profit = 0
+            
+            for detail in month_profit_details:
+                item = detail['item']
+                sale = detail['sale']
+                cost = detail['cost']
+                profit = detail['profit']
+                total_gross_profit += profit
+                
+                profit_percent = (profit / sale * 100) if sale > 0 else 0
+                
+                col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+                
+                with col1:
+                    st.write(f"**{item}**")
+                with col2:
+                    st.success(f"Sale: ₹{sale:,.0f}")
+                with col3:
+                    st.info(f"Cost: ₹{cost:,.0f}")
+                with col4:
+                    st.warning(f"Profit: ₹{profit:,.0f}")
+                with col5:
+                    st.metric("Margin", f"{profit_percent:.1f}%")
+                
+                st.divider()
+            
+            st.markdown("### 💰 Monthly Summary")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Total Gross Profit", f"₹{total_gross_profit:,.2f}")
+            with col2:
+                st.metric("Less: Expenses", f"₹{month_expense:,.2f}")
+            with col3:
+                st.metric("Net Profit", f"₹{month_profit:,.2f}", 
+                         delta=f"₹{total_gross_profit - month_expense:,.2f}")
+            
+            st.info(f"💡 **Formula:** Net Profit = (Sale Price - Purchase Cost) - Expenses")
+            st.success(f"✅ **Calculation:** (₹{total_gross_profit:,.2f} gross profit) - (₹{month_expense:,.2f} expenses) = ₹{month_profit:,.2f}")
+    
+    # Manual Correction Settings for Monthly Report
+    with st.expander("🔧 Monthly Report Settings (Manual Corrections)"):
+        st.success(f"✅ Auto-calculated for {curr_m_name} {datetime.now().year}, but you can manually adjust")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("💰 Sales")
+            st.write(f"Current (Auto): ₹{month_sale:,.2f}")
+            manual_month_sale = st.number_input("Correct Monthly Sale", value=float(month_sale), step=1.0, key="manual_month_sale")
+            
+            st.divider()
+            
+            st.subheader("🛒 Purchases")
+            st.write(f"Current (Auto): ₹{month_purchase:,.2f}")
+            manual_month_purchase = st.number_input("Correct Monthly Purchase", value=float(month_purchase), step=1.0, key="manual_month_purchase")
+        
+        with col2:
+            st.subheader("💸 Expenses")
+            st.write(f"Current (Auto): ₹{month_expense:,.2f}")
+            manual_month_expense = st.number_input("Correct Monthly Expense", value=float(month_expense), step=1.0, key="manual_month_expense")
+            
+            st.divider()
+            
+            st.subheader("📊 Profit (Auto-calculated)")
+            manual_month_profit = manual_month_sale - manual_month_purchase - manual_month_expense
+            st.metric("Corrected Profit", f"₹{manual_month_profit:,.2f}")
+        
+        st.divider()
+        
+        if manual_month_sale != month_sale or manual_month_purchase != month_purchase or manual_month_expense != month_expense:
+            st.warning("⚠️ You have made manual corrections for monthly report!")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.info(f"**Sale:** ₹{month_sale:,.2f} → ₹{manual_month_sale:,.2f}")
+            with col2:
+                st.info(f"**Purchase:** ₹{month_purchase:,.2f} → ₹{manual_month_purchase:,.2f}")
+            with col3:
+                st.info(f"**Expense:** ₹{month_expense:,.2f} → ₹{manual_month_expense:,.2f}")
+            
+            st.markdown("### 📊 Corrected Monthly Summary")
+            
+            st.markdown(f"""
+            <div style="display: flex; gap: 15px; margin-top: 20px;">
+                <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">💰 Corrected Sale</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_month_sale:,.2f}</h2>
+                </div>
+                <div style="flex: 1; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">🛒 Corrected Purchase</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_month_purchase:,.2f}</h2>
+                </div>
+                <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">💸 Corrected Expense</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_month_expense:,.2f}</h2>
+                </div>
+                <div style="flex: 1; background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 16px;">✨ Corrected Profit</p>
+                    <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{manual_month_profit:,.2f}</h2>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("💾 Save Monthly Corrections", type="primary", use_container_width=True):
+                # Save monthly corrections
+                save_data("MonthlyCorrections", [
+                    str(today_dt),
+                    curr_m_name,
+                    datetime.now().year,
+                    manual_month_sale,
+                    manual_month_purchase,
+                    manual_month_expense,
+                    manual_month_profit,
+                    f"Auto: Sale={month_sale}, Purchase={month_purchase}, Expense={month_expense}"
+                ])
+                st.success(f"✅ Manual corrections saved for {curr_m_name} {datetime.now().year}!")
+                st.balloons()
+                time.sleep(1)
+                st.rerun()
+        else:
+            st.success("✅ All values match auto-calculated amounts")
 
 # ========================================
 # MENU 2: BILLING
