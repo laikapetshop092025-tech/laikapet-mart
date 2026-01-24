@@ -390,6 +390,13 @@ if menu == "📊 Dashboard":
     else:
         total_stock_value = 0
     
+    # Hand Investment Calculation
+    hand_df = load_data("HandInvestments")
+    if not hand_df.empty and len(hand_df.columns) > 2:
+        total_hand_investment = pd.to_numeric(hand_df.iloc[:, 2], errors='coerce').sum()
+    else:
+        total_hand_investment = 0
+    
     st.markdown(f"""
     <div style="display: flex; gap: 15px; margin-bottom: 30px;">
         <div style="flex: 1; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
@@ -401,8 +408,12 @@ if menu == "📊 Dashboard":
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{online_bal:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">⚡ Total</p>
+            <p style="margin: 0; font-size: 16px;">⚡ Total Shop</p>
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_bal:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">👋 Hand Investment</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_hand_investment:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 16px;">📒 Customer Due</p>
@@ -417,28 +428,67 @@ if menu == "📊 Dashboard":
     
     with st.expander("🔧 Balance Settings"):
         st.success("✅ Balance auto-loads from Google Sheets")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Cash Balance")
-            st.write(f"Current: ₹{cash_bal:,.2f}")
-            new_cash = st.number_input("Update Cash", value=float(cash_bal), step=1.0)
-            if st.button("💾 Save Cash"):
-                st.session_state.manual_cash = new_cash
-                save_data("Balances", ["Cash", new_cash])
-                st.success(f"✅ Updated to ₹{new_cash:,.2f}")
-                time.sleep(1)
-                st.rerun()
         
-        with col2:
-            st.subheader("Online Balance")
-            st.write(f"Current: ₹{online_bal:,.2f}")
-            new_online = st.number_input("Update Online", value=float(online_bal), step=1.0)
-            if st.button("💾 Save Online"):
-                st.session_state.manual_online = new_online
-                save_data("Balances", ["Online", new_online])
-                st.success(f"✅ Updated to ₹{new_online:,.2f}")
-                time.sleep(1)
-                st.rerun()
+        tab1, tab2, tab3 = st.tabs(["💰 Cash & Online", "👋 Hand Investments", "📊 Summary"])
+        
+        with tab1:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Cash Balance")
+                st.write(f"Current: ₹{cash_bal:,.2f}")
+                new_cash = st.number_input("Update Cash", value=float(cash_bal), step=1.0)
+                if st.button("💾 Save Cash"):
+                    st.session_state.manual_cash = new_cash
+                    save_data("Balances", ["Cash", new_cash])
+                    st.success(f"✅ Updated to ₹{new_cash:,.2f}")
+                    time.sleep(1)
+                    st.rerun()
+            
+            with col2:
+                st.subheader("Online Balance")
+                st.write(f"Current: ₹{online_bal:,.2f}")
+                new_online = st.number_input("Update Online", value=float(online_bal), step=1.0)
+                if st.button("💾 Save Online"):
+                    st.session_state.manual_online = new_online
+                    save_data("Balances", ["Online", new_online])
+                    st.success(f"✅ Updated to ₹{new_online:,.2f}")
+                    time.sleep(1)
+                    st.rerun()
+        
+        with tab2:
+            st.subheader("👋 Hand Investments (Pocket Money)")
+            
+            st.metric("Total Personal Investment", f"₹{total_hand_investment:,.2f}")
+            
+            st.divider()
+            
+            hand_df = load_data("HandInvestments")
+            if not hand_df.empty:
+                st.markdown("### 📋 Investment History")
+                
+                for idx, row in hand_df.iterrows():
+                    date = row.iloc[0] if len(row) > 0 else "N/A"
+                    supplier = row.iloc[1] if len(row) > 1 else "N/A"
+                    amount = float(row.iloc[2]) if len(row) > 2 else 0
+                    items = row.iloc[3] if len(row) > 3 else "N/A"
+                    
+                    with st.expander(f"💰 {date} - ₹{amount:,.2f}"):
+                        st.write(f"**Supplier:** {supplier}")
+                        st.write(f"**Amount:** ₹{amount:,.2f}")
+                        st.write(f"**Items:** {items}")
+            else:
+                st.info("No hand investments yet. When you purchase using 'By Hand', entries will appear here.")
+        
+        with tab3:
+            st.subheader("📊 Total Business Capital")
+            
+            total_capital = cash_bal + online_bal + total_hand_investment
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Shop Cash", f"₹{cash_bal:,.2f}")
+            col2.metric("Shop Online", f"₹{online_bal:,.2f}")
+            col3.metric("Hand Investment", f"₹{total_hand_investment:,.2f}")
+            col4.metric("Total Capital", f"₹{total_capital:,.2f}", delta="All sources")
     
     st.divider()
     
@@ -1436,18 +1486,25 @@ elif menu == "📦 Purchase":
     with col1:
         payment_type = st.radio(
             "Payment Type",
-            ["💵 Cash/Online", "🏢 Udhaar (Credit)"],
-            horizontal=True,
+            ["💵 Cash (Shop)", "🏦 Online (Shop)", "🏢 Udhaar (Credit)", "👋 By Hand (Pocket Money)"],
+            horizontal=False,
             key="payment_radio"
         )
     
     with col2:
-        if payment_type == "💵 Cash/Online":
-            payment_mode = st.selectbox("Pay From", ["Cash", "Online"], key="pay_mode")
-            st.info(f"✅ Payment will be deducted from {payment_mode}")
-        else:
+        if payment_type == "💵 Cash (Shop)":
+            payment_mode = "Cash"
+            st.info(f"✅ Payment will be deducted from Shop Cash")
+        elif payment_type == "🏦 Online (Shop)":
+            payment_mode = "Online"
+            st.info(f"✅ Payment will be deducted from Shop Online")
+        elif payment_type == "🏢 Udhaar (Credit)":
             payment_mode = "Udhaar"
             st.warning("⚠️ This will be added to Supplier Dues")
+        else:  # By Hand
+            payment_mode = "By Hand"
+            st.success("✅ Personal money investment (Pocket)")
+            st.info("💡 This will be tracked separately in Hand Investments")
     
     st.divider()
     
@@ -1631,13 +1688,35 @@ elif menu == "📦 Purchase":
                         payment_info
                     ])
                 
-                # Handle payment
-                if payment_mode in ["Cash", "Online"]:
-                    update_balance(total_amount, payment_mode, 'subtract')
+                # Handle payment based on mode
+                if payment_mode == "Cash":
+                    update_balance(total_amount, "Cash", 'subtract')
                     st.success(f"✅ Purchase saved!")
-                    st.success(f"✅ ₹{total_amount:,.2f} deducted from {payment_mode}")
+                    st.success(f"✅ ₹{total_amount:,.2f} deducted from Shop Cash")
+                    
+                elif payment_mode == "Online":
+                    update_balance(total_amount, "Online", 'subtract')
+                    st.success(f"✅ Purchase saved!")
+                    st.success(f"✅ ₹{total_amount:,.2f} deducted from Shop Online")
+                    
+                elif payment_mode == "By Hand":
+                    # Save to Hand Investments tracking
+                    items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
+                    
+                    save_data("HandInvestments", [
+                        str(today_dt),
+                        supplier_full_info,
+                        total_amount,
+                        items_note,
+                        "Purchase by hand (pocket money)"
+                    ])
+                    
+                    st.success(f"✅ Purchase saved!")
+                    st.success(f"💰 ₹{total_amount:,.2f} invested from your pocket!")
                     st.info(f"📝 Supplier: {supplier_full_info}")
-                else:
+                    st.info(f"💡 Check 'Hand Investments' in dashboard to see total personal investment")
+                    
+                else:  # Udhaar
                     # Udhaar - Add to Supplier Dues
                     items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
                     
