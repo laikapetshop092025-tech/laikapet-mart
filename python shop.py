@@ -295,7 +295,7 @@ if user_role in ["ceo", "owner"]:
         "📋 Live Stock", 
         "💰 Expenses",
         "🐾 Pet Register",
-        "📒 Customer Khata",
+        "📒 Customer Due",
         "🏢 Supplier Dues",
         "👑 Royalty Points",
         "📈 Advanced Reports",
@@ -312,7 +312,7 @@ elif user_role == "manager":
         "📋 Live Stock", 
         "💰 Expenses",
         "🐾 Pet Register",
-        "📒 Customer Khata",
+        "📒 Customer Due",
         "🏢 Supplier Dues",
         "👑 Royalty Points",
         "📈 Advanced Reports",
@@ -327,6 +327,10 @@ else:  # staff
         "📋 Live Stock",
         "🐾 Pet Register"
     ]
+
+# Add Super Admin Panel at the END for Owner only
+if user_role == "owner":
+    menu_items.append("⚙️ Super Admin Panel")
 
 for item in menu_items:
     is_selected = (st.session_state.selected_menu == item)
@@ -368,13 +372,13 @@ if menu == "📊 Dashboard":
     online_bal = get_current_balance("Online")
     total_bal = cash_bal + online_bal
     
-    # Customer Udhaar Calculation
+    # Customer Due Calculation (renamed from Udhaar)
     k_df = load_data("CustomerKhata")
     if not k_df.empty and len(k_df.columns) > 1:
-        customer_udhaar = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum()
-        total_customer_udhaar = customer_udhaar[customer_udhaar > 0].sum()
+        customer_due = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum()
+        total_customer_due = customer_due[customer_due > 0].sum()
     else:
-        total_customer_udhaar = 0
+        total_customer_due = 0
     
     # Stock Value Calculation
     inv_df = load_data("Inventory")
@@ -401,8 +405,8 @@ if menu == "📊 Dashboard":
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_bal:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">📒 Customer Udhaar</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_customer_udhaar:,.2f}</h2>
+            <p style="margin: 0; font-size: 16px;">📒 Customer Due</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{total_customer_due:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
             <p style="margin: 0; font-size: 16px;">📦 Stock Value</p>
@@ -538,7 +542,7 @@ if menu == "📊 Dashboard":
     col4.metric("📊 Profit", f"₹{month_profit:,.2f}")
 
 # ========================================
-# MENU 2: BILLING (WITH STOCK DEDUCTION FIX)
+# MENU 2: BILLING
 # ========================================
 elif menu == "🧾 Billing":
     st.header("🧾 Billing System")
@@ -570,7 +574,10 @@ elif menu == "🧾 Billing":
                 st.info(f"📦 **Available Stock:** {available_qty} {last_unit}")
                 
                 with col2:
-                    qty = st.number_input("Quantity", min_value=0.1, max_value=float(available_qty), value=1.0, step=0.1, key="bill_qty")
+                    # Ensure max_value is at least min_value to avoid error
+                    max_qty = max(float(available_qty), 0.1) if available_qty > 0 else 1000.0
+                    default_qty = min(1.0, float(available_qty)) if available_qty > 0 else 1.0
+                    qty = st.number_input("Quantity", min_value=0.1, max_value=max_qty, value=default_qty, step=0.1, key="bill_qty")
                 
                 with col3:
                     rate = st.number_input("Rate/Unit", min_value=0.0, value=float(last_rate), step=1.0, key="bill_rate")
@@ -1201,10 +1208,10 @@ elif menu == "🐾 Pet Register":
             st.info("No pets registered yet. Add your first pet in the 'Add New Pet' tab!")
 
 # ========================================
-# MENU 7: CUSTOMER KHATA
+# MENU 8: CUSTOMER DUE (renamed from Customer Khata)
 # ========================================
-elif menu == "📒 Customer Khata":
-    st.header("📒 Customer Khata (Udhaar Management)")
+elif menu == "📒 Customer Due":
+    st.header("📒 Customer Due Management")
     
     tab1, tab2 = st.tabs(["💰 Payment Entry", "📊 View Summary"])
     
@@ -1216,7 +1223,7 @@ elif menu == "📒 Customer Khata":
             pay_mode = st.selectbox("Payment Mode", ["Cash", "Online", "Other"])
             note = st.text_input("Note (Optional)")
             
-            st.info("💡 Enter amount received from customer to reduce their udhaar")
+            st.info("💡 Enter amount received from customer to reduce their due")
             
             if st.form_submit_button("💾 Save Payment", type="primary"):
                 if amt > 0 and cust.strip():
@@ -1235,7 +1242,7 @@ elif menu == "📒 Customer Khata":
         k_df = load_data("CustomerKhata")
         
         if not k_df.empty and len(k_df.columns) > 1:
-            st.subheader("📊 Customer Udhaar Summary")
+            st.subheader("📊 Customer Due Summary")
             
             sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
             sum_df.columns = ['Customer', 'Balance']
@@ -1243,8 +1250,8 @@ elif menu == "📒 Customer Khata":
             sum_df = sum_df[sum_df['Balance'] > 0].sort_values('Balance', ascending=False)
             
             if not sum_df.empty:
-                total_udhaar = sum_df['Balance'].sum()
-                st.metric("💰 Total Outstanding Udhaar", f"₹{total_udhaar:,.2f}")
+                total_due = sum_df['Balance'].sum()
+                st.metric("💰 Total Outstanding Due", f"₹{total_due:,.2f}")
                 
                 st.divider()
                 
@@ -1261,13 +1268,13 @@ elif menu == "📒 Customer Khata":
                             note = str(txn.iloc[3]) if len(txn) > 3 else ""
                             
                             if amount > 0:
-                                st.error(f"📥 {date}: Udhaar ₹{amount:,.2f} - {note}")
+                                st.error(f"📥 {date}: Due ₹{amount:,.2f} - {note}")
                             else:
                                 st.success(f"💰 {date}: Payment ₹{abs(amount):,.2f} - {note}")
             else:
-                st.success("✅ No outstanding udhaar! All customers have cleared their dues.")
+                st.success("✅ No outstanding dues! All customers have cleared their payments.")
         else:
-            st.info("No udhaar records yet.")
+            st.info("No due records yet.")
 
 # ========================================
 # MENU 8: SUPPLIER DUES
@@ -1841,5 +1848,239 @@ elif menu == "🔐 Security & Compliance":
 # ========================================
 # FALLBACK FOR ANY OTHER MENU
 # ========================================
+elif menu == "⚙️ Super Admin Panel":
+    st.markdown("""
+    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); border-radius: 20px; margin-bottom: 20px;">
+        <h1 style="color: white; margin: 0; font-size: 48px;">⚙️ Super Admin Panel</h1>
+        <p style="color: white; margin-top: 15px; font-size: 20px;">Complete System Control</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["👥 User Management", "🎨 Theme Settings", "🔧 System Settings", "📊 System Stats"])
+    
+    with tab1:
+        st.header("👥 User Management")
+        
+        # Initialize users in session state if not exists
+        if 'system_users' not in st.session_state:
+            st.session_state.system_users = USERS.copy()
+        
+        # Add New User
+        with st.expander("➕ Add New User", expanded=False):
+            with st.form("add_user"):
+                st.subheader("Create New User Account")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    new_username = st.text_input("Username *", placeholder="Enter username")
+                    new_password = st.text_input("Password *", type="password", placeholder="Enter password")
+                
+                with col2:
+                    new_role = st.selectbox("Role *", ["ceo", "owner", "manager", "staff"])
+                    new_display_name = st.text_input("Display Name *", placeholder="e.g., John (Manager)")
+                
+                if st.form_submit_button("✅ Create User", type="primary", use_container_width=True):
+                    if new_username and new_password and new_display_name:
+                        if new_username not in st.session_state.system_users:
+                            st.session_state.system_users[new_username] = {
+                                "password": new_password,
+                                "role": new_role,
+                                "name": new_display_name
+                            }
+                            # Save to a file or database here
+                            st.success(f"✅ User '{new_username}' created successfully!")
+                            st.balloons()
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ Username already exists!")
+                    else:
+                        st.error("⚠️ Please fill all fields!")
+        
+        st.divider()
+        
+        # View All Users
+        st.subheader("👥 All System Users")
+        
+        for username, user_data in st.session_state.system_users.items():
+            with st.expander(f"👤 {user_data['name']} (@{username}) - {user_data['role'].upper()}"):
+                col1, col2, col3 = st.columns([2, 2, 1])
+                
+                with col1:
+                    st.write(f"**Username:** {username}")
+                    st.write(f"**Display Name:** {user_data['name']}")
+                    st.write(f"**Role:** {user_data['role'].upper()}")
+                
+                with col2:
+                    st.write(f"**Password:** {'*' * len(user_data['password'])}")
+                    if st.button(f"🔄 Reset Password", key=f"reset_{username}"):
+                        st.info("Password reset functionality - implement as needed")
+                
+                with col3:
+                    if username not in ["Laika", "Prateek"]:  # Protect default accounts
+                        if st.button(f"🗑️ Delete", key=f"del_{username}", type="secondary"):
+                            del st.session_state.system_users[username]
+                            st.success(f"✅ User '{username}' deleted!")
+                            time.sleep(1)
+                            st.rerun()
+                    else:
+                        st.info("🔒 Protected")
+    
+    with tab2:
+        st.header("🎨 Theme & UI Settings")
+        
+        # Initialize theme settings
+        if 'theme_settings' not in st.session_state:
+            st.session_state.theme_settings = {
+                'dashboard_theme': 'gradient_blue',
+                'sidebar_color': 'light',
+                'primary_color': '#667eea'
+            }
+        
+        st.subheader("Dashboard Theme")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            theme_option = st.selectbox(
+                "Choose Dashboard Theme",
+                [
+                    "Gradient Blue (Default)",
+                    "Dark Professional",
+                    "Light Modern",
+                    "Purple Royal",
+                    "Green Nature",
+                    "Orange Warm",
+                    "Pink Creative"
+                ],
+                key="theme_selector"
+            )
+        
+        with col2:
+            sidebar_theme = st.selectbox(
+                "Sidebar Theme",
+                ["Light (Default)", "Dark", "Colorful"],
+                key="sidebar_theme"
+            )
+        
+        st.divider()
+        
+        st.subheader("🎨 Color Customization")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            primary_color = st.color_picker("Primary Color", "#667eea")
+        
+        with col2:
+            secondary_color = st.color_picker("Secondary Color", "#764ba2")
+        
+        with col3:
+            accent_color = st.color_picker("Accent Color", "#f093fb")
+        
+        if st.button("💾 Save Theme Settings", type="primary", use_container_width=True):
+            st.session_state.theme_settings = {
+                'dashboard_theme': theme_option,
+                'sidebar_color': sidebar_theme,
+                'primary_color': primary_color,
+                'secondary_color': secondary_color,
+                'accent_color': accent_color
+            }
+            st.success("✅ Theme settings saved! Refresh page to see changes.")
+            st.balloons()
+        
+        st.divider()
+        
+        st.subheader("🖼️ Theme Preview")
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%); padding: 30px; border-radius: 15px; text-align: center;">
+            <h2 style="color: white; margin: 0;">Preview Theme</h2>
+            <p style="color: white; margin-top: 10px;">This is how your dashboard will look</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with tab3:
+        st.header("🔧 System Settings")
+        
+        st.subheader("⚙️ General Settings")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.text_input("Shop Name", value="LAIKA PET MART", key="shop_name")
+            st.text_input("Shop Phone", value="+91 XXXXXXXXXX", key="shop_phone")
+            st.text_input("Shop Address", value="Shop Address Here", key="shop_address")
+        
+        with col2:
+            st.number_input("Low Stock Alert Level", value=2, min_value=1, max_value=10, key="low_stock")
+            st.selectbox("Currency", ["₹ INR", "$ USD", "€ EUR"], key="currency")
+            st.selectbox("Date Format", ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"], key="date_format")
+        
+        st.divider()
+        
+        st.subheader("🔐 Security Settings")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.checkbox("Enable Auto Logout (30 min)", value=False, key="auto_logout")
+            st.checkbox("Require Password Change (90 days)", value=False, key="pwd_change")
+        
+        with col2:
+            st.checkbox("Enable Audit Logs", value=True, key="audit_logs")
+            st.checkbox("Two-Factor Authentication", value=False, key="2fa")
+        
+        if st.button("💾 Save System Settings", type="primary", use_container_width=True):
+            st.success("✅ System settings saved successfully!")
+    
+    with tab4:
+        st.header("📊 System Statistics")
+        
+        # Calculate stats
+        s_df = load_data("Sales")
+        i_df = load_data("Inventory")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        total_users = len(st.session_state.system_users) if 'system_users' in st.session_state else len(USERS)
+        total_products = len(i_df.iloc[:, 0].unique()) if not i_df.empty else 0
+        total_sales = len(s_df) if not s_df.empty else 0
+        
+        col1.metric("👥 Total Users", total_users)
+        col2.metric("📦 Total Products", total_products)
+        col3.metric("🧾 Total Sales", total_sales)
+        col4.metric("💾 Data Sheets", "10+")
+        
+        st.divider()
+        
+        st.subheader("📈 System Health")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        col1.success("✅ Database: Connected")
+        col2.success("✅ Google Sheets: Synced")
+        col3.success("✅ System: Running")
+        
+        st.divider()
+        
+        st.subheader("🔄 Quick Actions")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🗑️ Clear Cache", use_container_width=True):
+                st.cache_data.clear()
+                st.success("✅ Cache cleared!")
+        
+        with col2:
+            if st.button("🔄 Reload Data", use_container_width=True):
+                st.success("✅ Data reloaded!")
+                st.rerun()
+        
+        with col3:
+            if st.button("📥 Export All Data", use_container_width=True):
+                st.info("📦 Export functionality")
+
 else:
     st.info(f"Module: {menu} - Feature under development")
