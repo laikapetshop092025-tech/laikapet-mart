@@ -391,11 +391,17 @@ if menu == "📊 Dashboard":
         total_stock_value = 0
     
     # Hand Investment Calculation
-    hand_df = load_data("HandInvestments")
-    if not hand_df.empty and len(hand_df.columns) > 2:
-        total_hand_investment = pd.to_numeric(hand_df.iloc[:, 2], errors='coerce').sum()
-    else:
+    total_hand_investment = 0
+    hand_investment_error = False
+    try:
+        hand_df = load_data("HandInvestments")
+        if not hand_df.empty and len(hand_df.columns) > 2:
+            # Convert to numeric and sum, handling any errors
+            hand_amounts = pd.to_numeric(hand_df.iloc[:, 2], errors='coerce').fillna(0)
+            total_hand_investment = hand_amounts.sum()
+    except Exception as e:
         total_hand_investment = 0
+        hand_investment_error = True
     
     st.markdown(f"""
     <div style="display: flex; gap: 15px; margin-bottom: 30px;">
@@ -462,22 +468,27 @@ if menu == "📊 Dashboard":
             
             st.divider()
             
-            hand_df = load_data("HandInvestments")
-            if not hand_df.empty:
-                st.markdown("### 📋 Investment History")
+            # Simple display without complex iteration
+            try:
+                hand_df = load_data("HandInvestments")
                 
-                for idx, row in hand_df.iterrows():
-                    date = row.iloc[0] if len(row) > 0 else "N/A"
-                    supplier = row.iloc[1] if len(row) > 1 else "N/A"
-                    amount = float(row.iloc[2]) if len(row) > 2 else 0
-                    items = row.iloc[3] if len(row) > 3 else "N/A"
+                if not hand_df.empty:
+                    st.markdown("### 📋 Investment History")
+                    st.dataframe(hand_df, use_container_width=True)
                     
-                    with st.expander(f"💰 {date} - ₹{amount:,.2f}"):
-                        st.write(f"**Supplier:** {supplier}")
-                        st.write(f"**Amount:** ₹{amount:,.2f}")
-                        st.write(f"**Items:** {items}")
-            else:
+                    st.info("💡 Columns: Date | Supplier | Amount | Items | Note")
+                else:
+                    st.info("No hand investments yet. When you purchase using 'By Hand', entries will appear here.")
+                    st.markdown("""
+                    **How to add Hand Investment:**
+                    1. Go to Purchase menu
+                    2. Select payment type: 👋 By Hand (Pocket Money)
+                    3. Complete the purchase
+                    4. Investment will be tracked here
+                    """)
+            except Exception as e:
                 st.info("No hand investments yet. When you purchase using 'By Hand', entries will appear here.")
+                st.caption("💡 Note: HandInvestments sheet will be created automatically on first 'By Hand' purchase")
         
         with tab3:
             st.subheader("📊 Total Business Capital")
