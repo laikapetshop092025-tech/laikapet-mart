@@ -455,7 +455,7 @@ if menu == "📊 Dashboard":
     else:
         today_sale = 0
     
-    # Today's Purchases
+    # Today's Purchases (ACTUAL COST)
     p_df = load_data("Inventory")
     if not p_df.empty and len(p_df.columns) > 5:
         try:
@@ -478,18 +478,30 @@ if menu == "📊 Dashboard":
     else:
         today_expense = 0
     
-    # Today's Profit
-    if not s_df.empty and len(s_df.columns) > 7 and 'Date' in s_df.columns:
-        s_today_profit = s_df[s_df['Date'] == today_dt]
-        today_profit = pd.to_numeric(s_today_profit.iloc[:, 7], errors='coerce').sum() if not s_today_profit.empty else 0
-    else:
-        today_profit = 0
+    # Today's REAL Profit (Sale - Purchase Cost - Expenses)
+    today_profit = today_sale - today_purchase - today_expense
     
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Total Sale", f"₹{today_sale:,.2f}")
-    col2.metric("🛒 Total Purchase", f"₹{today_purchase:,.2f}")
-    col3.metric("💸 Total Expense", f"₹{today_expense:,.2f}")
-    col4.metric("📊 Profit", f"₹{today_profit:,.2f}")
+    # Colorful Cards for Today
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+        <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">💰 Total Sale</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_sale:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">🛒 Total Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_expense:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">📊 Net Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_profit:,.2f}</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.divider()
     
@@ -506,7 +518,7 @@ if menu == "📊 Dashboard":
     else:
         month_sale = 0
     
-    # This Month's Purchases
+    # This Month's Purchases (ACTUAL COST)
     if not p_df.empty and len(p_df.columns) > 5:
         try:
             p_df['pur_date'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce').dt.date
@@ -528,18 +540,30 @@ if menu == "📊 Dashboard":
     else:
         month_expense = 0
     
-    # This Month's Profit
-    if not s_df.empty and len(s_df.columns) > 7 and 'Date' in s_df.columns:
-        s_month_profit = s_df[s_df['Date'].apply(lambda x: x.month == curr_m if isinstance(x, date) else False)]
-        month_profit = pd.to_numeric(s_month_profit.iloc[:, 7], errors='coerce').sum() if not s_month_profit.empty else 0
-    else:
-        month_profit = 0
+    # This Month's REAL Profit (Sale - Purchase Cost - Expenses)
+    month_profit = month_sale - month_purchase - month_expense
     
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Total Sale", f"₹{month_sale:,.2f}")
-    col2.metric("🛒 Total Purchase", f"₹{month_purchase:,.2f}")
-    col3.metric("💸 Total Expense", f"₹{month_expense:,.2f}")
-    col4.metric("📊 Profit", f"₹{month_profit:,.2f}")
+    # Colorful Cards for Monthly
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+        <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
+            <p style="margin: 0; font-size: 16px;">💰 Total Sale</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_sale:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
+            <p style="margin: 0; font-size: 16px;">🛒 Total Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_purchase:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
+            <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_expense:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">📊 Net Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_profit:,.2f}</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ========================================
 # MENU 2: BILLING
@@ -643,17 +667,66 @@ elif menu == "🧾 Billing":
         st.divider()
         
         # Customer & Payment Details
+        st.markdown("### 👤 Customer & Payment Details")
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            cust_name = st.text_input("Customer Name", key="cust_name")
+            cust_name = st.text_input("Customer Name *", key="cust_name")
             cust_phone = st.text_input("Customer Phone", key="cust_phone")
         
         with col2:
             payment_mode = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar (Credit)"], key="pay_mode")
             
             if payment_mode == "Udhaar (Credit)":
-                st.warning("⚠️ This will create udhaar entry in Customer Khata")
+                st.warning("⚠️ This will create udhaar entry in Customer Due")
+        
+        st.divider()
+        
+        # GST Billing Section
+        st.markdown("### 🧾 GST Billing (Optional)")
+        
+        col1, col2 = st.columns([1, 3])
+        
+        with col1:
+            enable_gst = st.checkbox("✅ Enable GST Billing", value=False, key="enable_gst")
+        
+        with col2:
+            if enable_gst:
+                st.info("💡 GST billing enabled - Fill customer GSTIN details below")
+        
+        # GST Fields (only show if enabled)
+        if enable_gst:
+            st.markdown("#### 📋 GST Details")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                customer_gstin = st.text_input("Customer GSTIN *", placeholder="22AAAAA0000A1Z5", key="cust_gstin")
+            
+            with col2:
+                gst_rate = st.selectbox("GST Rate", ["5%", "12%", "18%", "28%"], index=2, key="gst_rate")
+            
+            with col3:
+                invoice_type = st.selectbox("Invoice Type", ["B2B", "B2C"], key="invoice_type")
+            
+            # Calculate GST
+            gst_percentage = float(gst_rate.replace('%', '')) / 100
+            
+            # Base amount (without GST)
+            base_amount = total / (1 + gst_percentage)
+            gst_amount = total - base_amount
+            cgst = gst_amount / 2
+            sgst = gst_amount / 2
+            
+            st.markdown("#### 💰 GST Breakdown")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            col1.metric("Base Amount", f"₹{base_amount:,.2f}")
+            col2.metric(f"CGST ({gst_percentage*50:.1f}%)", f"₹{cgst:,.2f}")
+            col3.metric(f"SGST ({gst_percentage*50:.1f}%)", f"₹{sgst:,.2f}")
+            col4.metric("Total (incl. GST)", f"₹{total:,.2f}")
         
         st.divider()
         
@@ -698,79 +771,181 @@ elif menu == "🧾 Billing":
         
         if st.button("💾 COMPLETE SALE", type="primary", use_container_width=True):
             if cust_name.strip():
-                customer_info = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
-                
-                # Save each item in cart
-                for cart_item in st.session_state.bill_cart:
-                    item_name = cart_item['Item']
-                    sold_qty = cart_item['Qty']
-                    unit = cart_item['Unit']
-                    rate = cart_item['Rate']
-                    amount = cart_item['Amount']
+                # Check GST validation
+                if enable_gst and not customer_gstin:
+                    st.error("⚠️ Please enter Customer GSTIN for GST billing!")
+                else:
+                    customer_info = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
                     
-                    # Calculate cost and profit (simplified - using 70% of selling price as cost)
-                    cost = amount * 0.7
-                    profit = amount - cost
+                    # Prepare GST info if enabled
+                    if enable_gst:
+                        gst_info = f"GST: {gst_rate} | GSTIN: {customer_gstin} | Type: {invoice_type}"
+                    else:
+                        gst_info = "No GST"
                     
-                    # Save to Sales sheet
-                    save_data("Sales", [
-                        str(today_dt),
-                        item_name,
-                        f"{sold_qty} {unit}",
-                        amount,
-                        payment_mode,
-                        customer_info,
-                        points,
-                        profit
-                    ])
-                    
-                    # ✅✅✅ CRITICAL FIX: DEDUCT STOCK FROM INVENTORY ✅✅✅
-                    inv_df = load_data("Inventory")
-                    if not inv_df.empty:
-                        # Find LATEST entry for this product
-                        product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
+                    # Save each item in cart
+                    for cart_item in st.session_state.bill_cart:
+                        item_name = cart_item['Item']
+                        sold_qty = cart_item['Qty']
+                        unit = cart_item['Unit']
+                        rate = cart_item['Rate']
+                        amount = cart_item['Amount']
                         
-                        if not product_rows.empty:
-                            # Get current stock from LATEST entry
-                            current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
-                            current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                        # Calculate actual profit based on purchase cost
+                        inv_df_check = load_data("Inventory")
+                        if not inv_df_check.empty:
+                            item_cost_rows = inv_df_check[inv_df_check.iloc[:, 0] == item_name]
+                            if not item_cost_rows.empty:
+                                # Get average purchase rate
+                                avg_purchase_rate = pd.to_numeric(item_cost_rows.iloc[:, 3], errors='coerce').mean()
+                                cost = sold_qty * avg_purchase_rate
+                                profit = amount - cost
+                            else:
+                                # Fallback to 70% cost estimate
+                                cost = amount * 0.7
+                                profit = amount - cost
+                        else:
+                            cost = amount * 0.7
+                            profit = amount - cost
+                        
+                        # Save to Sales sheet with GST info
+                        save_data("Sales", [
+                            str(today_dt),
+                            item_name,
+                            f"{sold_qty} {unit}",
+                            amount,
+                            payment_mode,
+                            customer_info,
+                            points,
+                            profit,
+                            gst_info
+                        ])
+                        
+                        # ✅ DEDUCT STOCK FROM INVENTORY
+                        inv_df = load_data("Inventory")
+                        if not inv_df.empty:
+                            product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
                             
-                            # Calculate new stock
-                            new_stock = current_stock - sold_qty
-                            
-                            # Save updated stock to Inventory
-                            save_data("Inventory", [
-                                item_name,
-                                new_stock,
-                                unit,
-                                current_rate,
-                                new_stock * current_rate,
-                                str(today_dt),
-                                f"Sale deduction"
-                            ])
-                            
-                            st.info(f"📦 {item_name}: {current_stock} → {new_stock} {unit}")
-                
-                # Handle payment
-                if payment_mode == "Cash":
-                    update_balance(total, "Cash", 'add')
-                    st.success(f"✅ ₹{total:,.2f} added to Cash")
-                elif payment_mode == "Online":
-                    update_balance(total, "Online", 'add')
-                    st.success(f"✅ ₹{total:,.2f} added to Online")
-                else:  # Udhaar
-                    save_data("CustomerKhata", [customer_info, total, str(today_dt), "Sale on credit"])
-                    st.warning(f"📒 ₹{total:,.2f} added to {customer_info}'s udhaar")
-                
-                st.success(f"✅ Sale completed! {customer_info} earned {points} points 👑")
-                st.session_state.bill_cart = []
-                st.balloons()
-                time.sleep(2)
-                st.rerun()
+                            if not product_rows.empty:
+                                current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                                current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                                
+                                new_stock = current_stock - sold_qty
+                                
+                                save_data("Inventory", [
+                                    item_name,
+                                    new_stock,
+                                    unit,
+                                    current_rate,
+                                    new_stock * current_rate,
+                                    str(today_dt),
+                                    f"Sale deduction"
+                                ])
+                                
+                                st.info(f"📦 {item_name}: {current_stock} → {new_stock} {unit}")
+                    
+                    # Handle payment
+                    if payment_mode == "Cash":
+                        update_balance(total, "Cash", 'add')
+                        st.success(f"✅ ₹{total:,.2f} added to Cash")
+                    elif payment_mode == "Online":
+                        update_balance(total, "Online", 'add')
+                        st.success(f"✅ ₹{total:,.2f} added to Online")
+                    else:  # Udhaar
+                        save_data("CustomerKhata", [customer_info, total, str(today_dt), "Sale on credit"])
+                        st.warning(f"📒 ₹{total:,.2f} added to {customer_info}'s due")
+                    
+                    # Show GST invoice info if enabled
+                    if enable_gst:
+                        st.success(f"🧾 GST Invoice Generated!")
+                        st.info(f"📋 GSTIN: {customer_gstin} | Rate: {gst_rate} | Type: {invoice_type}")
+                    
+                    st.success(f"✅ Sale completed! {customer_info} earned {points} points 👑")
+                    st.session_state.bill_cart = []
+                    st.balloons()
+                    time.sleep(2)
+                    st.rerun()
             else:
                 st.error("⚠️ Please enter customer name!")
     else:
         st.info("🛒 Cart is empty. Add items to start billing.")
+    
+    # View Recent Sales with Delete Option
+    st.divider()
+    st.markdown("### 📋 Recent Sales (Today)")
+    
+    s_df = load_data("Sales")
+    if not s_df.empty and 'Date' in s_df.columns:
+        today_sales = s_df[s_df['Date'] == today_dt]
+        
+        if not today_sales.empty:
+            for idx, row in today_sales.iterrows():
+                with st.expander(f"🧾 Sale #{idx+1} - {row.iloc[1] if len(row) > 1 else 'Item'} - ₹{row.iloc[3] if len(row) > 3 else 0}"):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        st.write(f"**Date:** {row.iloc[0] if len(row) > 0 else 'N/A'}")
+                        st.write(f"**Item:** {row.iloc[1] if len(row) > 1 else 'N/A'}")
+                        st.write(f"**Quantity:** {row.iloc[2] if len(row) > 2 else 'N/A'}")
+                        st.write(f"**Amount:** ₹{row.iloc[3] if len(row) > 3 else 0}")
+                        st.write(f"**Payment:** {row.iloc[4] if len(row) > 4 else 'N/A'}")
+                        st.write(f"**Customer:** {row.iloc[5] if len(row) > 5 else 'N/A'}")
+                    
+                    with col2:
+                        if st.button("🗑️ Delete", key=f"del_sale_{idx}", type="secondary"):
+                            # Get sale details
+                            item_name = row.iloc[1]
+                            qty_str = str(row.iloc[2])
+                            amount = float(row.iloc[3])
+                            payment_mode = str(row.iloc[4])
+                            
+                            # Extract quantity and unit
+                            qty_parts = qty_str.split()
+                            qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
+                            unit = qty_parts[1] if len(qty_parts) > 1 else "Pcs"
+                            
+                            # REVERSE PAYMENT
+                            if payment_mode == "Cash":
+                                update_balance(amount, "Cash", 'subtract')
+                                st.success(f"✅ ₹{amount:,.2f} deducted from Cash")
+                            elif payment_mode == "Online":
+                                update_balance(amount, "Online", 'subtract')
+                                st.success(f"✅ ₹{amount:,.2f} deducted from Online")
+                            
+                            # ADD STOCK BACK
+                            inv_df = load_data("Inventory")
+                            if not inv_df.empty:
+                                product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
+                                
+                                if not product_rows.empty:
+                                    current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                                    current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                                    
+                                    # Add stock back
+                                    new_stock = current_stock + qty
+                                    
+                                    save_data("Inventory", [
+                                        item_name,
+                                        new_stock,
+                                        unit,
+                                        current_rate,
+                                        new_stock * current_rate,
+                                        str(today_dt),
+                                        f"Sale reversal (deleted)"
+                                    ])
+                                    
+                                    st.success(f"📦 Stock restored: {current_stock} → {new_stock} {unit}")
+                            
+                            # Note: Manual Google Sheets deletion required
+                            st.warning("⚠️ Please manually delete this entry from Google Sheets Sales tab")
+                            st.info(f"🔍 Search for: {item_name} - {today_dt}")
+                            
+                            time.sleep(2)
+                            st.rerun()
+        else:
+            st.info("No sales today")
+    else:
+        st.info("No sales data available")
 
 # ========================================
 # MENU 3: PURCHASE
@@ -1025,6 +1200,86 @@ elif menu == "📦 Purchase":
                 st.rerun()
     else:
         st.info("🛒 Cart is empty. Add items above to start purchase.")
+    
+    # View Recent Purchases with Delete Option
+    st.divider()
+    st.markdown("### 📋 Recent Purchases (Today)")
+    
+    inv_df_recent = load_data("Inventory")
+    if not inv_df_recent.empty and len(inv_df_recent.columns) > 5:
+        try:
+            inv_df_recent['pur_date'] = pd.to_datetime(inv_df_recent.iloc[:, 5], errors='coerce').dt.date
+            today_purchases = inv_df_recent[inv_df_recent['pur_date'] == today_dt]
+            
+            if not today_purchases.empty:
+                for idx, row in today_purchases.iterrows():
+                    with st.expander(f"📦 Purchase #{idx+1} - {row.iloc[0]} - ₹{row.iloc[4]}"):
+                        col1, col2 = st.columns([3, 1])
+                        
+                        with col1:
+                            st.write(f"**Item:** {row.iloc[0]}")
+                            st.write(f"**Quantity:** {row.iloc[1]} {row.iloc[2]}")
+                            st.write(f"**Rate:** ₹{row.iloc[3]}")
+                            st.write(f"**Total:** ₹{row.iloc[4]}")
+                            st.write(f"**Date:** {row.iloc[5]}")
+                            st.write(f"**Payment:** {row.iloc[6] if len(row) > 6 else 'N/A'}")
+                        
+                        with col2:
+                            if st.button("🗑️ Delete", key=f"del_purchase_{idx}", type="secondary"):
+                                # Get purchase details
+                                item_name = row.iloc[0]
+                                qty = float(row.iloc[1])
+                                unit = row.iloc[2]
+                                rate = float(row.iloc[3])
+                                total_amount = float(row.iloc[4])
+                                payment_info = str(row.iloc[6]) if len(row) > 6 else ""
+                                
+                                # REVERSE PAYMENT (if Cash/Online)
+                                if "Cash" in payment_info:
+                                    update_balance(total_amount, "Cash", 'add')
+                                    st.success(f"✅ ₹{total_amount:,.2f} added back to Cash")
+                                elif "Online" in payment_info:
+                                    update_balance(total_amount, "Online", 'add')
+                                    st.success(f"✅ ₹{total_amount:,.2f} added back to Online")
+                                
+                                # SUBTRACT STOCK
+                                inv_df_check = load_data("Inventory")
+                                if not inv_df_check.empty:
+                                    product_rows = inv_df_check[inv_df_check.iloc[:, 0] == item_name].tail(1)
+                                    
+                                    if not product_rows.empty:
+                                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                                        
+                                        # Remove purchased quantity
+                                        new_stock = current_stock - qty
+                                        
+                                        if new_stock >= 0:
+                                            save_data("Inventory", [
+                                                item_name,
+                                                new_stock,
+                                                unit,
+                                                current_rate,
+                                                new_stock * current_rate,
+                                                str(today_dt),
+                                                f"Purchase reversal (deleted)"
+                                            ])
+                                            
+                                            st.success(f"📦 Stock adjusted: {current_stock} → {new_stock} {unit}")
+                                        else:
+                                            st.error(f"⚠️ Cannot delete! Stock would go negative ({new_stock})")
+                                
+                                st.warning("⚠️ Please manually delete this entry from Google Sheets Inventory tab")
+                                st.info(f"🔍 Search for: {item_name} - {today_dt}")
+                                
+                                time.sleep(2)
+                                st.rerun()
+            else:
+                st.info("No purchases today")
+        except:
+            st.info("No purchase data")
+    else:
+        st.info("No purchase data available")
 
 # ========================================
 # MENU 4: LIVE STOCK
@@ -1121,7 +1376,36 @@ elif menu == "💰 Expenses":
         today_expenses = e_df[e_df.iloc[:, 0] == str(today_dt)] if len(e_df.columns) > 0 else e_df
         
         if not today_expenses.empty:
-            st.dataframe(today_expenses, use_container_width=True)
+            for idx, row in today_expenses.iterrows():
+                with st.expander(f"💸 {row.iloc[1] if len(row) > 1 else 'Expense'} - ₹{row.iloc[2] if len(row) > 2 else 0}"):
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        st.write(f"**Date:** {row.iloc[0] if len(row) > 0 else 'N/A'}")
+                        st.write(f"**Category:** {row.iloc[1] if len(row) > 1 else 'N/A'}")
+                        st.write(f"**Amount:** ₹{row.iloc[2] if len(row) > 2 else 0}")
+                        st.write(f"**Mode:** {row.iloc[3] if len(row) > 3 else 'N/A'}")
+                        st.write(f"**Note:** {row.iloc[4] if len(row) > 4 else 'N/A'}")
+                    
+                    with col2:
+                        if st.button("🗑️ Delete", key=f"del_expense_{idx}", type="secondary"):
+                            # Get expense details
+                            amount = float(row.iloc[2])
+                            mode = str(row.iloc[3])
+                            
+                            # REVERSE PAYMENT - Add money back
+                            if mode == "Cash":
+                                update_balance(amount, "Cash", 'add')
+                                st.success(f"✅ ₹{amount:,.2f} added back to Cash")
+                            elif mode == "Online":
+                                update_balance(amount, "Online", 'add')
+                                st.success(f"✅ ₹{amount:,.2f} added back to Online")
+                            
+                            st.warning("⚠️ Please manually delete this entry from Google Sheets Expenses tab")
+                            st.info(f"🔍 Search for: {row.iloc[1]} - {today_dt}")
+                            
+                            time.sleep(2)
+                            st.rerun()
         else:
             st.info("No expenses today")
         
@@ -1186,7 +1470,7 @@ elif menu == "🐾 Pet Register":
             # Display pets
             for idx, row in filtered_df.iterrows():
                 with st.expander(f"🐾 {row.iloc[1] if len(row) > 1 else 'Pet'} - {row.iloc[2] if len(row) > 2 else ''} ({row.iloc[5] if len(row) > 5 else 'Owner'})"):
-                    col1, col2 = st.columns(2)
+                    col1, col2, col3 = st.columns([2, 2, 1])
                     
                     with col1:
                         st.write("**Pet Information:**")
@@ -1201,6 +1485,12 @@ elif menu == "🐾 Pet Register":
                         st.write(f"Name: {row.iloc[5] if len(row) > 5 else 'N/A'}")
                         st.write(f"Phone: {row.iloc[6] if len(row) > 6 else 'N/A'}")
                         st.write(f"Address: {row.iloc[7] if len(row) > 7 else 'N/A'}")
+                    
+                    with col3:
+                        if st.button("🗑️ Delete", key=f"del_pet_{idx}", type="secondary"):
+                            st.warning("⚠️ Please manually delete this entry from Google Sheets PetRegister tab")
+                            st.info(f"🔍 Search for: {row.iloc[1]} - {row.iloc[5]}")
+                            st.success("✅ Deletion confirmed. Remove from Google Sheets to complete.")
                     
                     if len(row) > 9 and str(row.iloc[9]).strip():
                         st.write("**Notes:**", row.iloc[9])
