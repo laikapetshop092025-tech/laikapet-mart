@@ -648,13 +648,46 @@ elif menu == "🧾 Billing":
             if payment_mode == "Udhaar (Credit)":
                 st.warning("⚠️ This will create udhaar entry in Customer Khata")
         
+        st.divider()
+        
+        # Royalty Points Section with Checkboxes
+        st.markdown("### 👑 Royalty Points & Rewards")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            give_points = st.checkbox("✅ Give Royalty Points", value=True, key="give_points")
+        
+        with col2:
+            if give_points:
+                is_referral = st.checkbox("🎁 Referral Bonus (+10 points)", value=False, key="is_referral")
+            else:
+                is_referral = False
+        
+        with col3:
+            if give_points:
+                st.info("Weekday: 2% | Weekend: 5%")
+        
         # Calculate Royalty Points
-        points = int(total * 0.05) if is_weekend else int(total * 0.02)
+        if give_points:
+            base_points = int(total * 0.05) if is_weekend else int(total * 0.02)
+            referral_bonus = 10 if is_referral else 0
+            points = base_points + referral_bonus
+            
+            if is_referral:
+                st.success(f"👑 **Total Points: {points}** (Base: {base_points} + Referral Bonus: {referral_bonus})")
+            else:
+                st.success(f"👑 **Total Points: {points}**")
+        else:
+            points = 0
+            st.info("No points will be awarded for this sale")
+        
+        st.divider()
         
         col1, col2, col3 = st.columns(3)
         col1.metric("💰 Total Amount", f"₹{total:,.2f}")
         col2.metric("💳 Payment", payment_mode)
-        col3.metric("👑 Royalty Points", f"+{points}")
+        col3.metric("👑 Royalty Points", f"+{points}" if points > 0 else "0")
         
         if st.button("💾 COMPLETE SALE", type="primary", use_container_width=True):
             if cust_name.strip():
@@ -741,14 +774,32 @@ elif menu == "📦 Purchase":
     if 'purchase_cart' not in st.session_state:
         st.session_state.purchase_cart = []
     
-    # Payment selection at top
+    # Party Details Section - MANDATORY for all purchases
+    st.markdown("### 👤 Party/Supplier Details (Mandatory)")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        supplier_name = st.text_input("📝 Party/Supplier Name *", placeholder="Enter supplier/party name", key="supplier_name_input")
+    
+    with col2:
+        supplier_phone = st.text_input("📞 Party Phone Number *", placeholder="Enter phone number", key="supplier_phone_input")
+    
+    if not supplier_name or not supplier_name.strip():
+        st.warning("⚠️ Please enter Party/Supplier name to continue")
+    
+    if not supplier_phone or not supplier_phone.strip():
+        st.warning("⚠️ Please enter Party phone number to continue")
+    
+    st.divider()
+    
+    # Payment selection
     st.markdown("### 💰 Payment Method")
     col1, col2 = st.columns(2)
     
     with col1:
         payment_type = st.radio(
             "Payment Type",
-            ["💵 Cash/Online", "🏢 Party/Supplier"],
+            ["💵 Cash/Online", "🏢 Udhaar (Credit)"],
             horizontal=True,
             key="payment_radio"
         )
@@ -756,10 +807,10 @@ elif menu == "📦 Purchase":
     with col2:
         if payment_type == "💵 Cash/Online":
             payment_mode = st.selectbox("Pay From", ["Cash", "Online"], key="pay_mode")
-            supplier_name = None
+            st.info(f"✅ Payment will be deducted from {payment_mode}")
         else:
-            payment_mode = "Party"
-            supplier_name = st.text_input("Party/Supplier Name", placeholder="Enter supplier name", key="supplier_input")
+            payment_mode = "Udhaar"
+            st.warning("⚠️ This will be added to Supplier Dues")
     
     st.divider()
     
@@ -900,13 +951,37 @@ elif menu == "📦 Purchase":
         st.divider()
         
         # Final save button
-        if payment_type == "🏢 Party/Supplier" and (not supplier_name or not supplier_name.strip()):
-            st.error("⚠️ Please enter Party/Supplier name above!")
+        can_save = supplier_name and supplier_name.strip() and supplier_phone and supplier_phone.strip()
+        
+        if not can_save:
+            st.error("⚠️ Please enter Party/Supplier Name and Phone Number above to save purchase!")
         else:
+            # Show summary before saving
+            st.markdown("### 📋 Purchase Summary")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.info(f"**Party:** {supplier_name}")
+                st.info(f"**Phone:** {supplier_phone}")
+            
+            with col2:
+                st.success(f"**Total Items:** {total_items}")
+                st.success(f"**Total Amount:** ₹{total_amount:,.2f}")
+            
+            with col3:
+                st.warning(f"**Payment:** {payment_mode}")
+                if payment_mode in ["Cash", "Online"]:
+                    st.info(f"Will deduct from {payment_mode}")
+                else:
+                    st.info("Will add to Supplier Dues")
+            
             if st.button("💾 SAVE PURCHASE", type="primary", use_container_width=True):
+                # Create supplier full info
+                supplier_full_info = f"{supplier_name} ({supplier_phone})"
+                
                 # Save all items to Inventory
                 for item in st.session_state.purchase_cart:
-                    payment_info = payment_mode if not supplier_name else f"Party: {supplier_name}"
+                    payment_info = f"{payment_mode} - {supplier_full_info}"
                     total_value = item['Qty'] * item['Rate']
                     
                     save_data("Inventory", [
@@ -922,18 +997,20 @@ elif menu == "📦 Purchase":
                 # Handle payment
                 if payment_mode in ["Cash", "Online"]:
                     update_balance(total_amount, payment_mode, 'subtract')
-                    st.success(f"✅ Purchase saved! Paid ₹{total_amount:,.2f} from {payment_mode}")
+                    st.success(f"✅ Purchase saved!")
+                    st.success(f"✅ ₹{total_amount:,.2f} deducted from {payment_mode}")
+                    st.info(f"📝 Supplier: {supplier_full_info}")
                 else:
-                    # ✅ AUTOMATIC SUPPLIER DUES ENTRY
-                    if supplier_name and supplier_name.strip():
-                        items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
-                        
-                        # Save to Dues sheet with POSITIVE amount (we owe them)
-                        save_data("Dues", [supplier_name, total_amount, str(today_dt), f"Purchase: {items_note}"])
-                        
-                        st.success(f"✅ Purchase saved!")
-                        st.success(f"✅ ₹{total_amount:,.2f} automatically added to {supplier_name}'s dues in Supplier Dues section!")
-                        st.info(f"💡 Check 'Supplier Dues' menu to see {supplier_name}'s balance")
+                    # Udhaar - Add to Supplier Dues
+                    items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
+                    
+                    # Save to Dues sheet with POSITIVE amount (we owe them)
+                    save_data("Dues", [supplier_full_info, total_amount, str(today_dt), f"Purchase: {items_note}"])
+                    
+                    st.success(f"✅ Purchase saved!")
+                    st.success(f"✅ ₹{total_amount:,.2f} added to {supplier_name}'s dues!")
+                    st.info(f"📝 Phone: {supplier_phone}")
+                    st.info(f"💡 Check 'Supplier Dues' menu to see {supplier_name}'s balance")
                 
                 st.session_state.purchase_cart = []
                 st.balloons()
