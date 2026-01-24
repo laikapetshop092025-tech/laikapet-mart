@@ -1395,35 +1395,61 @@ Thank you! Visit again soon! 🙏"""
         today_sales = s_df[s_df['Date'] == today_dt]
         
         if not today_sales.empty:
-            st.success(f"✅ {len(today_sales)} bills created today")
+            # Group by customer
+            customer_bills = {}
             
-            # Reverse order - latest bill first (niche se upar)
-            for idx in reversed(today_sales.index):
-                row = today_sales.loc[idx]
+            for idx, row in today_sales.iterrows():
+                customer = str(row.iloc[5]) if len(row) > 5 else "Unknown Customer"
                 
-                # Extract bill details
-                bill_date = row.iloc[0] if len(row) > 0 else "N/A"
-                item_name = row.iloc[1] if len(row) > 1 else "N/A"
-                quantity = row.iloc[2] if len(row) > 2 else "N/A"
+                if customer not in customer_bills:
+                    customer_bills[customer] = {
+                        'items': [],
+                        'total_amount': 0,
+                        'total_points': 0,
+                        'payment': str(row.iloc[4]) if len(row) > 4 else "N/A",
+                        'indices': []
+                    }
+                
+                # Add item to customer's bill
+                item_name = str(row.iloc[1]) if len(row) > 1 else "Item"
+                quantity = str(row.iloc[2]) if len(row) > 2 else "0"
                 amount = float(row.iloc[3]) if len(row) > 3 else 0
-                payment = row.iloc[4] if len(row) > 4 else "N/A"
-                customer = row.iloc[5] if len(row) > 5 else "N/A"
                 points = int(float(row.iloc[6])) if len(row) > 6 and pd.notna(row.iloc[6]) else 0
                 
-                # Extract customer phone from customer info
+                customer_bills[customer]['items'].append({
+                    'name': item_name,
+                    'qty': quantity,
+                    'amount': amount,
+                    'index': idx
+                })
+                customer_bills[customer]['total_amount'] += amount
+                customer_bills[customer]['total_points'] += points
+                customer_bills[customer]['indices'].append(idx)
+            
+            st.success(f"✅ {len(customer_bills)} customers today | {len(today_sales)} total items")
+            
+            # Display grouped bills (latest customer first)
+            for customer, bill_data in reversed(list(customer_bills.items())):
+                # Extract customer phone
                 cust_phone = ""
-                if "(" in str(customer) and ")" in str(customer):
-                    cust_phone = str(customer).split("(")[1].split(")")[0].strip()
+                cust_name = customer
+                if "(" in customer and ")" in customer:
+                    cust_name = customer.split("(")[0].strip()
+                    cust_phone = customer.split("(")[1].split(")")[0].strip()
                 
-                # Create expandable bill entry
+                # Create bill container
                 with st.container():
                     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                     
                     with col1:
-                        st.write(f"**{customer}** - {item_name} ({quantity}) - ₹{amount:,.0f}")
+                        st.write(f"**👤 {cust_name}**")
+                        # Show all items
+                        items_text = ", ".join([f"{item['name']} ({item['qty']})" for item in bill_data['items']])
+                        st.caption(items_text)
+                        st.write(f"**💰 Total: ₹{bill_data['total_amount']:,.0f}** | 💳 {bill_data['payment']}")
                     
                     with col2:
-                        st.write(f"👑 {points} pts")
+                        st.metric("Points", f"👑 {bill_data['total_points']}", delta=None)
                     
                     with col3:
                         # WhatsApp Button
@@ -1433,77 +1459,96 @@ Thank you! Visit again soon! 🙏"""
                             if not clean_phone.startswith('91') and len(clean_phone) == 10:
                                 clean_phone = '91' + clean_phone
                             
-                            # Create WhatsApp message
+                            # Create WhatsApp message with all items
+                            items_list = "\n".join([f"  • {item['name']} - {item['qty']} = ₹{item['amount']:,.0f}" for item in bill_data['items']])
+                            
                             message = f"""🐾 *LAIKA PET MART* 🐾
 
-Hello {customer.split('(')[0].strip()}! 
+Hello {cust_name}! 
 
 Thank you for shopping with us! 💚
 
 *Bill Details:*
 ━━━━━━━━━━━━━━━━
-📦 Item: {item_name} ({quantity})
-💰 Amount: ₹{amount:,.2f}
-💳 Payment: {payment}"""
+📦 Items Purchased:
+{items_list}
+
+💰 Total Amount: ₹{bill_data['total_amount']:,.2f}
+💳 Payment Mode: {bill_data['payment']}"""
                             
-                            if points > 0:
+                            if bill_data['total_points'] > 0:
                                 message += f"""
 
-👑 Points Earned: {points}
-💡 Keep collecting for rewards!"""
+👑 Total Points Earned: {bill_data['total_points']}
+💡 Keep collecting points for amazing rewards!"""
+                            else:
+                                message += f"""
+
+💡 Purchase ₹100+ to earn royalty points!"""
                             
                             message += f"""
 
 ━━━━━━━━━━━━━━━━
-📅 {bill_date}
+📅 Date: {today_dt.strftime('%d %B %Y')}
 
-Thank you! Visit again! 🙏"""
+Thank you for your purchase! 
+Visit us again soon! 🙏"""
                             
                             import urllib.parse
                             encoded_message = urllib.parse.quote(message)
                             whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_message}"
                             
-                            st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><button style="background: #25D366; color: white; padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">💬 WhatsApp</button></a>', unsafe_allow_html=True)
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><button style="background: #25D366; color: white; padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; width: 100%;">💬 Send</button></a>', unsafe_allow_html=True)
                         else:
-                            st.write("❌ No phone")
+                            st.caption("❌ No phone")
                     
                     with col4:
-                        # Delete Button
-                        if st.button("🗑️", key=f"del_bill_{idx}", help="Delete this bill"):
-                            # Get quantity for stock reversal
-                            qty_str = str(quantity)
-                            qty_parts = qty_str.split()
-                            qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
-                            unit = qty_parts[1] if len(qty_parts) > 1 else "Pcs"
+                        # Delete Button (deletes all items for this customer)
+                        if st.button("🗑️", key=f"del_customer_{hash(customer)}", help="Delete all bills for this customer"):
+                            total_reversed = 0
+                            
+                            # Reverse all transactions
+                            for item in bill_data['items']:
+                                item_name = item['name']
+                                qty_str = item['qty']
+                                amount = item['amount']
+                                
+                                # Extract quantity and unit
+                                qty_parts = qty_str.split()
+                                qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
+                                unit = qty_parts[1] if len(qty_parts) > 1 else "Pcs"
+                                
+                                # ADD STOCK BACK
+                                inv_df = load_data("Inventory")
+                                if not inv_df.empty:
+                                    product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
+                                    if not product_rows.empty:
+                                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                                        new_stock = current_stock + qty
+                                        
+                                        save_data("Inventory", [
+                                            item_name,
+                                            new_stock,
+                                            unit,
+                                            current_rate,
+                                            new_stock * current_rate,
+                                            str(today_dt),
+                                            f"Bill deleted - stock restored"
+                                        ])
+                                
+                                total_reversed += amount
                             
                             # REVERSE PAYMENT
-                            if payment == "Cash":
-                                update_balance(amount, "Cash", 'subtract')
-                            elif payment == "Online":
-                                update_balance(amount, "Online", 'subtract')
+                            if bill_data['payment'] == "Cash":
+                                update_balance(total_reversed, "Cash", 'subtract')
+                            elif bill_data['payment'] == "Online":
+                                update_balance(total_reversed, "Online", 'subtract')
                             
-                            # ADD STOCK BACK
-                            inv_df = load_data("Inventory")
-                            if not inv_df.empty:
-                                product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
-                                if not product_rows.empty:
-                                    current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
-                                    current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
-                                    new_stock = current_stock + qty
-                                    
-                                    save_data("Inventory", [
-                                        item_name,
-                                        new_stock,
-                                        unit,
-                                        current_rate,
-                                        new_stock * current_rate,
-                                        str(today_dt),
-                                        f"Bill deleted - stock restored"
-                                    ])
-                            
-                            st.success(f"✅ Bill deleted! ₹{amount:,.0f} reversed, stock restored")
+                            st.success(f"✅ All bills for {cust_name} deleted!")
+                            st.info(f"💰 ₹{total_reversed:,.0f} reversed | 📦 Stock restored")
                             st.warning("⚠️ Also delete from Google Sheets Sales tab")
-                            time.sleep(1)
+                            time.sleep(2)
                             st.rerun()
                     
                     st.divider()
