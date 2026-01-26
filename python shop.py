@@ -1058,8 +1058,6 @@ elif menu == "🧾 Billing":
                             st.error(f"❌ Not enough stock! Only {available_qty} {last_unit} available")
                     else:
                         st.error("⚠️ Enter valid quantity and rate!")
-                    else:
-                        st.error("⚠️ Enter valid quantity and rate!")
     
     # Display cart
     if st.session_state.bill_cart:
@@ -3133,6 +3131,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
