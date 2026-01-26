@@ -1054,7 +1054,7 @@ with col5:
                             st.session_state.bill_cart.append({
                                 'Item': item,
                                 'Qty': qty,
-                                'Unit': last_unit,
+                                'Unit': selected_unit,
                                 'Rate': rate,
                                 'Amount': qty * rate
                             })
@@ -3138,5 +3138,6 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
