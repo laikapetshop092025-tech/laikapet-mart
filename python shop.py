@@ -1007,12 +1007,21 @@ elif menu == "🧾 Billing":
                 st.error("⚠️ No items in inventory!")
                 item = None
         
-        with col2:
-    max_qty = max(float(available_qty), 0.1) if available_qty > 0 else 1000.0
-    default_qty = min(1.0, float(available_qty)) if available_qty > 0 else 1.0
-    qty = st.number_input("Quantity", min_value=0.1, max_value=max_qty, value=default_qty, step=0.1, key="bill_qty")
-
-with col3:
+       with col2:
+            max_qty = max(float(available_qty), 0.1) if available_qty > 0 else 1000.0
+            default_qty = min(1.0, float(available_qty)) if available_qty > 0 else 1.0
+            qty = st.number_input("Quantity", min_value=0.1, max_value=max_qty, value=default_qty, step=0.1, key="bill_qty")
+        
+        with col3:
+            selected_unit = st.selectbox("Unit *", ["Kg", "Pcs", "Pkt", "Grams", "Ltr"], key="bill_unit")
+            st.caption(f"Last: {last_unit}")
+        
+        with col4:
+            rate = st.number_input("Rate/Unit", min_value=0.0, value=float(last_rate), step=1.0, key="bill_rate")
+        
+        with col5:
+            st.write("**Amount**")
+            st.success(f"₹{qty * rate:,.2f}")
     selected_unit = st.selectbox("Unit *", ["Kg", "Pcs", "Pkt", "Grams", "Ltr"], key="bill_unit")
     st.caption(f"Last: {last_unit}")
 
@@ -3129,4 +3138,5 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
