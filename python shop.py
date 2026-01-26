@@ -1007,37 +1007,30 @@ elif menu == "🧾 Billing":
                 st.error("⚠️ No items in inventory!")
                 item = None
         
-       with col2:
-            max_qty = max(float(available_qty), 0.1) if available_qty > 0 else 1000.0
-            default_qty = min(1.0, float(available_qty)) if available_qty > 0 else 1.0
-            qty = st.number_input("Quantity", min_value=0.1, max_value=max_qty, value=default_qty, step=0.1, key="bill_qty")
-        
-        with col3:
-            selected_unit = st.selectbox("Unit *", ["Kg", "Pcs", "Pkt", "Grams", "Ltr"], key="bill_unit")
-            st.caption(f"Last: {last_unit}")
-        
-        with col4:
-            rate = st.number_input("Rate/Unit", min_value=0.0, value=float(last_rate), step=1.0, key="bill_rate")
-        
-        with col5:
-            st.write("**Amount**")
-            st.success(f"₹{qty * rate:,.2f}")
-    selected_unit = st.selectbox("Unit *", ["Kg", "Pcs", "Pkt", "Grams", "Ltr"], key="bill_unit")
-    st.caption(f"Last: {last_unit}")
-
-with col4:
-    rate = st.number_input("Rate/Unit", min_value=0.0, value=float(last_rate), step=1.0, key="bill_rate")
-
-with col5:
-    st.write("**Amount**")
-    st.success(f"₹{qty * rate:,.2f}")
+        if item and not inv_df.empty:
+            # Get LATEST stock entry for this product
+            product_stock = inv_df[inv_df.iloc[:, 0] == item].tail(1)
+            
+            if not product_stock.empty:
+                available_qty = pd.to_numeric(product_stock.iloc[-1, 1], errors='coerce')
+                last_unit = product_stock.iloc[-1, 2] if len(product_stock.columns) > 2 else "Pcs"
+                last_rate = pd.to_numeric(product_stock.iloc[-1, 3], errors='coerce') if len(product_stock.columns) > 3 else 0
+                
+                st.info(f"📦 **Available Stock:** {available_qty} {last_unit}")
+                
+                with col2:
+                    max_qty = max(float(available_qty), 0.1) if available_qty > 0 else 1000.0
                     default_qty = min(1.0, float(available_qty)) if available_qty > 0 else 1.0
                     qty = st.number_input("Quantity", min_value=0.1, max_value=max_qty, value=default_qty, step=0.1, key="bill_qty")
                 
                 with col3:
-                    rate = st.number_input("Rate/Unit", min_value=0.0, value=float(last_rate), step=1.0, key="bill_rate")
+                    selected_unit = st.selectbox("Unit *", ["Kg", "Pcs", "Pkt", "Grams", "Ltr"], key="bill_unit")
+                    st.caption(f"Last: {last_unit}")
                 
                 with col4:
+                    rate = st.number_input("Rate/Unit", min_value=0.0, value=float(last_rate), step=1.0, key="bill_rate")
+                
+                with col5:
                     st.write("**Amount**")
                     st.success(f"₹{qty * rate:,.2f}")
                 
@@ -1058,11 +1051,13 @@ with col5:
                                 'Rate': rate,
                                 'Amount': qty * rate
                             })
-                            st.success(f"✅ Added {item}")
+                            st.success(f"✅ Added {item} ({qty} {selected_unit})")
                             time.sleep(0.3)
                             st.rerun()
                         else:
                             st.error(f"❌ Not enough stock! Only {available_qty} {last_unit} available")
+                    else:
+                        st.error("⚠️ Enter valid quantity and rate!")
                     else:
                         st.error("⚠️ Enter valid quantity and rate!")
     
@@ -3138,6 +3133,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
