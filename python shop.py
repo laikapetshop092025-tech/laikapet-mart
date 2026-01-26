@@ -2235,7 +2235,10 @@ elif menu == "🐾 Pet Register":
 # ========================================
 # MENU 8: CUSTOMER DUE (renamed from Customer Khata)
 # ========================================
-    elif menu == "📒 Customer Due":
+    # ========================================
+# MENU 8: CUSTOMER DUE (renamed from Customer Khata)
+# ========================================
+elif menu == "📒 Customer Due":
     st.header("📒 Customer Due Management")
     
     tab1, tab2 = st.tabs(["💰 Transaction Entry", "📊 View Summary"])
@@ -2244,15 +2247,14 @@ elif menu == "🐾 Pet Register":
         with st.form("khata"):
             st.subheader("Record Transaction")
             cust = st.text_input("Customer Name/Phone *", placeholder="Enter customer name or phone")
-            amt = st.number_input("Amount (₹)", min_value=0.0, step=10.0)
+            amt = st.number_input("Amount (Rs.)", min_value=0.0, step=10.0)
             
-            # Transaction type selection
             st.markdown("### Transaction Type")
             transaction_type = st.radio(
                 "Select transaction type:",
                 [
-                    "💰 Payment Received (Customer ne hamein paisa diya)",
-                    "📒 Credit Given (Hamne customer ko udhaar diya)"
+                    "Payment Received (Customer ne hamein paisa diya)",
+                    "Credit Given (Hamne customer ko udhaar diya)"
                 ],
                 horizontal=False,
                 help="Choose whether customer is paying you or you're giving credit"
@@ -2264,20 +2266,19 @@ elif menu == "🐾 Pet Register":
             
             st.divider()
             
-            # Show clear explanation based on transaction type
             if "Payment Received" in transaction_type:
                 st.success("""
-                **💰 Payment Received:**
+                Payment Received:
                 - Customer ka due REDUCE hoga (kam hoga)
                 - Paisa aapke Cash/Online balance mein ADD hoga
-                - Example: Customer ka ₹500 due hai, usne ₹300 diye, toh due ₹200 ho jayega
+                - Example: Customer ka Rs.500 due hai, usne Rs.300 diye, toh due Rs.200 ho jayega
                 """)
             else:
                 st.warning("""
-                **📒 Credit Given:**
+                Credit Given:
                 - Customer ka due INCREASE hoga (badh jayega)
                 - Paisa aapke balance se deduct NAHI hoga (kyunki ye future payment hai)
-                - Example: Customer ko ₹500 ka maal diya udhaar par, toh due ₹500 ho jayega
+                - Example: Customer ko Rs.500 ka maal diya udhaar par, toh due Rs.500 ho jayega
                 """)
             
             if st.form_submit_button("💾 Save Transaction", type="primary"):
@@ -2289,25 +2290,25 @@ elif menu == "🐾 Pet Register":
                         # ADD money to our balance
                         if pay_mode == "Cash":
                             update_balance(amt, "Cash", 'add')
-                            st.success(f"✅ ₹{amt:,.2f} added to Cash balance")
+                            st.success(f"Rs.{amt:,.2f} added to Cash balance")
                         elif pay_mode == "Online":
                             update_balance(amt, "Online", 'add')
-                            st.success(f"✅ ₹{amt:,.2f} added to Online balance")
+                            st.success(f"Rs.{amt:,.2f} added to Online balance")
                         
-                        st.success(f"✅ Payment of ₹{amt:,.2f} recorded from {cust}")
-                        st.info(f"📉 Customer ka due ₹{amt:,.2f} kam ho gaya")
+                        st.success(f"Payment of Rs.{amt:,.2f} recorded from {cust}")
+                        st.info(f"Customer ka due Rs.{amt:,.2f} kam ho gaya")
                         st.balloons()
                         
                     else:
                         # We gave credit - INCREASE their due (positive entry)
                         save_data("CustomerKhata", [cust, amt, str(today_dt), f"Credit given: {note}"])
-                        st.success(f"✅ Credit of ₹{amt:,.2f} given to {cust}")
-                        st.warning(f"📈 Customer ka due ₹{amt:,.2f} badh gaya")
+                        st.success(f"Credit of Rs.{amt:,.2f} given to {cust}")
+                        st.warning(f"Customer ka due Rs.{amt:,.2f} badh gaya")
                     
                     time.sleep(2)
                     st.rerun()
                 else:
-                    st.error("⚠️ Please enter customer name and amount!")
+                    st.error("Please enter customer name and amount!")
     
     with tab2:
         k_df = load_data("CustomerKhata")
@@ -2318,30 +2319,27 @@ elif menu == "🐾 Pet Register":
             sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
             sum_df.columns = ['Customer', 'Balance']
             
-            # Show only customers with positive balance (they owe us)
             sum_df = sum_df[sum_df['Balance'] > 0].sort_values('Balance', ascending=False)
             
             if not sum_df.empty:
                 total_due = sum_df['Balance'].sum()
                 
                 col1, col2 = st.columns([1, 1])
-                col1.metric("💰 Total Outstanding Due", f"₹{total_due:,.2f}")
+                col1.metric("💰 Total Outstanding Due", f"Rs.{total_due:,.2f}")
                 col2.metric("👥 Customers with Due", len(sum_df))
                 
                 st.divider()
                 
-                # Search functionality
                 search_customer = st.text_input("🔍 Search Customer", placeholder="Type customer name or phone")
                 
                 if search_customer:
                     sum_df = sum_df[sum_df['Customer'].str.contains(search_customer, case=False, na=False)]
                 
-                # Display each customer's due
                 for idx, row in sum_df.iterrows():
                     customer = row['Customer']
                     balance = row['Balance']
                     
-                    with st.expander(f"🔴 **{customer}** - Due: ₹{balance:,.2f}"):
+                    with st.expander(f"🔴 **{customer}** - Due: Rs.{balance:,.2f}"):
                         cust_txns = k_df[k_df.iloc[:, 0] == customer]
                         
                         col1, col2 = st.columns([2, 1])
@@ -2354,14 +2352,13 @@ elif menu == "🐾 Pet Register":
                                 note = str(txn.iloc[3]) if len(txn) > 3 else ""
                                 
                                 if amount > 0:
-                                    st.error(f"📥 {date}: Credit ₹{amount:,.2f} - {note}")
+                                    st.error(f"📥 {date}: Credit Rs.{amount:,.2f} - {note}")
                                 else:
-                                    st.success(f"💰 {date}: Payment ₹{abs(amount):,.2f} - {note}")
+                                    st.success(f"💰 {date}: Payment Rs.{abs(amount):,.2f} - {note}")
                         
                         with col2:
                             st.markdown("#### Quick Actions")
                             
-                            # Quick payment form
                             with st.form(f"quick_pay_{customer}_{idx}"):
                                 st.write("**Receive Payment**")
                                 quick_amt = st.number_input(
@@ -2380,7 +2377,6 @@ elif menu == "🐾 Pet Register":
                                 
                                 if st.form_submit_button("💰 Receive", type="primary", use_container_width=True):
                                     if quick_amt > 0:
-                                        # Record payment
                                         save_data("CustomerKhata", [
                                             customer, 
                                             -quick_amt, 
@@ -2388,19 +2384,17 @@ elif menu == "🐾 Pet Register":
                                             f"Quick payment via {quick_mode}"
                                         ])
                                         
-                                        # Add to balance
                                         if quick_mode == "Cash":
                                             update_balance(quick_amt, "Cash", 'add')
                                         elif quick_mode == "Online":
                                             update_balance(quick_amt, "Online", 'add')
                                         
-                                        st.success(f"✅ ₹{quick_amt:,.2f} received!")
+                                        st.success(f"Rs.{quick_amt:,.2f} received!")
                                         time.sleep(1)
                                         st.rerun()
                 
                 st.divider()
                 
-                # Download report
                 if st.button("📥 Download Due Report", type="secondary"):
                     csv = sum_df.to_csv(index=False).encode('utf-8')
                     st.download_button(
@@ -2436,135 +2430,6 @@ elif menu == "🐾 Pet Register":
             3. Customer's due will be increased
             4. No money deduction from your balance
             """)
-```
-
----
-
-## 📍 Step 5: File Save Karo
-```
-1. Ctrl + S press karo
-2. File save ho jayegi
-```
-
----
-
-## 📍 Step 6: Test Karo
-```
-Terminal mein:
-streamlit run laika_pet_mart_app.py
-```
-
-**Test Steps:**
-
-1. **Login karo**
-2. **Customer Due menu kholo**
-3. **Transaction Entry tab kholo**
-
-**Test Case 1: Payment Received**
-```
-- Customer Name: "Rahul Test"
-- Amount: 500
-- Select: "Payment Received (Customer ne hamein paisa diya)"
-- Payment Mode: Cash
-- Click "Save Transaction"
-```
-
-**Check karo:**
-- ✅ Cash balance mein ₹500 add hua?
-- ✅ Success message aaya?
-- ✅ Balloons animation dikhi?
-
----
-
-## 🎯 Quick Visual Guide
-
-**BEFORE (Purana Code):**
-```
-Customer Due → Payment Entry → Enter Amount → Save
-❌ Balance update nahi hota tha
-```
-
-**AFTER (Naya Code):**
-```
-Customer Due → Transaction Entry 
-→ Select "Payment Received" 
-→ Enter Amount 
-→ Select Cash/Online 
-→ Save
-✅ Balance automatically update hota hai!
-```
-
----
-
-## 📱 Screenshots Guide
-
-**Screen 1: Transaction Type Selection**
-```
-( ) Payment Received (Customer ne hamein paisa diya)  ← SELECT THIS
-( ) Credit Given (Hamne customer ko udhaar diya)
-```
-
-**Screen 2: Form Fields**
-```
-Customer Name: [Rahul (9876543210)]
-Amount: [500]
-Payment Mode: [Cash ▼]
-Note: [optional]
-```
-
-**Screen 3: Success Message**
-```
-✅ ₹500.00 added to Cash balance
-✅ Payment of ₹500.00 recorded from Rahul
-📉 Customer ka due ₹500.00 kam ho gaya
-```
-
----
-
-## ⚠️ Common Mistakes
-
-**Mistake 1:** Galat transaction type select karna
-```
-❌ Customer payment kar raha hai but "Credit Given" select kar diya
-✅ "Payment Received" select karo jab customer pay kare
-```
-
-**Mistake 2:** Copy-paste mein formatting kharab hona
-```
-Solution: Code ko plain text editor mein paste karo pehle (Notepad)
-Fir wahan se copy karke apni file mein paste karo
-```
-
-**Mistake 3:** Wrong section delete karna
-```
-Solution: Ctrl+F se dhundho "elif menu == "📒 Customer Due":"
-Sirf wahi section delete karo
-```
-
----
-
-## 🆘 Agar Koi Problem Ho
-
-**Problem 1: Code run nahi ho raha**
-```
-1. Check karo indentation sahi hai (spaces equal hain)
-2. Check karo quotes (' ') sahi hain
-3. Ek baar file restart karo
-```
-
-**Problem 2: Balance update nahi ho raha**
-```
-1. Check karo "Payment Received" select kiya hai
-2. Check karo Cash ya Online select kiya hai
-3. Dashboard refresh karo
-```
-
-**Problem 3: Error aa raha hai**
-```
-1. Screenshot bhejo error ka
-2. Check karo poora code paste hua hai
-3. File mein syntax error toh nahi
-
 # ========================================
 # MENU 8: SUPPLIER DUES
 # ========================================
@@ -3395,6 +3260,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
