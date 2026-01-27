@@ -2936,9 +2936,7 @@ elif menu == "📒 Customer Due":
         st.metric("💎 Net Worth", f"₹{net_worth:,.2f}")       
         st.info("💡 Simplified tax calculations for reference")
         
-        if not s_df.empty and len(s_df.columns) > 3:
-            start_date = today_dt - timedelta(days=30)
-        end_date = today_dt
+         end_date = today_dt
             period_sales = s_df[(s_df['Date'] >= start_date) & (s_df['Date'] <= end_date)]
             total_sales = pd.to_numeric(period_sales.iloc[:, 3], errors='coerce').sum() if not period_sales.empty else 0
             
@@ -3277,6 +3275,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
