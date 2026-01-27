@@ -2701,9 +2701,8 @@ elif menu == "📈 Advanced Reports":
 elif menu == "👥 Customer Analytics":
     st.header("👥 Customer Analytics & Insights")
     
-    s_df = load_data("Sales")
-    
-  elif menu == "📒 Customer Due":
+    s_df = load_data("Sales") 
+elif menu == "📒 Customer Due":
     st.header("📒 Customer Due Management")
     
     tab1, tab2 = st.tabs(["💰 Transaction Entry", "📊 View Summary"])
@@ -3267,6 +3266,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
