@@ -2238,7 +2238,7 @@ elif menu == "🐾 Pet Register":
     # ========================================
 # MENU 8: CUSTOMER DUE (renamed from Customer Khata)
 # ========================================
-elif menu == "📒 Customer Due":
+elif menu == "Customer Due":
     st.header("📒 Customer Due Management")
     
     tab1, tab2 = st.tabs(["💰 Transaction Entry", "📊 View Summary"])
@@ -3268,6 +3268,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
