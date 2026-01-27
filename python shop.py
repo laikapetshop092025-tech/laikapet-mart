@@ -2905,39 +2905,35 @@ elif menu == "📒 Customer Due":
             payables = 0
         
         # Calculate asset values
-s_df = load_data("Sales")
-if not s_df.empty and len(s_df.columns) > 1:
-    cash_bal = s_df.groupby(s_df.columns[0])[s_df.columns[1]].sum()
-    cash_bal = cash_bal[cash_bal.index == "Cash"].sum() if "Cash" in cash_bal.index else 0
-else:
-    cash_bal = 0
+    s_df = load_data("Sales")
+    if not s_df.empty and len(s_df.columns) > 1:
+        cash_bal = s_df.groupby(s_df.columns[0])[s_df.columns[1]].sum()
+        cash_bal = cash_bal[cash_bal.index == "Cash"].sum() if "Cash" in cash_bal.index else 0
+    else:
+        cash_bal = 0
 
-online_bal = s_df.groupby(s_df.columns[0])[s_df.columns[1]].sum()
-online_bal = online_bal[online_bal.index == "Online"].sum() if "Online" in online_bal.index else 0
+    online_bal = s_df.groupby(s_df.columns[0])[s_df.columns[1]].sum()
+    online_bal = online_bal[online_bal.index == "Online"].sum() if "Online" in online_bal.index else 0
 
-inventory_value = 0  # आपको inventory calculation add करना होगा
-receivables = 0      # आपको receivables calculation add करना होगा
-col1, col2 = st.columns(2)
-with col1:
-            st.markdown("### 📈 Assets")
-            st.metric("💵 Cash", f"₹{cash_bal:,.2f}")
-            st.metric("🏦 Online/Bank", f"₹{online_bal:,.2f}")
-            st.metric("📦 Inventory", f"₹{inventory_value:,.2f}")
-            st.metric("📒 Receivables", f"₹{receivables:,.2f}")
-            total_assets = cash_bal + online_bal + inventory_value + receivables
-            st.metric("✨ Total Assets", f"₹{total_assets:,.2f}")
-        
-        with col2:
-            st.markdown("### 📉 Liabilities")
-            st.metric("🏢 Supplier Dues", f"₹{payables:,.2f}")
-            st.metric("✨ Total Liabilities", f"₹{payables:,.2f}")
-            st.divider()
-            net_worth = total_assets - payables
-            st.metric("💎 Net Worth", f"₹{net_worth:,.2f}")
+    inventory_value = 0
+    receivables = 0
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### 📈 Assets")
+        st.metric("💵 Cash", f"₹{cash_bal:,.2f}")
+        st.metric("🏦 Online/Bank", f"₹{online_bal:,.2f}")
+        st.metric("📦 Inventory", f"₹{inventory_value:,.2f}")
+        st.metric("📒 Receivables", f"₹{receivables:,.2f}")
+        total_assets = cash_bal + online_bal + inventory_value + receivables
+        st.metric("✨ Total Assets", f"₹{total_assets:,.2f}")
     
-    with tab3:
-        st.subheader("📈 Tax Reports (GST)")
-        
+    with col2:
+        st.markdown("### 📉 Liabilities")
+        st.metric("🏢 Supplier Dues", f"₹{payables:,.2f}")
+        st.metric("✨ Total Liabilities", f"₹{payables:,.2f}")
+        st.divider()
+        net_worth = total_assets - payables
+        st.metric("💎 Net Worth", f"₹{net_worth:,.2f}")       
         st.info("💡 Simplified tax calculations for reference")
         
         if not s_df.empty and len(s_df.columns) > 3:
@@ -3279,6 +3275,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
