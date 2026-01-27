@@ -2918,7 +2918,7 @@ online_bal = online_bal[online_bal.index == "Online"].sum() if "Online" in onlin
 inventory_value = 0  # आपको inventory calculation add करना होगा
 receivables = 0      # आपको receivables calculation add करना होगा
 col1, col2 = st.columns(2)
-        with col1:
+with col1:
             st.markdown("### 📈 Assets")
             st.metric("💵 Cash", f"₹{cash_bal:,.2f}")
             st.metric("🏦 Online/Bank", f"₹{online_bal:,.2f}")
@@ -3279,6 +3279,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
