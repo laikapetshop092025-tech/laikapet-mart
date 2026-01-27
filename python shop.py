@@ -2703,8 +2703,7 @@ elif menu == "👥 Customer Analytics":
     
     s_df = load_data("Sales")
     
-    if not s_df.empty and len(s_df.columns) > 5:
-elif menu == "📒 Customer Due":
+  elif menu == "📒 Customer Due":
     st.header("📒 Customer Due Management")
     
     tab1, tab2 = st.tabs(["💰 Transaction Entry", "📊 View Summary"])
@@ -3268,6 +3267,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
