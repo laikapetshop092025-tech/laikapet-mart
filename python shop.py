@@ -2915,9 +2915,9 @@ else:
 online_bal = s_df.groupby(s_df.columns[0])[s_df.columns[1]].sum()
 online_bal = online_bal[online_bal.index == "Online"].sum() if "Online" in online_bal.index else 0
 
-            inventory_value = 0  # आपको inventory calculation add करना होगा
-            receivables = 0      # आपको receivables calculation add करना होगा
-            col1, col2 = st.columns(2)
+inventory_value = 0  # आपको inventory calculation add करना होगा
+receivables = 0      # आपको receivables calculation add करना होगा
+col1, col2 = st.columns(2)
         with col1:
             st.markdown("### 📈 Assets")
             st.metric("💵 Cash", f"₹{cash_bal:,.2f}")
@@ -3279,6 +3279,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
