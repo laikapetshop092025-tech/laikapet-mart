@@ -2904,6 +2904,19 @@ elif menu == "📒 Customer Due":
         else:
             payables = 0
         
+        # Calculate asset values
+s_df = load_data("Sales")
+if not s_df.empty and len(s_df.columns) > 1:
+    cash_bal = s_df.groupby(s_df.columns[0])[s_df.columns[1]].sum()
+    cash_bal = cash_bal[cash_bal.index == "Cash"].sum() if "Cash" in cash_bal.index else 0
+else:
+    cash_bal = 0
+
+online_bal = s_df.groupby(s_df.columns[0])[s_df.columns[1]].sum()
+online_bal = online_bal[online_bal.index == "Online"].sum() if "Online" in online_bal.index else 0
+
+inventory_value = 0  # आपको inventory calculation add करना होगा
+receivables = 0      # आपको receivables calculation add करना होगा
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("### 📈 Assets")
@@ -3266,6 +3279,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
