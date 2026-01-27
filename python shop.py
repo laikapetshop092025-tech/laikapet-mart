@@ -2704,190 +2704,198 @@ elif menu == "👥 Customer Analytics":
     s_df = load_data("Sales")
     
     if not s_df.empty and len(s_df.columns) > 5:
-        # RFM Analysis
-        st.subheader("🎯 RFM Analysis (Recency, Frequency, Monetary)")
-        
-        customer_data = s_df.groupby(s_df.columns[5]).agg({
-            s_df.columns[0]: 'max',  # Last purchase date
-            s_df.columns[3]: ['count', 'sum']  # Frequency and Monetary
-        }).reset_index()
-        
-        customer_data.columns = ['Customer', 'Last_Purchase', 'Frequency', 'Monetary']
-        customer_data['Monetary'] = pd.to_numeric(customer_data['Monetary'], errors='coerce')
-        
-        # Segment customers
-        high_value = customer_data[customer_data['Monetary'] > customer_data['Monetary'].quantile(0.7)]
-        medium_value = customer_data[(customer_data['Monetary'] > customer_data['Monetary'].quantile(0.3)) & 
-                                     (customer_data['Monetary'] <= customer_data['Monetary'].quantile(0.7))]
-        low_value = customer_data[customer_data['Monetary'] <= customer_data['Monetary'].quantile(0.3)]
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric("🌟 High Value", len(high_value))
-        col2.metric("📊 Medium Value", len(medium_value))
-        col3.metric("📉 Low Value", len(low_value))
-        
-        st.divider()
-        st.subheader("🏆 Top 10 Customers by Spending")
-        
-        top_customers = customer_data.sort_values('Monetary', ascending=False).head(10)
-        
-        for idx, row in top_customers.iterrows():
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                st.write(f"**{row['Customer']}**")
-            with col2:
-                st.metric("Total Spent", f"₹{row['Monetary']:,.0f}")
-            with col3:
-                st.metric("Visits", f"{row['Frequency']}")
-    else:
-        st.info("No customer data available")
-
-# ========================================
-# MENU 12: DISCOUNTS & OFFERS
-# ========================================
-elif menu == "🎁 Discounts & Offers":
-    st.header("🎁 Discounts & Offers Management")
+        elif menu == "📒 Customer Due":
+    st.header("📒 Customer Due Management")
     
-    tab1, tab2, tab3 = st.tabs(["📦 Bulk Discounts", "🎊 Seasonal Offers", "🎯 Combo Deals"])
+    tab1, tab2 = st.tabs(["💰 Transaction Entry", "📊 View Summary"])
     
     with tab1:
-        st.subheader("📦 Bulk Purchase Discounts")
-        
-        with st.form("bulk_discount"):
-            product = st.text_input("Product Name")
-            min_qty = st.number_input("Minimum Quantity", min_value=1)
-            discount_percent = st.number_input("Discount %", min_value=0.0, max_value=100.0, step=5.0)
+        with st.form("khata"):
+            st.subheader("Record Transaction")
+            cust = st.text_input("Customer Name/Phone *", placeholder="Enter customer name or phone")
+            amt = st.number_input("Amount (Rs.)", min_value=0.0, step=10.0)
             
-            if st.form_submit_button("💾 Save Discount", type="primary"):
-                save_data("Discounts", ["Bulk", product, min_qty, discount_percent, str(today_dt)])
-                st.success(f"✅ {discount_percent}% discount added for {product} (min {min_qty} units)")
-                time.sleep(1)
-                st.rerun()
-        
-        disc_df = load_data("Discounts")
-        if not disc_df.empty:
-            bulk_disc = disc_df[disc_df.iloc[:, 0] == "Bulk"]
-            if not bulk_disc.empty:
-                st.divider()
-                st.subheader("Active Bulk Discounts")
-                st.dataframe(bulk_disc, use_container_width=True)
-    
-    with tab2:
-        st.subheader("🎊 Seasonal Offers")
-        
-        with st.form("seasonal"):
-            offer_name = st.text_input("Offer Name", placeholder="e.g., Diwali Special")
-            start_date = st.date_input("Start Date")
-            end_date = st.date_input("End Date")
-            discount = st.number_input("Discount %", min_value=0.0, max_value=100.0)
+            st.markdown("### Transaction Type")
+            transaction_type = st.radio(
+                "Select transaction type:",
+                [
+                    "Payment Received (Customer ne hamein paisa diya)",
+                    "Credit Given (Hamne customer ko udhaar diya)"
+                ],
+                horizontal=False,
+                help="Choose whether customer is paying you or you're giving credit"
+            )
             
-            if st.form_submit_button("💾 Create Offer", type="primary"):
-                save_data("Offers", [offer_name, str(start_date), str(end_date), discount])
-                st.success(f"✅ {offer_name} created with {discount}% discount!")
-                time.sleep(1)
-                st.rerun()
-        
-        off_df = load_data("Offers")
-        if not off_df.empty:
+            pay_mode = st.selectbox("Payment Mode", ["Cash", "Online", "Other"], 
+                                   help="How the payment was made")
+            note = st.text_input("Note (Optional)", placeholder="Add any additional details")
+            
             st.divider()
-            st.subheader("Active Seasonal Offers")
-            st.dataframe(off_df, use_container_width=True)
-    
-    with tab3:
-        st.subheader("🎯 Combo Deal Builder")
-        
-        st.info("💡 Buy together and save! Create product combos with special pricing")
-        
-        with st.form("combo"):
-            combo_name = st.text_input("Combo Name", placeholder="e.g., Pet Care Bundle")
-            products = st.text_area("Products (one per line)")
-            combo_price = st.number_input("Combo Price", min_value=0.0)
             
-            if st.form_submit_button("💾 Create Combo", type="primary"):
-                save_data("Combos", [combo_name, products, combo_price, str(today_dt)])
-                st.success(f"✅ {combo_name} combo created at ₹{combo_price}!")
-                time.sleep(1)
-                st.rerun()
-
-# ========================================
-# MENU 13: FINANCIAL REPORTS
-# ========================================
-elif menu == "💼 Financial Reports":
-    st.header("💼 Financial Reports & Analysis")
-    
-    s_df = load_data("Sales")
-    e_df = load_data("Expenses")
-    p_df = load_data("Inventory")
-    
-    # Date range selector
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("From Date", value=datetime.now().date() - timedelta(days=30))
-    with col2:
-        end_date = st.date_input("To Date", value=datetime.now().date())
-    
-    tab1, tab2, tab3 = st.tabs(["📊 P&L Statement", "💰 Balance Sheet", "📈 Tax Reports"])
-    
-    with tab1:
-        st.subheader(f"📊 Profit & Loss: {start_date} to {end_date}")
-        
-        # Calculate revenue
-        if not s_df.empty and 'Date' in s_df.columns:
-            period_sales = s_df[(s_df['Date'] >= start_date) & (s_df['Date'] <= end_date)]
-            total_revenue = pd.to_numeric(period_sales.iloc[:, 3], errors='coerce').sum() if not period_sales.empty else 0
-        else:
-            total_revenue = 0
-        
-        # Calculate expenses
-        if not e_df.empty and len(e_df.columns) > 2:
-            try:
-                e_df['Date'] = pd.to_datetime(e_df.iloc[:, 0], errors='coerce').dt.date
-                period_expenses = e_df[(e_df['Date'] >= start_date) & (e_df['Date'] <= end_date)]
-                total_expenses = pd.to_numeric(period_expenses.iloc[:, 2], errors='coerce').sum() if not period_expenses.empty else 0
-            except:
-                total_expenses = 0
-        else:
-            total_expenses = 0
-        
-        # Calculate COGS (from purchases)
-        if not p_df.empty and len(p_df.columns) > 4:
-            cogs = pd.to_numeric(p_df.iloc[:, 4], errors='coerce').sum()
-        else:
-            cogs = 0
-        
-        gross_profit = total_revenue - cogs
-        net_profit = total_revenue - cogs - total_expenses
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("💰 Total Revenue", f"₹{total_revenue:,.2f}")
-            st.metric("📦 Cost of Goods Sold", f"₹{cogs:,.2f}")
-            st.metric("💵 Gross Profit", f"₹{gross_profit:,.2f}")
-        with col2:
-            st.metric("💸 Operating Expenses", f"₹{total_expenses:,.2f}")
-            st.metric("✨ Net Profit", f"₹{net_profit:,.2f}", 
-                     delta=f"{(net_profit/total_revenue*100):.1f}%" if total_revenue > 0 else "0%")
+            if "Payment Received" in transaction_type:
+                st.success("""
+                Payment Received:
+                - Customer ka due REDUCE hoga (kam hoga)
+                - Paisa aapke Cash/Online balance mein ADD hoga
+                - Example: Customer ka Rs.500 due hai, usne Rs.300 diye, toh due Rs.200 ho jayega
+                """)
+            else:
+                st.warning("""
+                Credit Given:
+                - Customer ka due INCREASE hoga (badh jayega)
+                - Paisa aapke balance se deduct NAHI hoga (kyunki ye future payment hai)
+                - Example: Customer ko Rs.500 ka maal diya udhaar par, toh due Rs.500 ho jayega
+                """)
+            
+            if st.form_submit_button("💾 Save Transaction", type="primary"):
+                if amt > 0 and cust.strip():
+                    if "Payment Received" in transaction_type:
+                        # Customer paid us - REDUCE their due (negative entry)
+                        save_data("CustomerKhata", [cust, -amt, str(today_dt), f"Payment received: {note}"])
+                        
+                        # ADD money to our balance
+                        if pay_mode == "Cash":
+                            update_balance(amt, "Cash", 'add')
+                            st.success(f"Rs.{amt:,.2f} added to Cash balance")
+                        elif pay_mode == "Online":
+                            update_balance(amt, "Online", 'add')
+                            st.success(f"Rs.{amt:,.2f} added to Online balance")
+                        
+                        st.success(f"Payment of Rs.{amt:,.2f} recorded from {cust}")
+                        st.info(f"Customer ka due Rs.{amt:,.2f} kam ho gaya")
+                        st.balloons()
+                        
+                    else:
+                        # We gave credit - INCREASE their due (positive entry)
+                        save_data("CustomerKhata", [cust, amt, str(today_dt), f"Credit given: {note}"])
+                        st.success(f"Credit of Rs.{amt:,.2f} given to {cust}")
+                        st.warning(f"Customer ka due Rs.{amt:,.2f} badh gaya")
+                    
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("Please enter customer name and amount!")
     
     with tab2:
-        st.subheader("💰 Balance Sheet")
-        
-        cash_bal = get_current_balance("Cash")
-        online_bal = get_current_balance("Online")
-        
-        # Calculate inventory value
-        if not p_df.empty and len(p_df.columns) > 4:
-            inventory_value = pd.to_numeric(p_df.iloc[:, 1], errors='coerce').mul(
-                pd.to_numeric(p_df.iloc[:, 3], errors='coerce')
-            ).sum()
-        else:
-            inventory_value = 0
-        
-        # Calculate receivables (Customer Khata)
         k_df = load_data("CustomerKhata")
+        
         if not k_df.empty and len(k_df.columns) > 1:
-            receivables = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum().sum()
-            receivables = max(0, receivables)
+            st.subheader("📊 Customer Due Summary")
+            
+            sum_df = k_df.groupby(k_df.columns[0]).agg({k_df.columns[1]: 'sum'}).reset_index()
+            sum_df.columns = ['Customer', 'Balance']
+            
+            sum_df = sum_df[sum_df['Balance'] > 0].sort_values('Balance', ascending=False)
+            
+            if not sum_df.empty:
+                total_due = sum_df['Balance'].sum()
+                
+                col1, col2 = st.columns([1, 1])
+                col1.metric("💰 Total Outstanding Due", f"Rs.{total_due:,.2f}")
+                col2.metric("👥 Customers with Due", len(sum_df))
+                
+                st.divider()
+                
+                search_customer = st.text_input("🔍 Search Customer", placeholder="Type customer name or phone")
+                
+                if search_customer:
+                    sum_df = sum_df[sum_df['Customer'].str.contains(search_customer, case=False, na=False)]
+                
+                for idx, row in sum_df.iterrows():
+                    customer = row['Customer']
+                    balance = row['Balance']
+                    
+                    with st.expander(f"🔴 **{customer}** - Due: Rs.{balance:,.2f}"):
+                        cust_txns = k_df[k_df.iloc[:, 0] == customer]
+                        
+                        col1, col2 = st.columns([2, 1])
+                        
+                        with col1:
+                            st.markdown("#### Transaction History")
+                            for _, txn in cust_txns.iterrows():
+                                date = str(txn.iloc[2]) if len(txn) > 2 else "N/A"
+                                amount = float(txn.iloc[1]) if len(txn) > 1 else 0
+                                note = str(txn.iloc[3]) if len(txn) > 3 else ""
+                                
+                                if amount > 0:
+                                    st.error(f"📥 {date}: Credit Rs.{amount:,.2f} - {note}")
+                                else:
+                                    st.success(f"💰 {date}: Payment Rs.{abs(amount):,.2f} - {note}")
+                        
+                        with col2:
+                            st.markdown("#### Quick Actions")
+                            
+                            with st.form(f"quick_pay_{customer}_{idx}"):
+                                st.write("**Receive Payment**")
+                                quick_amt = st.number_input(
+                                    "Amount", 
+                                    min_value=0.0, 
+                                    max_value=float(balance), 
+                                    value=float(balance),
+                                    step=10.0,
+                                    key=f"quick_{customer}_{idx}"
+                                )
+                                quick_mode = st.selectbox(
+                                    "Mode", 
+                                    ["Cash", "Online"], 
+                                    key=f"mode_{customer}_{idx}"
+                                )
+                                
+                                if st.form_submit_button("💰 Receive", type="primary", use_container_width=True):
+                                    if quick_amt > 0:
+                                        save_data("CustomerKhata", [
+                                            customer, 
+                                            -quick_amt, 
+                                            str(today_dt), 
+                                            f"Quick payment via {quick_mode}"
+                                        ])
+                                        
+                                        if quick_mode == "Cash":
+                                            update_balance(quick_amt, "Cash", 'add')
+                                        elif quick_mode == "Online":
+                                            update_balance(quick_amt, "Online", 'add')
+                                        
+                                        st.success(f"Rs.{quick_amt:,.2f} received!")
+                                        time.sleep(1)
+                                        st.rerun()
+                
+                st.divider()
+                
+                if st.button("📥 Download Due Report", type="secondary"):
+                    csv = sum_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="💾 Download CSV",
+                        data=csv,
+                        file_name=f"customer_due_report_{today_dt}.csv",
+                        mime="text/csv"
+                    )
+                
+            else:
+                st.success("✅ No outstanding dues! All customers have cleared their payments.")
+                st.balloons()
+            
+            st.divider()
+            st.subheader("📋 All Transactions")
+            st.dataframe(k_df, use_container_width=True)
+            
         else:
+            st.info("📝 No customer due records yet. Start recording transactions above!")
+            
+            st.markdown("""
+            ### 💡 How to use:
+            
+            **When customer pays you:**
+            1. Select "Payment Received"
+            2. Enter amount and payment mode
+            3. Money will be added to your Cash/Online balance
+            4. Customer's due will be reduced
+            
+            **When you give credit:**
+            1. Select "Credit Given"
+            2. Enter amount
+            3. Customer's due will be increased
+            4. No money deduction from your balance
+            """)
             receivables = 0
         
         # Calculate payables (Supplier Dues)
