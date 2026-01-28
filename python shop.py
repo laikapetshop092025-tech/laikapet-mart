@@ -1285,14 +1285,14 @@ elif menu == "🧾 Billing":
                         
                     # Handle payment
                     if payment_mode == "Cash":
-                        
-```
-=SUMIF(Sales!B:B, A2, Sales!C:C)
+                        update_balance(total, "Cash", 'add')
+                        st.success(f"Rs.{total:,.2f} added to Cash")
+                    elif payment_mode == "Online":
                         update_balance(total, "Online", 'add')
-                        st.success(f"✅ ₹{total:,.2f} added to Online")
+                        st.success(f"Rs.{total:,.2f} added to Online")
                     else:  # Udhaar
                         save_data("CustomerKhata", [customer_info, total, str(today_dt), "Sale on credit"])
-                        st.warning(f"📒 ₹{total:,.2f} added to {customer_info}'s due")
+                        st.warning(f"Rs.{total:,.2f} added to {customer_info}'s due")
                     
                     # Show GST invoice info if enabled
                     if enable_gst:
@@ -3273,6 +3273,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
