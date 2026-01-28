@@ -1282,13 +1282,10 @@ elif menu == "🧾 Billing":
                         
                         # Show info only, don't save new entry
                         st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
-                       # Show info only, don't save new entry
-st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
-```
-
-## 🎯 **Result After Fix:**
-
-1. **Billing karte time:**
+                        
+                    # Handle payment
+                    if payment_mode == "Cash":
+                        update_balance(total, "Cash", 'add')1. **Billing karte time:**
    - Stock calculation dikhega ✅
    - Low stock alert dikhega ✅
    - **New inventory entry NAHI** banegi ✅
@@ -3298,6 +3295,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
