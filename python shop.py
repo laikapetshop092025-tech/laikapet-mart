@@ -516,19 +516,27 @@ if menu == "📊 Dashboard":
     else:
         today_sale = 0
     
-    # Today's Purchases (ACTUAL COST)
+    # Today's Purchases (ACTUAL COST) - FIXED
     p_df = load_data("Inventory")
+    today_purchase = 0
+    
     if not p_df.empty and len(p_df.columns) > 5:
         try:
+            # Convert date column to date type
             p_df['pur_date'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce').dt.date
+            
+            # Filter ONLY today's purchases
             p_today = p_df[p_df['pur_date'] == today_dt]
-            today_purchase = pd.to_numeric(p_today.iloc[:, 4], errors='coerce').sum() if not p_today.empty else 0
-        except:
+            
+            # Sum column 4 (Total Value) ONLY for today
+            if not p_today.empty:
+                today_purchase = pd.to_numeric(p_today.iloc[:, 4], errors='coerce').sum()
+            else:
+                today_purchase = 0  # No purchase today
+        except Exception as e:
             today_purchase = 0
     else:
-        today_purchase = 0
-    
-    # Today's Expenses
+        today_purchase = 0    # Today's Expenses
     if not e_df.empty and len(e_df.columns) > 2:
         try:
             e_df['exp_date'] = pd.to_datetime(e_df.iloc[:, 0], errors='coerce').dt.date
@@ -3276,6 +3284,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
