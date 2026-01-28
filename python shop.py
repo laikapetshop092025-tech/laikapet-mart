@@ -1271,34 +1271,51 @@ elif menu == "🧾 Billing":
                             gst_info
                         ])
                         
-                        # ✅ DEDUCT STOCK FROM INVENTORY
-                        inv_df = load_data("Inventory")
-                        if not inv_df.empty:
-                            product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
-                            
-                            if not product_rows.empty:
-                                current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
-                                current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
-                                
-                                new_stock = current_stock - sold_qty
-                                
-                                save_data("Inventory", [
-                                    item_name,
-                                    new_stock,
-                                    unit,
-                                    current_rate,
-                                    new_stock * current_rate,
-                                    str(today_dt),
-                                    f"Sale deduction"
-                                ])
-                                
-                                st.info(f"📦 {item_name}: {current_stock} → {new_stock} {unit}")
+                        # ✅ STOCK TRACKING (Info only - no new entry)
+                inv_df = load_data("Inventory")
+                if not inv_df.empty:
+                    product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
                     
-                    # Handle payment
-                    if payment_mode == "Cash":
-                        update_balance(total, "Cash", 'add')
-                        st.success(f"✅ ₹{total:,.2f} added to Cash")
-                    elif payment_mode == "Online":
+                    if not product_rows.empty:
+                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                        new_stock = current_stock - sold_qty
+                        
+                        # Show info only, don't save new entry
+                        st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
+                       # Show info only, don't save new entry
+st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
+```
+**Sirf info dikhata hai, new entry NAHI banata! ✅**
+
+---
+
+## 🎯 **Result After Fix:**
+
+1. **Billing karte time:**
+   - Stock calculation dikhega ✅
+   - Low stock alert dikhega ✅
+   - **New inventory entry NAHI** banegi ✅
+
+2. **Google Sheets mein:**
+   - **Duplicate entries NAHI** banegi ✅
+   - Purchase calculation **sahi** hoga ✅
+
+3. **Stock update:**
+   - Manually karo Google Sheets mein ✅
+   - Ya billing report dekh ke adjust karo ✅
+
+---
+
+## 📊 **How to Track Stock Now:**
+
+### **Option 1: Manual (Simple)**
+1. Billing report dekho
+2. Google Sheets mein manually update karo
+
+### **Option 2: Formula (Better)**
+Google Sheets mein formula lagao:
+```
+=SUMIF(Sales!B:B, A2, Sales!C:C)
                         update_balance(total, "Online", 'add')
                         st.success(f"✅ ₹{total:,.2f} added to Online")
                     else:  # Udhaar
@@ -3284,6 +3301,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
