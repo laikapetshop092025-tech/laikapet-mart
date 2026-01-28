@@ -1155,43 +1155,41 @@ elif menu == "🧾 Billing":
         st.divider()
         
         # Royalty Points Section with Checkboxes
+        # Royalty Points Section - Manual Entry
         st.markdown("### 👑 Royalty Points & Rewards")
         
-        # Check if purchase is above ₹100
-        if total >= 100:
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                give_points = st.checkbox("✅ Give Royalty Points", value=True, key="give_points")
-            
-            with col2:
-                if give_points:
-                    is_referral = st.checkbox("🎁 Referral Bonus (+10 points)", value=False, key="is_referral")
-                else:
-                    is_referral = False
-            
-            with col3:
-                if give_points:
-                    st.info("Weekday: 2% | Weekend: 5%")
-            
-            # Calculate Royalty Points
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            give_points = st.checkbox("✅ Give Royalty Points", value=True, key="give_points")
+        
+        with col2:
             if give_points:
-                base_points = int(total * 0.05) if is_weekend else int(total * 0.02)
-                referral_bonus = 10 if is_referral else 0
-                points = base_points + referral_bonus
-                
-                if is_referral:
-                    st.success(f"👑 **Total Points: {points}** (Base: {base_points} + Referral Bonus: {referral_bonus})")
-                else:
-                    st.success(f"👑 **Total Points: {points}**")
+                points = st.number_input(
+                    "Enter Points", 
+                    min_value=0, 
+                    max_value=10000, 
+                    value=0, 
+                    step=1,
+                    key="manual_points",
+                    help="Apne hisaab se points enter karo"
+                )
             else:
                 points = 0
-                st.info("No points will be awarded for this sale")
-        else:
-            # Purchase below ₹100 - No points
-            points = 0
-            st.warning(f"⚠️ Minimum ₹100 purchase required for points. Current: ₹{total:,.2f}")
-            st.info("💡 Add more items to qualify for royalty points!")
+        
+        with col3:
+            if give_points and points > 0:
+                st.success(f"👑 **Points: {points}**")
+            elif give_points:
+                st.info("💡 Enter points to give")
+            else:
+                st.info("No points")
+        
+        # Show points summary
+        if give_points and points > 0:
+            st.success(f"✅ Customer ko {points} points milenge!")
+        elif not give_points:
+            st.info("❌ No points will be awarded for this sale")
         
         st.divider()
         
@@ -3278,6 +3276,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
