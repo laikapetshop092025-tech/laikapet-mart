@@ -1285,9 +1285,6 @@ elif menu == "🧾 Billing":
                        # Show info only, don't save new entry
 st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
 ```
-**Sirf info dikhata hai, new entry NAHI banata! ✅**
-
----
 
 ## 🎯 **Result After Fix:**
 
@@ -3301,6 +3298,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
