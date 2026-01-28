@@ -2751,22 +2751,23 @@ elif menu == "📒 Customer Due":
                         # Customer paid us - REDUCE their due (negative entry)
                         save_data("CustomerKhata", [cust, -amt, str(today_dt), f"Payment received: {note}"])
                         
-                        # ADD money to our balance
+                        # ✅ ADD money to our balance
                         if pay_mode == "Cash":
                             update_balance(amt, "Cash", 'add')
-                            st.success(f"Rs.{amt:,.2f} added to Cash balance")
+                            st.success(f"✅ Cash balance: +Rs.{amt:,.2f}")
                         elif pay_mode == "Online":
                             update_balance(amt, "Online", 'add')
-                            st.success(f"Rs.{amt:,.2f} added to Online balance")
+                            st.success(f"✅ Online balance: +Rs.{amt:,.2f}")
                         
-                        st.success(f"Payment of Rs.{amt:,.2f} recorded from {cust}")
-                        st.info(f"Customer ka due Rs.{amt:,.2f} kam ho gaya")
+                        st.success(f"✅ Payment Rs.{amt:,.2f} received from {cust}")
+                        st.info(f"📉 {cust} ka due Rs.{amt:,.2f} kam ho gaya")
                         st.balloons()
                         
                     else:
-                        # We gave credit - INCREASE their due (positive entry)
+                        # ✅ We gave credit - INCREASE their due (positive entry)
                         save_data("CustomerKhata", [cust, amt, str(today_dt), f"Credit given: {note}"])
-                        st.success(f"Credit of Rs.{amt:,.2f} given to {cust}")
+                        st.success(f"✅ Credit Rs.{amt:,.2f} given to {cust}")
+                        st.warning(f"📈 {cust} ka due Rs.{amt:,.2f} badh gaya")
                         st.warning(f"Customer ka due Rs.{amt:,.2f} badh gaya")
                     
                     time.sleep(2)
@@ -3277,6 +3278,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
