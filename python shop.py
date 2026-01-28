@@ -1285,29 +1285,7 @@ elif menu == "🧾 Billing":
                         
                     # Handle payment
                     if payment_mode == "Cash":
-                        update_balance(total, "Cash", 'add')1. **Billing karte time:**
-   - Stock calculation dikhega ✅
-   - Low stock alert dikhega ✅
-   - **New inventory entry NAHI** banegi ✅
-
-2. **Google Sheets mein:**
-   - **Duplicate entries NAHI** banegi ✅
-   - Purchase calculation **sahi** hoga ✅
-
-3. **Stock update:**
-   - Manually karo Google Sheets mein ✅
-   - Ya billing report dekh ke adjust karo ✅
-
----
-
-## 📊 **How to Track Stock Now:**
-
-### **Option 1: Manual (Simple)**
-1. Billing report dekho
-2. Google Sheets mein manually update karo
-
-### **Option 2: Formula (Better)**
-Google Sheets mein formula lagao:
+                        
 ```
 =SUMIF(Sales!B:B, A2, Sales!C:C)
                         update_balance(total, "Online", 'add')
@@ -3295,6 +3273,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
