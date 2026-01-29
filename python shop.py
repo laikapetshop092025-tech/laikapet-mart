@@ -803,38 +803,39 @@ if menu == "📊 Dashboard":
                 qty_parts = qty_str.split()
                 sold_qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
                 
-                # Get actual purchase rate from inventory
+                # Get LATEST purchase rate (not average) for this item
+                purchase_cost = 0
                 if not inv_df_profit.empty and item_name:
                     item_rows = inv_df_profit[inv_df_profit.iloc[:, 0] == item_name]
                     
                     if not item_rows.empty:
+                        # Get LATEST purchase rate (last entry)
                         latest_rate = pd.to_numeric(item_rows.iloc[-1, 3], errors='coerce')
-                        purchase_cost = sold_qty * avg_rate
-                        item_profit = sale_amount - purchase_cost
-                        
-                        month_profit += item_profit
-                        
-                        # Add to details (group by item)
-                        existing = next((x for x in month_profit_details if x['item'] == item_name), None)
-                        if existing:
-                            existing['sale'] += sale_amount
-                            existing['cost'] += purchase_cost
-                            existing['profit'] += item_profit
-                        else:
-                            month_profit_details.append({
-                                'item': item_name,
-                                'sale': sale_amount,
-                                'cost': purchase_cost,
-                                'profit': item_profit
-                            })
+                        purchase_cost = sold_qty * latest_rate
                     else:
+                        # New item - assume 70% cost
                         purchase_cost = sale_amount * 0.7
-                        item_profit = sale_amount * 0.3
-                        month_profit += item_profit
                 else:
+                    # No inventory data - assume 70% cost
                     purchase_cost = sale_amount * 0.7
-                    item_profit = sale_amount * 0.3
-                    month_profit += item_profit
+                
+                # Calculate profit
+                item_profit = sale_amount - purchase_cost
+                month_profit += item_profit
+                
+                # Add to details (group by item)
+                existing = next((x for x in month_profit_details if x['item'] == item_name), None)
+                if existing:
+                    existing['sale'] += sale_amount
+                    existing['cost'] += purchase_cost
+                    existing['profit'] += item_profit
+                else:
+                    month_profit_details.append({
+                        'item': item_name,
+                        'sale': sale_amount,
+                        'cost': purchase_cost,
+                        'profit': item_profit
+                    })
     
     # Subtract expenses from profit
     month_profit = month_profit - month_expense
@@ -3273,6 +3274,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
