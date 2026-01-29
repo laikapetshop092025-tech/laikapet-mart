@@ -566,48 +566,35 @@ if menu == "📊 Dashboard":
                 qty_parts = qty_str.split()
                 sold_qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
                 
-                # Get actual purchase rate from inventory
+                # ✅ Get LATEST purchase rate (not average) for this item
+                purchase_cost = 0
                 if not inv_df_profit.empty and item_name:
                     item_rows = inv_df_profit[inv_df_profit.iloc[:, 0] == item_name]
                     
                     if not item_rows.empty:
-                        # Get average purchase rate
-                        avg_rate = pd.to_numeric(item_rows.iloc[:, 3], errors='coerce').mean()
-                        purchase_cost = sold_qty * avg_rate
-                        item_profit = sale_amount - purchase_cost
-                        
-                        today_profit += item_profit
-                        today_profit_details.append({
-                            'item': item_name,
-                            'sale': sale_amount,
-                            'cost': purchase_cost,
-                            'profit': item_profit
-                        })
+                        # Get LATEST purchase rate (last entry)
+                        latest_rate = pd.to_numeric(item_rows.iloc[-1, 3], errors='coerce')
+                        purchase_cost = sold_qty * latest_rate
                     else:
-                        # If no purchase record, use 70% cost estimate
+                        # New item - assume 70% cost
                         purchase_cost = sale_amount * 0.7
-                        item_profit = sale_amount * 0.3
-                        today_profit += item_profit
                 else:
-                    # Fallback
+                    # No inventory data - assume 70% cost
                     purchase_cost = sale_amount * 0.7
-                    item_profit = sale_amount * 0.3
-                    today_profit += item_profit
+                
+                # Calculate profit
+                item_profit = sale_amount - purchase_cost
+                today_profit += item_profit
+                
+                today_profit_details.append({
+                    'item': item_name,
+                    'sale': sale_amount,
+                    'cost': purchase_cost,
+                    'profit': item_profit
+                })
     
     # Subtract expenses from profit
     today_profit = today_profit - today_expense
-    
-    # Colorful Cards for Today
-    st.markdown(f"""
-    <div style="display: flex; gap: 15px; margin-bottom: 30px;">
-        <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">💰 Total Sale</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_sale:,.2f}</h2>
-        </div>
-        <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">🛒 Total Purchase</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase:,.2f}</h2>
-        </div>
         <div style="flex: 1; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_expense:,.2f}</h2>
@@ -808,7 +795,7 @@ if menu == "📊 Dashboard":
                     item_rows = inv_df_profit[inv_df_profit.iloc[:, 0] == item_name]
                     
                     if not item_rows.empty:
-                        avg_rate = pd.to_numeric(item_rows.iloc[:, 3], errors='coerce').mean()
+                        latest_rate = pd.to_numeric(item_rows.iloc[-1, 3], errors='coerce')
                         purchase_cost = sold_qty * avg_rate
                         item_profit = sale_amount - purchase_cost
                         
@@ -3273,6 +3260,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
