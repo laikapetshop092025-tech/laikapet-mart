@@ -595,6 +595,20 @@ if menu == "📊 Dashboard":
     
     # Subtract expenses from profit
     today_profit = today_profit - today_expense
+        # Subtract expenses from profit
+    today_profit = today_profit - today_expense
+    
+    # Colorful Cards for Today
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+        <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">💰 Total Sale</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_sale:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">🛒 Total Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase:,.2f}</h2>
+        </div>
         <div style="flex: 1; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_expense:,.2f}</h2>
@@ -605,7 +619,6 @@ if menu == "📊 Dashboard":
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
     # Show Item-wise Profit Breakdown
     if today_profit_details:
         with st.expander("📊 Today's Item-wise Profit Breakdown", expanded=False):
@@ -3260,6 +3273,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
