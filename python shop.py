@@ -1243,21 +1243,21 @@ elif menu == "🧾 Billing":
                         
                         # Calculate actual profit based on purchase cost
                         inv_df_check = load_data("Inventory")
+                        purchase_cost = 0
+                        
                         if not inv_df_check.empty:
                             item_cost_rows = inv_df_check[inv_df_check.iloc[:, 0] == item_name]
                             if not item_cost_rows.empty:
-                                # Get average purchase rate
-                                avg_purchase_rate = pd.to_numeric(item_cost_rows.iloc[:, 3], errors='coerce').mean()
-                                cost = sold_qty * avg_purchase_rate
-                                profit = amount - cost
+                                # Get LATEST purchase rate (not average!)
+                                latest_purchase_rate = pd.to_numeric(item_cost_rows.iloc[-1, 3], errors='coerce')
+                                purchase_cost = sold_qty * latest_purchase_rate
                             else:
-                                # Fallback to 70% cost estimate
-                                cost = amount * 0.7
-                                profit = amount - cost
+                                # New item - no purchase history, profit = sale amount
+                                purchase_cost = 0
                         else:
-                            cost = amount * 0.7
-                            profit = amount - cost
+                            purchase_cost = 0
                         
+                        profit = amount - purchase_cost
                         # Save to Sales sheet with GST info
                         save_data("Sales", [
                             str(today_dt),
@@ -3273,6 +3273,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
