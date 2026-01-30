@@ -1332,112 +1332,81 @@ elif menu == "🧾 Billing":
                         # ✅ Calculate NEW total points
                         new_points_total = previous_points_total + points
                         
-                        # ✅ Create WhatsApp message
                         items_list = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.bill_cart])
                         
-                        # ✅ Payment info for message
-                        if payment_mode == "Partial Payment (Mixed)":
-                            payment_info = f"""💵 Cash: ₹{cash_amount:,.0f}
-🏦 Online: ₹{online_amount:,.0f}"""
-                            if udhaar_amount > 0:
-                                payment_info += f"\n📒 Udhaar: ₹{udhaar_amount:,.0f}"
-                        elif payment_mode == "Full Cash":
-                            payment_info = f"💵 Cash: ₹{total:,.0f}"
-                        elif payment_mode == "Full Online":
-                            payment_info = f"🏦 Online: ₹{total:,.0f}"
-                        else:  # Full Udhaar
-                            payment_info = f"📒 Udhaar: ₹{total:,.0f}"
-                        
-                        # ✅ Get customer's PREVIOUS total points (before this sale)
-                        s_df_whatsapp = load_data("Sales")
-                        previous_points_total = 0
-                        
-                        if not s_df_whatsapp.empty and len(s_df_whatsapp.columns) > 6:
-                            customer_previous = s_df_whatsapp[s_df_whatsapp.iloc[:, 5].str.contains(cust_name, case=False, na=False)]
-                            if not customer_previous.empty:
-                                previous_points_total = int(pd.to_numeric(customer_previous.iloc[:, 6], errors='coerce').sum())
-                        
-                        new_points_total = previous_points_total + points
-                        
-                        items_list = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.bill_cart])
-                        
-                        if payment_mode == "Partial Payment (Mixed)":
-                            payment_info = f"Cash: Rs.{cash_amount:,.0f} | Online: Rs.{online_amount:,.0f}"
-                            if udhaar_amount > 0:
-                                payment_info += f" | Udhaar: Rs.{udhaar_amount:,.0f}"
-                        elif payment_mode == "Full Cash":
-                            payment_info = f"Cash: Rs.{total:,.0f}"
-                        elif payment_mode == "Full Online":
-                            payment_info = f"Online: Rs.{total:,.0f}"
-                        else:
-                            payment_info = f"Udhaar: Rs.{total:,.0f}"
-                        
-                        message = "LAIKA PET MART\n\n"
-                        message += f"Hello {cust_name}!\n\n"
-                        message += "Thank you for shopping with us!\n\n"
-                        message += "*Bill Details:*\n"
-                        message += "━━━━━━━━━━━━━━━━\n"
-                        message += f"Items: {items_list}\n"
-                        message += f"Total Amount: Rs.{total:,.2f}\n\n"
-                        message += f"*Payment:*\n{payment_info}\n"
+                        msg_lines = []
+                        msg_lines.append("LAIKA PET MART")
+                        msg_lines.append("")
+                        msg_lines.append(f"Hello {cust_name}!")
+                        msg_lines.append("")
+                        msg_lines.append("Thank you for shopping with us!")
+                        msg_lines.append("")
+                        msg_lines.append("*Bill Details:*")
+                        msg_lines.append("=" * 30)
+                        msg_lines.append(f"Items: {items_list}")
+                        msg_lines.append(f"Total Amount: Rs.{total:,.2f}")
+                        msg_lines.append("")
+                        msg_lines.append("*Payment:*")
+                        msg_lines.append(payment_info)
                         
                         if points > 0:
-                            message += "\n━━━━━━━━━━━━━━━━\n"
-                            message += f"Points Earned Today: {points} points\n"
-                            message += f"Your Total Points: {new_points_total} points\n\n"
-                            message += "Keep collecting points for amazing rewards!\n"
+                            msg_lines.append("")
+                            msg_lines.append("=" * 30)
+                            msg_lines.append(f"*Points Earned Today:* {points} points")
+                            msg_lines.append(f"*Your Total Points:* {new_points_total} points")
+                            msg_lines.append("")
+                            msg_lines.append("Keep collecting points for rewards!")
                         else:
-                            message += "\nPurchase Rs.100+ to earn royalty points!\n"
+                            msg_lines.append("")
+                            msg_lines.append("Purchase Rs.100+ to earn points!")
                         
                         if enable_gst:
-                            message += "\n━━━━━━━━━━━━━━━━\n"
-                            message += f"GST Invoice: Yes\n"
-                            message += f"GSTIN: {customer_gstin}\n"
+                            msg_lines.append("")
+                            msg_lines.append("=" * 30)
+                            msg_lines.append(f"GST Invoice: Yes")
+                            msg_lines.append(f"GSTIN: {customer_gstin}")
                         
-                        message += "\n━━━━━━━━━━━━━━━━\n"
-                        message += f"Date: {today_dt.strftime('%d %B %Y')}\n\n"
-                        message += "Thank you for your purchase!\nVisit us again soon!"
-```
-
----
-
-## **📋 Example Test:**
-
-### **Test Case:**
-- Customer: **Rahul**
-- Previous purchases: 3 bills with 2, 3, 0 points = **5 total**
-- Today's bill: ₹700
-- You manually enter: **14 points**
-- Payment: Cash ₹400, Online ₹300
-
-### **WhatsApp Message Will Show:**
-```
-🐾 LAIKA PET MART 🐾
-
-Hello Rahul!
-
-Thank you for shopping with us! 💚
-
-Bill Details:
-━━━━━━━━━━━━━━━━
-📦 Items: Dog Food (2 Kg)
-💰 Total Amount: ₹700.00
-
-💳 Payment:
-💵 Cash: ₹400
-🏦 Online: ₹300
-
-━━━━━━━━━━━━━━━━
-👑 Points Earned Today: 14 points
-📊 Your Total Points: 19 points
-
-💡 Keep collecting points for amazing rewards!
-
-━━━━━━━━━━━━━━━━
-📅 Date: 30 January 2026
-
-Thank you for your purchase!
-Visit us again soon! 🙏
+                        msg_lines.append("")
+                        msg_lines.append("=" * 30)
+                        msg_lines.append(f"Date: {today_dt.strftime('%d %B %Y')}")
+                        msg_lines.append("")
+                        msg_lines.append("Thank you! Visit again soon!")
+                        
+                        message = "\n".join(msg_lines)
+                        
+                        import urllib.parse
+                        encoded_message = urllib.parse.quote(message)
+                        
+                        whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_message}"
+                        
+                        col1, col2 = st.columns([1, 3])
+                        
+                        with col1:
+                            st.success(f"📱 {cust_phone}")
+                        
+                        with col2:
+                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background: #25D366; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%;">💬 Send WhatsApp Message</button></a>', unsafe_allow_html=True)
+                        
+                        with st.expander("📄 Preview Message"):
+                            st.text(message)
+                    
+                    st.session_state.bill_cart = []
+                    st.balloons()
+                    time.sleep(3)
+                    st.rerun()
+            else:
+                st.error("⚠️ Please enter customer name!")
+    else:
+        st.info("🛒 Cart is empty. Add items to start billing.")
+    
+    # View Recent Sales with Delete and WhatsApp Option
+    st.divider()
+    st.markdown("### 📋 Today's Bills")
+    
+    s_df = load_data("Sales")
+    if not s_df.empty and 'Date' in s_df.columns:
+        today_sales = s_df[s_df['Date'] == today_dt]
+        
         if not today_sales.empty:
             # Group by customer
             customer_bills = {}
@@ -1454,7 +1423,6 @@ Visit us again soon! 🙏
                         'indices': []
                     }
                 
-                # Add item to customer's bill
                 item_name = str(row.iloc[1]) if len(row) > 1 else "Item"
                 quantity = str(row.iloc[2]) if len(row) > 2 else "0"
                 amount = float(row.iloc[3]) if len(row) > 3 else 0
@@ -1472,22 +1440,18 @@ Visit us again soon! 🙏
             
             st.success(f"✅ {len(customer_bills)} customers today | {len(today_sales)} total items")
             
-            # Display grouped bills (latest customer first)
             for customer, bill_data in reversed(list(customer_bills.items())):
-                # Extract customer phone
                 cust_phone = ""
                 cust_name = customer
                 if "(" in customer and ")" in customer:
                     cust_name = customer.split("(")[0].strip()
                     cust_phone = customer.split("(")[1].split(")")[0].strip()
                 
-                # Create bill container
                 with st.container():
                     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                     
                     with col1:
                         st.write(f"**👤 {cust_name}**")
-                        # Show all items
                         items_text = ", ".join([f"{item['name']} ({item['qty']})" for item in bill_data['items']])
                         st.caption(items_text)
                         st.write(f"**💰 Total: ₹{bill_data['total_amount']:,.0f}** | 💳 {bill_data['payment']}")
@@ -1496,47 +1460,42 @@ Visit us again soon! 🙏
                         st.metric("Points", f"👑 {bill_data['total_points']}", delta=None)
                     
                     with col3:
-                        # WhatsApp Button
                         if cust_phone:
-                            # Clean phone number
                             clean_phone = ''.join(filter(str.isdigit, cust_phone))
                             if not clean_phone.startswith('91') and len(clean_phone) == 10:
                                 clean_phone = '91' + clean_phone
                             
-                            # Create WhatsApp message with all items
                             items_list = "\n".join([f"  • {item['name']} - {item['qty']} = ₹{item['amount']:,.0f}" for item in bill_data['items']])
                             
-                            message = f"""🐾 *LAIKA PET MART* 🐾
+                            message = f"""LAIKA PET MART
 
-Hello {cust_name}! 
+Hello {cust_name}!
 
-Thank you for shopping with us! 💚
+Thank you for shopping with us!
 
 *Bill Details:*
-━━━━━━━━━━━━━━━━
-📦 Items Purchased:
+Items Purchased:
 {items_list}
 
-💰 Total Amount: ₹{bill_data['total_amount']:,.2f}
-💳 Payment Mode: {bill_data['payment']}"""
+Total Amount: Rs.{bill_data['total_amount']:,.2f}
+Payment Mode: {bill_data['payment']}"""
                             
                             if bill_data['total_points'] > 0:
                                 message += f"""
 
-👑 Total Points Earned: {bill_data['total_points']}
-💡 Keep collecting points for amazing rewards!"""
+Total Points Earned: {bill_data['total_points']}
+Keep collecting points for amazing rewards!"""
                             else:
                                 message += f"""
 
-💡 Purchase ₹100+ to earn royalty points!"""
+Purchase Rs.100+ to earn royalty points!"""
                             
                             message += f"""
 
-━━━━━━━━━━━━━━━━
-📅 Date: {today_dt.strftime('%d %B %Y')}
+Date: {today_dt.strftime('%d %B %Y')}
 
-Thank you for your purchase! 
-Visit us again soon! 🙏"""
+Thank you for your purchase!
+Visit us again soon!"""
                             
                             import urllib.parse
                             encoded_message = urllib.parse.quote(message)
@@ -1547,22 +1506,18 @@ Visit us again soon! 🙏"""
                             st.caption("❌ No phone")
                     
                     with col4:
-                        # Delete Button (deletes all items for this customer)
                         if st.button("🗑️", key=f"del_customer_{hash(customer)}", help="Delete all bills for this customer"):
                             total_reversed = 0
                             
-                            # Reverse all transactions
                             for item in bill_data['items']:
                                 item_name = item['name']
                                 qty_str = item['qty']
                                 amount = item['amount']
                                 
-                                # Extract quantity and unit
                                 qty_parts = qty_str.split()
                                 qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
                                 unit = qty_parts[1] if len(qty_parts) > 1 else "Pcs"
                                 
-                                # ADD STOCK BACK
                                 inv_df = load_data("Inventory")
                                 if not inv_df.empty:
                                     product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
@@ -1583,7 +1538,6 @@ Visit us again soon! 🙏"""
                                 
                                 total_reversed += amount
                             
-                            # REVERSE PAYMENT
                             if bill_data['payment'] == "Cash":
                                 update_balance(total_reversed, "Cash", 'subtract')
                             elif bill_data['payment'] == "Online":
@@ -1601,7 +1555,6 @@ Visit us again soon! 🙏"""
             st.caption("💡 Yesterday's bills are automatically cleared")
     else:
         st.info("No sales data available")
-
 # ========================================
 # MENU 3: PURCHASE
 # ========================================
@@ -3319,6 +3272,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
