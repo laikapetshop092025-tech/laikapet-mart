@@ -1348,66 +1348,55 @@ elif menu == "🧾 Billing":
                         else:  # Full Udhaar
                             payment_info = f"📒 Udhaar: ₹{total:,.0f}"
                         
-                        message = f"""🐾 *LAIKA PET MART* 🐾
-
-Hello {cust_name}! 
-
-Thank you for shopping with us! 💚
-
-*Bill Details:*
-━━━━━━━━━━━━━━━━
-📦 Items: {items_list}
-💰 Total Amount: ₹{total:,.2f}
-
-💳 *Payment:*
-{payment_info}
-"""
+                        # ✅ Get customer's PREVIOUS total points (before this sale)
+                        s_df_whatsapp = load_data("Sales")
+                        previous_points_total = 0
                         
-                        # ✅ Points section (CORRECTED)
-                        if points > 0:
-                            message += f"""
-━━━━━━━━━━━━━━━━
-👑 *Points Earned Today:* {points} points
-📊 *Your Total Points:* {new_points_total} points
-
-💡 Keep collecting points for amazing rewards!
-"""
+                        if not s_df_whatsapp.empty and len(s_df_whatsapp.columns) > 6:
+                            customer_previous = s_df_whatsapp[s_df_whatsapp.iloc[:, 5].str.contains(cust_name, case=False, na=False)]
+                            if not customer_previous.empty:
+                                previous_points_total = int(pd.to_numeric(customer_previous.iloc[:, 6], errors='coerce').sum())
+                        
+                        new_points_total = previous_points_total + points
+                        
+                        items_list = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.bill_cart])
+                        
+                        if payment_mode == "Partial Payment (Mixed)":
+                            payment_info = f"Cash: Rs.{cash_amount:,.0f} | Online: Rs.{online_amount:,.0f}"
+                            if udhaar_amount > 0:
+                                payment_info += f" | Udhaar: Rs.{udhaar_amount:,.0f}"
+                        elif payment_mode == "Full Cash":
+                            payment_info = f"Cash: Rs.{total:,.0f}"
+                        elif payment_mode == "Full Online":
+                            payment_info = f"Online: Rs.{total:,.0f}"
                         else:
-                            message += f"""
-💡 Purchase ₹100+ to earn royalty points!
-"""
+                            payment_info = f"Udhaar: Rs.{total:,.0f}"
                         
-                        # GST info (if enabled)
+                        message = "LAIKA PET MART\n\n"
+                        message += f"Hello {cust_name}!\n\n"
+                        message += "Thank you for shopping with us!\n\n"
+                        message += "*Bill Details:*\n"
+                        message += "━━━━━━━━━━━━━━━━\n"
+                        message += f"Items: {items_list}\n"
+                        message += f"Total Amount: Rs.{total:,.2f}\n\n"
+                        message += f"*Payment:*\n{payment_info}\n"
+                        
+                        if points > 0:
+                            message += "\n━━━━━━━━━━━━━━━━\n"
+                            message += f"Points Earned Today: {points} points\n"
+                            message += f"Your Total Points: {new_points_total} points\n\n"
+                            message += "Keep collecting points for amazing rewards!\n"
+                        else:
+                            message += "\nPurchase Rs.100+ to earn royalty points!\n"
+                        
                         if enable_gst:
-                            message += f"""
-━━━━━━━━━━━━━━━━
-🧾 GST Invoice: Yes
-📋 GSTIN: {customer_gstin}
-"""
+                            message += "\n━━━━━━━━━━━━━━━━\n"
+                            message += f"GST Invoice: Yes\n"
+                            message += f"GSTIN: {customer_gstin}\n"
                         
-                        # Footer
-                        message += f"""
-━━━━━━━━━━━━━━━━
-📅 Date: {today_dt.strftime('%d %B %Y')}
-
-Thank you for your purchase! 
-Visit us again soon! 🙏"""
-```
-
----
-
-## **🎯 Kya Change Hua:**
-
-### **BEFORE (Galat):**
-```
-👑 Royalty Points Earned: 14 points
-📊 Total Points: 42 points  ❌ (WRONG - shows cumulative from sale entries)
-```
-
-### **AFTER (Sahi):**
-```
-👑 Points Earned Today: 14 points  ✅ (EXACTLY what you entered)
-📊 Your Total Points: 19 points    ✅ (5 previous + 14 new)
+                        message += "\n━━━━━━━━━━━━━━━━\n"
+                        message += f"Date: {today_dt.strftime('%d %B %Y')}\n\n"
+                        message += "Thank you for your purchase!\nVisit us again soon!"
 ```
 
 ---
@@ -3330,6 +3319,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
