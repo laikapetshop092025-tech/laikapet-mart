@@ -1319,8 +1319,34 @@ elif menu == "🧾 Billing":
                         if not clean_phone.startswith('91') and len(clean_phone) == 10:
                             clean_phone = '91' + clean_phone
                         
-                        # Create WhatsApp message
+                        # ✅ Get customer's PREVIOUS total points (before this sale)
+                        s_df_whatsapp = load_data("Sales")
+                        previous_points_total = 0
+                        
+                        if not s_df_whatsapp.empty and len(s_df_whatsapp.columns) > 6:
+                            # Get all previous sales for this customer
+                            customer_previous = s_df_whatsapp[s_df_whatsapp.iloc[:, 5].str.contains(cust_name, case=False, na=False)]
+                            if not customer_previous.empty:
+                                previous_points_total = int(pd.to_numeric(customer_previous.iloc[:, 6], errors='coerce').sum())
+                        
+                        # ✅ Calculate NEW total points
+                        new_points_total = previous_points_total + points
+                        
+                        # ✅ Create WhatsApp message
                         items_list = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.bill_cart])
+                        
+                        # ✅ Payment info for message
+                        if payment_mode == "Partial Payment (Mixed)":
+                            payment_info = f"""💵 Cash: ₹{cash_amount:,.0f}
+🏦 Online: ₹{online_amount:,.0f}"""
+                            if udhaar_amount > 0:
+                                payment_info += f"\n📒 Udhaar: ₹{udhaar_amount:,.0f}"
+                        elif payment_mode == "Full Cash":
+                            payment_info = f"💵 Cash: ₹{total:,.0f}"
+                        elif payment_mode == "Full Online":
+                            payment_info = f"🏦 Online: ₹{total:,.0f}"
+                        else:  # Full Udhaar
+                            payment_info = f"📒 Udhaar: ₹{total:,.0f}"
                         
                         message = f"""🐾 *LAIKA PET MART* 🐾
 
@@ -1332,67 +1358,97 @@ Thank you for shopping with us! 💚
 ━━━━━━━━━━━━━━━━
 📦 Items: {items_list}
 💰 Total Amount: ₹{total:,.2f}
-💳 Payment: {payment_mode}
+
+💳 *Payment:*
+{payment_info}
 """
                         
+                        # ✅ Points section (CORRECTED)
                         if points > 0:
                             message += f"""
-👑 *Royalty Points Earned:* {points} points
-📊 *Total Points:* {new_total_points} points
+━━━━━━━━━━━━━━━━
+👑 *Points Earned Today:* {points} points
+📊 *Your Total Points:* {new_points_total} points
 
-💡 Keep collecting points for rewards!
+💡 Keep collecting points for amazing rewards!
 """
                         else:
                             message += f"""
 💡 Purchase ₹100+ to earn royalty points!
 """
                         
+                        # GST info (if enabled)
                         if enable_gst:
                             message += f"""
+━━━━━━━━━━━━━━━━
 🧾 GST Invoice: Yes
 📋 GSTIN: {customer_gstin}
 """
                         
+                        # Footer
                         message += f"""
 ━━━━━━━━━━━━━━━━
 📅 Date: {today_dt.strftime('%d %B %Y')}
 
-Thank you! Visit again soon! 🙏"""
-                        
-                        # URL encode the message
-                        import urllib.parse
-                        encoded_message = urllib.parse.quote(message)
-                        
-                        whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_message}"
-                        
-                        col1, col2 = st.columns([1, 3])
-                        
-                        with col1:
-                            st.success(f"📱 {cust_phone}")
-                        
-                        with col2:
-                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background: #25D366; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%;">💬 Send WhatsApp Message</button></a>', unsafe_allow_html=True)
-                        
-                        with st.expander("📄 Preview Message"):
-                            st.text(message)
-                    
-                    st.session_state.bill_cart = []
-                    st.balloons()
-                    time.sleep(3)
-                    st.rerun()
-            else:
-                st.error("⚠️ Please enter customer name!")
-    else:
-        st.info("🛒 Cart is empty. Add items to start billing.")
-    
-    # View Recent Sales with Delete and WhatsApp Option
-    st.divider()
-    st.markdown("### 📋 Today's Bills")
-    
-    s_df = load_data("Sales")
-    if not s_df.empty and 'Date' in s_df.columns:
-        today_sales = s_df[s_df['Date'] == today_dt]
-        
+Thank you for your purchase! 
+Visit us again soon! 🙏"""
+```
+
+---
+
+## **🎯 Kya Change Hua:**
+
+### **BEFORE (Galat):**
+```
+👑 Royalty Points Earned: 14 points
+📊 Total Points: 42 points  ❌ (WRONG - shows cumulative from sale entries)
+```
+
+### **AFTER (Sahi):**
+```
+👑 Points Earned Today: 14 points  ✅ (EXACTLY what you entered)
+📊 Your Total Points: 19 points    ✅ (5 previous + 14 new)
+```
+
+---
+
+## **📋 Example Test:**
+
+### **Test Case:**
+- Customer: **Rahul**
+- Previous purchases: 3 bills with 2, 3, 0 points = **5 total**
+- Today's bill: ₹700
+- You manually enter: **14 points**
+- Payment: Cash ₹400, Online ₹300
+
+### **WhatsApp Message Will Show:**
+```
+🐾 LAIKA PET MART 🐾
+
+Hello Rahul!
+
+Thank you for shopping with us! 💚
+
+Bill Details:
+━━━━━━━━━━━━━━━━
+📦 Items: Dog Food (2 Kg)
+💰 Total Amount: ₹700.00
+
+💳 Payment:
+💵 Cash: ₹400
+🏦 Online: ₹300
+
+━━━━━━━━━━━━━━━━
+👑 Points Earned Today: 14 points
+📊 Your Total Points: 19 points
+
+💡 Keep collecting points for amazing rewards!
+
+━━━━━━━━━━━━━━━━
+📅 Date: 30 January 2026
+
+Thank you for your purchase!
+Visit us again soon! 🙏
         if not today_sales.empty:
             # Group by customer
             customer_bills = {}
@@ -3274,6 +3330,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
