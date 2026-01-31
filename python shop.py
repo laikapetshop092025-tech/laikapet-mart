@@ -1105,6 +1105,125 @@ elif menu == "🧾 Billing":
             cust_phone = st.text_input("Customer Phone", key="cust_phone")
         
         st.divider()
+        ╔═══════════════════════════════════════════════════════════════╗
+║          DEKHO - TUMHARI SCREEN KE ACCORDING                  ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+🎯 EXACT LINE NUMBERS - TUMHARI FILE SE:
+========================================
+
+LINE 1107: st.divider()
+LINE 1108: st.markdown("### 💰 Payment Details")
+
+PASTE KARO:
+-----------
+LINE 1107 KE BAAD
+LINE 1108 SE PEHLE
+
+MATLAB:
+
+┌─────────────────────────────────────────────────────────────┐
+│ Line 1107: st.divider()                                     │
+│ Line 1108: [YAHAN NAYA CODE PASTE KARO - NEECHE SE COPY]   │ ← YE BLANK LINE
+│            [CODE SHURU]                                     │
+│            st.divider()                                     │
+│            st.markdown("### 👑 Royalty Points...")         │
+│            if cust_name and cust_name.strip():             │
+│            ... (50 lines)                                   │
+│            else:                                            │
+│                st.info("💡 Enter customer name...")        │
+│            [CODE KHATAM]                                    │
+│ Line ~1160: st.markdown("### 💰 Payment Details")          │
+└─────────────────────────────────────────────────────────────┘
+
+
+📝 STEPS:
+=========
+
+1. Line 1107 par click karo (st.divider() wali line)
+
+2. END key dabao (line ke last mein jao)
+
+3. ENTER dabao (nayi line ban jayegi - ye Line 1108 hogi)
+
+4. AB NEECHE DIYA HUA PURA CODE PASTE KARO
+
+5. Paste karne ke baad - Line 1108 mein tumhara code hoga
+
+6. Purana "### 💰 Payment Details" ab Line ~1160 par chala jayega
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YE CODE COPY KARO (Line 1108 par paste karna hai):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    st.divider()
+    st.markdown("### 👑 Royalty Points Redemption")
+    
+    if cust_name and cust_name.strip():
+        s_df_check = load_data("Sales")
+        if not s_df_check.empty and len(s_df_check.columns) > 6:
+            customer_points = 0
+            customer_identifier = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
+            
+            for cust_variant in [customer_identifier, cust_name, cust_name.strip()]:
+                points_data = s_df_check[s_df_check.iloc[:, 5].str.contains(cust_variant, case=False, na=False)]
+                if not points_data.empty:
+                    customer_points = pd.to_numeric(points_data.iloc[:, 6], errors='coerce').sum()
+                    break
+            
+            col1, col2, col3 = st.columns([1, 1, 1])
+            
+            with col1:
+                st.metric("👑 Available Points", int(customer_points))
+            
+            with col2:
+                use_points = st.checkbox("✅ Use Points for Discount", key="use_points_checkbox")
+            
+            with col3:
+                if use_points and customer_points >= 100:
+                    points_to_redeem = st.number_input(
+                        "Points to Use", 
+                        min_value=100, 
+                        max_value=int(customer_points),
+                        step=100,
+                        key="points_redeem"
+                    )
+                    
+                    discount_amount = points_to_redeem
+                    st.success(f"💰 Discount: ₹{discount_amount:,.0f}")
+                    st.info(f"Remaining Points: {int(customer_points - points_to_redeem)}")
+                    
+                    total = total - discount_amount
+                    if total < 0:
+                        total = 0
+                    
+                    st.warning(f"🎯 New Bill Total: ₹{total:,.2f}")
+                elif use_points and customer_points < 100:
+                    st.error("❌ Minimum 100 points required!")
+                    use_points = False
+        else:
+            st.info("💡 Enter customer name to check points")
+    else:
+        st.info("💡 Enter customer name to check points")
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+⚠️ DHYAN RAKHO:
+===============
+
+1. Code paste karte waqt 4 SPACES se shuru karo
+   (kyunki ye "elif menu == billing" ke andar hai)
+
+2. Pehli line "st.divider()" mein 4 spaces
+   Andar ki lines mein 8, 12, 16 spaces (nesting ke hisab se)
+
+3. Indentation bilkul SAME rakho jaise Line 1107, 1110 mein hai
+
+
+✅ SAVE KARO (CTRL+S) AUR RUN KARO!
         st.markdown("### 💰 Payment Details")
         
         st.info(f"💵 **Total Bill Amount:** ₹{total:,.2f}")
@@ -3167,6 +3286,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
