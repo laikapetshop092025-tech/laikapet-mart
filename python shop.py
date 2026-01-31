@@ -1105,64 +1105,56 @@ elif menu == "🧾 Billing":
             cust_phone = st.text_input("Customer Phone", key="cust_phone")
         
         st.divider()
-st.divider()
         st.markdown("### 👑 Royalty Points Redemption")
-    
-    if cust_name and cust_name.strip():
-        s_df_check = load_data("Sales")
-        if not s_df_check.empty and len(s_df_check.columns) > 6:
-            customer_points = 0
-            customer_identifier = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
-            
-            for cust_variant in [customer_identifier, cust_name, cust_name.strip()]:
-                points_data = s_df_check[s_df_check.iloc[:, 5].str.contains(cust_variant, case=False, na=False)]
-                if not points_data.empty:
-                    customer_points = pd.to_numeric(points_data.iloc[:, 6], errors='coerce').sum()
-                    break
-            
-            col1, col2, col3 = st.columns([1, 1, 1])
-            
-            with col1:
-                st.metric("👑 Available Points", int(customer_points))
-            
-            with col2:
-                use_points = st.checkbox("✅ Use Points for Discount", key="use_points_checkbox")
-            
-            with col3:
-                if use_points and customer_points >= 100:
-                    points_to_redeem = st.number_input(
-                        "Points to Use", 
-                        min_value=100, 
-                        max_value=int(customer_points),
-                        step=100,
-                        key="points_redeem"
-                    )
-                    
-                    discount_amount = points_to_redeem
-                    st.success(f"💰 Discount: ₹{discount_amount:,.0f}")
-                    st.info(f"Remaining Points: {int(customer_points - points_to_redeem)}")
-                    
-                    total = total - discount_amount
-                    if total < 0:
-                        total = 0
-                    
-                    st.warning(f"🎯 New Bill Total: ₹{total:,.2f}")
-                elif use_points and customer_points < 100:
-                    st.error("❌ Minimum 100 points required!")
-                    use_points = False
+        
+        if cust_name and cust_name.strip():
+            s_df_check = load_data("Sales")
+            if not s_df_check.empty and len(s_df_check.columns) > 6:
+                customer_points = 0
+                customer_identifier = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
+                
+                for cust_variant in [customer_identifier, cust_name, cust_name.strip()]:
+                    points_data = s_df_check[s_df_check.iloc[:, 5].str.contains(cust_variant, case=False, na=False)]
+                    if not points_data.empty:
+                        customer_points = pd.to_numeric(points_data.iloc[:, 6], errors='coerce').sum()
+                        break
+                
+                col1, col2, col3 = st.columns([1, 1, 1])
+                
+                with col1:
+                    st.metric("👑 Available Points", int(customer_points))
+                
+                with col2:
+                    use_points = st.checkbox("✅ Use Points for Discount", key="use_points_checkbox")
+                
+                with col3:
+                    if use_points and customer_points >= 100:
+                        points_to_redeem = st.number_input(
+                            "Points to Use", 
+                            min_value=100, 
+                            max_value=int(customer_points),
+                            step=100,
+                            key="points_redeem"
+                        )
+                        
+                        discount_amount = points_to_redeem
+                        st.success(f"💰 Discount: ₹{discount_amount:,.0f}")
+                        st.info(f"Remaining Points: {int(customer_points - points_to_redeem)}")
+                        
+                        total = total - discount_amount
+                        if total < 0:
+                            total = 0
+                        
+                        st.warning(f"🎯 New Bill Total: ₹{total:,.2f}")
+                    elif use_points and customer_points < 100:
+                        st.error("❌ Minimum 100 points required!")
+                        use_points = False
+            else:
+                st.info("💡 Enter customer name to check points")
         else:
             st.info("💡 Enter customer name to check points")
-    else:
-        st.info("💡 Enter customer name to check points")
-
+        
         st.markdown("### 💰 Payment Details")
-        
-        st.info(f"💵 **Total Bill Amount:** ₹{total:,.2f}")
-        
-        payment_split = st.radio(
-            "Payment Type:",
-            ["Single Payment Mode", "Multiple Payment Modes (Split Payment)"],
-            horizontal=True,
             key="payment_split_type"
         )
         
@@ -3217,6 +3209,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
