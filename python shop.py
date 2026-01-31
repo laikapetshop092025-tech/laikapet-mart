@@ -996,7 +996,7 @@ if menu == "📊 Dashboard":
             st.success("✅ All values match auto-calculated amounts")
 
 # ========================================
-# MENU 2: BILLING
+# MENU 2: BILLING - COMPLETE CLEAN VERSION
 # ========================================
 elif menu == "🧾 Billing":
     st.header("🧾 Billing System")
@@ -1130,8 +1130,8 @@ elif menu == "🧾 Billing":
                 with col3:
                     if use_points and customer_points >= 100:
                         points_to_redeem = st.number_input(
-                            "Points to Use", 
-                            min_value=100, 
+                            "Points to Use",
+                            min_value=100,
                             max_value=int(customer_points),
                             step=100,
                             key="points_redeem"
@@ -1324,8 +1324,113 @@ elif menu == "🧾 Billing":
             st.error(error_msg)
         
         if st.button("💾 COMPLETE SALE", type="primary", use_container_width=True, disabled=not can_save):
-            # Sale processing code continues...
-            st.success("✅ Sale completed!")
+            customer_info = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
+            
+            if enable_gst:
+                gst_info = f"GST: {gst_rate} | GSTIN: {customer_gstin} | Type: {invoice_type}"
+            else:
+                gst_info = "No GST"
+            
+            payment_modes_used = []
+            if cash_amount > 0:
+                payment_modes_used.append(f"Cash: ₹{cash_amount:,.2f}")
+            if online_amount > 0:
+                payment_modes_used.append(f"Online: ₹{online_amount:,.2f}")
+            if udhaar_amount > 0:
+                payment_modes_used.append(f"Udhaar: ₹{udhaar_amount:,.2f}")
+            
+            payment_info = " | ".join(payment_modes_used)
+            
+            for cart_item in st.session_state.bill_cart:
+                item_name = cart_item['Item']
+                sold_qty = cart_item['Qty']
+                unit = cart_item['Unit']
+                rate = cart_item['Rate']
+                amount = cart_item['Amount']
+                
+                inv_df_check = load_data("Inventory")
+                purchase_cost = 0
+                
+                if not inv_df_check.empty:
+                    item_cost_rows = inv_df_check[inv_df_check.iloc[:, 0] == item_name]
+                    if not item_cost_rows.empty:
+                        latest_purchase_rate = pd.to_numeric(item_cost_rows.iloc[-1, 3], errors='coerce')
+                        purchase_cost = sold_qty * latest_purchase_rate
+                    else:
+                        purchase_cost = 0
+                else:
+                    purchase_cost = 0
+                
+                profit = amount - purchase_cost
+                
+                save_data("Sales", [
+                    str(today_dt),
+                    item_name,
+                    f"{sold_qty} {unit}",
+                    amount,
+                    payment_info,
+                    customer_info,
+                    points,
+                    profit,
+                    gst_info
+                ])
+                
+                inv_df_update = load_data("Inventory")
+                if not inv_df_update.empty:
+                    product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name].tail(1)
+                    
+                    if not product_rows.empty:
+                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                        new_stock = current_stock - sold_qty
+                        
+                        save_data("Inventory", [
+                            item_name,
+                            new_stock,
+                            unit,
+                            current_rate,
+                            new_stock * current_rate,
+                            str(today_dt),
+                            f"Sale to {customer_info} - Stock updated"
+                        ])
+                        
+                        st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
+            
+            payment_success = True
+            
+            if cash_amount > 0:
+                if update_balance(cash_amount, "Cash", 'add'):
+                    st.success(f"💵 Cash: ₹{cash_amount:,.2f} added")
+                else:
+                    payment_success = False
+            
+            if online_amount > 0:
+                if update_balance(online_amount, "Online", 'add'):
+                    st.success(f"🏦 Online: ₹{online_amount:,.2f} added")
+                else:
+                    payment_success = False
+            
+            if udhaar_amount > 0:
+                save_data("CustomerKhata", [customer_info, udhaar_amount, str(today_dt), "Sale on credit"])
+                st.warning(f"📒 Udhaar: ₹{udhaar_amount:,.2f} added to due")
+            
+            if enable_gst:
+                st.success(f"🧾 GST Invoice Generated!")
+            
+            if points > 0:
+                st.success(f"✅ {customer_info} earned {points} points!")
+            else:
+                st.success(f"✅ Sale completed!")
+            
+            st.divider()
+            st.markdown("### 💰 Payment Breakdown")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("💵 Cash", f"₹{cash_amount:,.2f}")
+            col2.metric("🏦 Online", f"₹{online_amount:,.2f}")
+            col3.metric("📒 Udhaar", f"₹{udhaar_amount:,.2f}")
+            col4.metric("✅ Total", f"₹{total:,.2f}")
+            
             st.session_state.bill_cart = []
             st.balloons()
             time.sleep(3)
@@ -1333,8 +1438,21 @@ elif menu == "🧾 Billing":
     
     else:
         st.info("🛒 Cart is empty. Add items to start billing.")
+    
+    st.divider()
+    st.markdown("### 📋 Today's Bills")
+    
+    s_df = load_data("Sales")
+    if not s_df.empty and 'Date' in s_df.columns:
+        today_sales = s_df[s_df['Date'] == today_dt]
+        
+        if not today_sales.empty:
+            st.success(f"✅ {len(today_sales)} bills today")
+        else:
+            st.info("No bills today")
     else:
-        st.info("No sales data")# ========================================
+        st.info("No sales data")
+# ========================================
 # MENU 3: PURCHASE
 # ========================================
 elif menu == "📦 Purchase":
@@ -3051,6 +3169,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
