@@ -1106,7 +1106,7 @@ elif menu == "🧾 Billing":
         
         st.divider()
 st.divider()
-    st.markdown("### 👑 Royalty Points Redemption")
+        st.markdown("### 👑 Royalty Points Redemption")
     
     if cust_name and cust_name.strip():
         s_df_check = load_data("Sales")
@@ -3217,6 +3217,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
