@@ -1105,43 +1105,6 @@ elif menu == "🧾 Billing":
             cust_phone = st.text_input("Customer Phone", key="cust_phone")
         
         st.divider()
-        ╔═══════════════════════════════════════════════════════════════╗
-║          DEKHO - TUMHARI SCREEN KE ACCORDING                  ║
-╚═══════════════════════════════════════════════════════════════╝
-
-
-🎯 EXACT LINE NUMBERS - TUMHARI FILE SE:
-========================================
-
-LINE 1107: st.divider()
-LINE 1108: st.markdown("### 💰 Payment Details")
-
-PASTE KARO:
------------
-LINE 1107 KE BAAD
-LINE 1108 SE PEHLE
-
-MATLAB:
-
-📝 STEPS:
-=========
-
-1. Line 1107 par click karo (st.divider() wali line)
-
-2. END key dabao (line ke last mein jao)
-
-3. ENTER dabao (nayi line ban jayegi - ye Line 1108 hogi)
-
-4. AB NEECHE DIYA HUA PURA CODE PASTE KARO
-
-5. Paste karne ke baad - Line 1108 mein tumhara code hoga
-
-6. Purana "### 💰 Payment Details" ab Line ~1160 par chala jayega
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-YE CODE COPY KARO (Line 1108 par paste karna hai):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     st.divider()
     st.markdown("### 👑 Royalty Points Redemption")
@@ -3271,6 +3234,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
