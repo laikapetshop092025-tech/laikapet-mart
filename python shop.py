@@ -1123,21 +1123,6 @@ LINE 1108 SE PEHLE
 
 MATLAB:
 
-┌─────────────────────────────────────────────────────────────┐
-│ Line 1107: st.divider()                                     │
-│ Line 1108: [YAHAN NAYA CODE PASTE KARO - NEECHE SE COPY]   │ ← YE BLANK LINE
-│            [CODE SHURU]                                     │
-│            st.divider()                                     │
-│            st.markdown("### 👑 Royalty Points...")         │
-│            if cust_name and cust_name.strip():             │
-│            ... (50 lines)                                   │
-│            else:                                            │
-│                st.info("💡 Enter customer name...")        │
-│            [CODE KHATAM]                                    │
-│ Line ~1160: st.markdown("### 💰 Payment Details")          │
-└─────────────────────────────────────────────────────────────┘
-
-
 📝 STEPS:
 =========
 
@@ -3286,6 +3271,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
