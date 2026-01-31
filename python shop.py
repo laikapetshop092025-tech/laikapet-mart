@@ -1159,19 +1159,6 @@ elif menu == "🧾 Billing":
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-⚠️ DHYAN RAKHO:
-===============
-
-1. Code paste karte waqt 4 SPACES se shuru karo
-   (kyunki ye "elif menu == billing" ke andar hai)
-
-2. Pehli line "st.divider()" mein 4 spaces
-   Andar ki lines mein 8, 12, 16 spaces (nesting ke hisab se)
-
-3. Indentation bilkul SAME rakho jaise Line 1107, 1110 mein hai
-
-
-✅ SAVE KARO (CTRL+S) AUR RUN KARO!
         st.markdown("### 💰 Payment Details")
         
         st.info(f"💵 **Total Bill Amount:** ₹{total:,.2f}")
@@ -3234,6 +3221,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
