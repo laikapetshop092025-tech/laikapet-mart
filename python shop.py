@@ -1105,8 +1105,7 @@ elif menu == "🧾 Billing":
             cust_phone = st.text_input("Customer Phone", key="cust_phone")
         
         st.divider()
-
-    st.divider()
+st.divider()
     st.markdown("### 👑 Royalty Points Redemption")
     
     if cust_name and cust_name.strip():
@@ -1155,9 +1154,6 @@ elif menu == "🧾 Billing":
             st.info("💡 Enter customer name to check points")
     else:
         st.info("💡 Enter customer name to check points")
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 
         st.markdown("### 💰 Payment Details")
         
@@ -3221,6 +3217,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
