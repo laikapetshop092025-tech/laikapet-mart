@@ -1008,7 +1008,6 @@ elif menu == "🧾 Billing":
         
         with col1:
             if not inv_df.empty:
-                # Get latest stock for each item (groupby and take last entry)
                 latest_stock = inv_df.groupby(inv_df.iloc[:, 0]).tail(1)
                 items_list = latest_stock.iloc[:, 0].unique().tolist()
                 item = st.selectbox("Select Item", items_list, key="bill_item")
@@ -1017,7 +1016,6 @@ elif menu == "🧾 Billing":
                 item = None
         
         if item and not inv_df.empty:
-            # Get LATEST stock entry for this product
             product_stock = inv_df[inv_df.iloc[:, 0] == item].tail(1)
             
             if not product_stock.empty:
@@ -1043,7 +1041,6 @@ elif menu == "🧾 Billing":
                     st.write("**Amount**")
                     st.success(f"₹{qty * rate:,.2f}")
                 
-                # Show remaining stock after this sale
                 remaining = available_qty - qty
                 if remaining < 2:
                     st.warning(f"⚠️ Low stock alert! Only {remaining} {last_unit} will remain after this sale")
@@ -1068,7 +1065,6 @@ elif menu == "🧾 Billing":
                     else:
                         st.error("⚠️ Enter valid quantity and rate!")
     
-    # Display cart
     if st.session_state.bill_cart:
         st.divider()
         st.markdown("### 🛒 Shopping Cart")
@@ -1098,308 +1094,301 @@ elif menu == "🧾 Billing":
                     st.rerun()
         
         st.divider()
-        
-        # Customer & Payment Details
-        st.markdown("### 👤 Customer & Payment Details")
+        st.markdown("### 👤 Customer Details")
         
         col1, col2 = st.columns(2)
         
         with col1:
             cust_name = st.text_input("Customer Name *", key="cust_name")
+        
+        with col2:
             cust_phone = st.text_input("Customer Phone", key="cust_phone")
         
-        with col2:
-            payment_mode = st.selectbox("Payment Mode", ["Cash", "Online", "Udhaar (Credit)"], key="pay_mode")
-            
-            if payment_mode == "Udhaar (Credit)":
-                st.warning("⚠️ This will create udhaar entry in Customer Due")
-        
         st.divider()
+        st.markdown("### 💰 Payment Details")
         
-        # GST Billing Section
-        st.markdown("### 🧾 GST Billing (Optional)")
+        st.info(f"💵 **Total Bill Amount:** ₹{total:,.2f}")
         
-        col1, col2 = st.columns([1, 3])
+        payment_split = st.radio(
+            "Payment Type:",
+            ["Single Payment Mode", "Multiple Payment Modes (Split Payment)"],
+            horizontal=True,
+            key="payment_split_type"
+        )
         
-        with col1:
-            enable_gst = st.checkbox("✅ Enable GST Billing", value=False, key="enable_gst")
+        cash_amount = 0
+        online_amount = 0
+        udhaar_amount = 0
         
-        with col2:
-            if enable_gst:
-                st.info("💡 GST billing enabled - Fill customer GSTIN details below")
+        if payment_split == "Single Payment Mode":
+            st.markdown("#### 💳 Select Payment Mode")
+            
+            single_mode = st.selectbox(
+                "Payment Mode",
+                ["Cash", "Online", "Udhaar (Credit)"],
+                key="single_pay_mode"
+            )
+            
+            if single_mode == "Cash":
+                cash_amount = total
+                st.success(f"💵 **Cash Payment:** ₹{cash_amount:,.2f}")
+            elif single_mode == "Online":
+                online_amount = total
+                st.success(f"🏦 **Online Payment:** ₹{online_amount:,.2f}")
+            else:
+                udhaar_amount = total
+                st.warning(f"📒 **Credit (Udhaar):** ₹{udhaar_amount:,.2f}")
         
-        # GST Fields (only show if enabled)
-        if enable_gst:
-            st.markdown("#### 📋 GST Details")
+        else:
+            st.markdown("#### 💳 Split Payment")
+            st.info("💡 Customer ne multiple tareeke se payment kiya hai")
             
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                customer_gstin = st.text_input("Customer GSTIN *", placeholder="22AAAAA0000A1Z5", key="cust_gstin")
+                st.markdown("**💵 Cash**")
+                cash_amount = st.number_input(
+                    "Cash Amount",
+                    min_value=0.0,
+                    max_value=float(total),
+                    value=0.0,
+                    step=10.0,
+                    key="split_cash"
+                )
+                if cash_amount > 0:
+                    st.success(f"✅ Cash: ₹{cash_amount:,.2f}")
             
             with col2:
-                gst_rate = st.selectbox("GST Rate", ["5%", "12%", "18%", "28%"], index=2, key="gst_rate")
+                st.markdown("**🏦 Online**")
+                max_online = float(total - cash_amount)
+                online_amount = st.number_input(
+                    "Online Amount",
+                    min_value=0.0,
+                    max_value=max_online,
+                    value=0.0,
+                    step=10.0,
+                    key="split_online"
+                )
+                if online_amount > 0:
+                    st.success(f"✅ Online: ₹{online_amount:,.2f}")
             
             with col3:
-                invoice_type = st.selectbox("Invoice Type", ["B2B", "B2C"], key="invoice_type")
+                st.markdown("**📒 Udhaar**")
+                max_udhaar = float(total - cash_amount - online_amount)
+                udhaar_amount = st.number_input(
+                    "Udhaar Amount",
+                    min_value=0.0,
+                    max_value=max_udhaar,
+                    value=max_udhaar,
+                    step=10.0,
+                    key="split_udhaar"
+                )
+                if udhaar_amount > 0:
+                    st.warning(f"⚠️ Udhaar: ₹{udhaar_amount:,.2f}")
             
-            # Calculate GST
-            gst_percentage = float(gst_rate.replace('%', '')) / 100
+            total_paid = cash_amount + online_amount + udhaar_amount
+            remaining = total - total_paid
             
-            # Base amount (without GST)
-            base_amount = total / (1 + gst_percentage)
-            gst_amount = total - base_amount
-            cgst = gst_amount / 2
-            sgst = gst_amount / 2
+            st.divider()
             
-            st.markdown("#### 💰 GST Breakdown")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("💰 Total Bill", f"₹{total:,.2f}")
+            col2.metric("✅ Total Entered", f"₹{total_paid:,.2f}")
             
-            col1, col2, col3, col4 = st.columns(4)
-            
-            col1.metric("Base Amount", f"₹{base_amount:,.2f}")
-            col2.metric(f"CGST ({gst_percentage*50:.1f}%)", f"₹{cgst:,.2f}")
-            col3.metric(f"SGST ({gst_percentage*50:.1f}%)", f"₹{sgst:,.2f}")
-            col4.metric("Total (incl. GST)", f"₹{total:,.2f}")
+            if remaining > 0.01:
+                col3.metric("⚠️ Remaining", f"₹{remaining:,.2f}", delta="Incomplete")
+                st.error(f"❌ Payment incomplete! ₹{remaining:,.2f} remaining")
+            elif remaining < -0.01:
+                col3.metric("⚠️ Excess", f"₹{abs(remaining):,.2f}", delta="Too much")
+                st.error(f"❌ Payment exceeds bill by ₹{abs(remaining):,.2f}")
+            else:
+                col3.metric("✅ Status", "Complete", delta="Matched")
+                st.success("✅ Payment matched!")
         
         st.divider()
+        st.markdown("### 🧾 GST Billing (Optional)")
         
-        # Royalty Points Section with Checkboxes
-        # Royalty Points Section - Manual Entry
-        st.markdown("### 👑 Royalty Points & Rewards")
+        enable_gst = st.checkbox("✅ Enable GST", value=False, key="enable_gst")
+        
+        customer_gstin = ""
+        gst_rate = "18%"
+        invoice_type = "B2C"
+        
+        if enable_gst:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                customer_gstin = st.text_input("GSTIN *", key="cust_gstin")
+            with col2:
+                gst_rate = st.selectbox("GST Rate", ["5%", "12%", "18%", "28%"], index=2)
+            with col3:
+                invoice_type = st.selectbox("Type", ["B2B", "B2C"])
+        
+        st.divider()
+        st.markdown("### 👑 Royalty Points")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            give_points = st.checkbox("✅ Give Royalty Points", value=True, key="give_points")
+            give_points = st.checkbox("✅ Give Points", value=True, key="give_points")
         
         with col2:
             if give_points:
-                points = st.number_input(
-                    "Enter Points", 
-                    min_value=0, 
-                    max_value=10000, 
-                    value=0, 
-                    step=1,
-                    key="manual_points",
-                    help="Apne hisaab se points enter karo"
-                )
+                points = st.number_input("Points", min_value=0, max_value=10000, value=0, step=1, key="manual_points")
             else:
                 points = 0
         
         with col3:
             if give_points and points > 0:
-                st.success(f"👑 **Points: {points}**")
-            elif give_points:
-                st.info("💡 Enter points to give")
+                st.success(f"👑 **{points}**")
             else:
                 st.info("No points")
         
-        # Show points summary
-        if give_points and points > 0:
-            st.success(f"✅ Customer ko {points} points milenge!")
-        elif not give_points:
-            st.info("❌ No points will be awarded for this sale")
-        
         st.divider()
+        st.markdown("### 📊 Final Summary")
         
-        col1, col2, col3 = st.columns(3)
-        col1.metric("💰 Total Amount", f"₹{total:,.2f}")
-        col2.metric("💳 Payment", payment_mode)
-        col3.metric("👑 Royalty Points", f"+{points}" if points > 0 else "0")
+        payment_summary_cols = st.columns(5)
+        payment_summary_cols[0].metric("💰 Bill", f"₹{total:,.2f}")
+        payment_summary_cols[1].metric("💵 Cash", f"₹{cash_amount:,.2f}" if cash_amount > 0 else "₹0")
+        payment_summary_cols[2].metric("🏦 Online", f"₹{online_amount:,.2f}" if online_amount > 0 else "₹0")
+        payment_summary_cols[3].metric("📒 Udhaar", f"₹{udhaar_amount:,.2f}" if udhaar_amount > 0 else "₹0")
+        payment_summary_cols[4].metric("👑 Points", f"+{points}" if points > 0 else "0")
         
-        if st.button("💾 COMPLETE SALE", type="primary", use_container_width=True):
-            if cust_name.strip():
-                # Check GST validation
-                if enable_gst and not customer_gstin:
-                    st.error("⚠️ Please enter Customer GSTIN for GST billing!")
-                else:
-                    customer_info = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
-                    
-                    # Prepare GST info if enabled
-                    if enable_gst:
-                        gst_info = f"GST: {gst_rate} | GSTIN: {customer_gstin} | Type: {invoice_type}"
+        can_save = True
+        error_msg = ""
+        
+        if not cust_name.strip():
+            can_save = False
+            error_msg = "⚠️ Enter customer name!"
+        
+        if payment_split == "Multiple Payment Modes (Split Payment)":
+            total_paid = cash_amount + online_amount + udhaar_amount
+            if abs(total_paid - total) > 0.01:
+                can_save = False
+                error_msg = f"⚠️ Payment mismatch!"
+        
+        if enable_gst and not customer_gstin:
+            can_save = False
+            error_msg = "⚠️ Enter GSTIN!"
+        
+        if not can_save:
+            st.error(error_msg)
+        
+        if st.button("💾 COMPLETE SALE", type="primary", use_container_width=True, disabled=not can_save):
+            customer_info = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
+            
+            if enable_gst:
+                gst_info = f"GST: {gst_rate} | GSTIN: {customer_gstin} | Type: {invoice_type}"
+            else:
+                gst_info = "No GST"
+            
+            payment_modes_used = []
+            if cash_amount > 0:
+                payment_modes_used.append(f"Cash: ₹{cash_amount:,.2f}")
+            if online_amount > 0:
+                payment_modes_used.append(f"Online: ₹{online_amount:,.2f}")
+            if udhaar_amount > 0:
+                payment_modes_used.append(f"Udhaar: ₹{udhaar_amount:,.2f}")
+            
+            payment_info = " | ".join(payment_modes_used)
+            
+            for cart_item in st.session_state.bill_cart:
+                item_name = cart_item['Item']
+                sold_qty = cart_item['Qty']
+                unit = cart_item['Unit']
+                rate = cart_item['Rate']
+                amount = cart_item['Amount']
+                
+                inv_df_check = load_data("Inventory")
+                purchase_cost = 0
+                
+                if not inv_df_check.empty:
+                    item_cost_rows = inv_df_check[inv_df_check.iloc[:, 0] == item_name]
+                    if not item_cost_rows.empty:
+                        latest_purchase_rate = pd.to_numeric(item_cost_rows.iloc[-1, 3], errors='coerce')
+                        purchase_cost = sold_qty * latest_purchase_rate
                     else:
-                        gst_info = "No GST"
-                    
-                    # Calculate cumulative points for this customer
-                    s_df_points = load_data("Sales")
-                    current_total_points = 0
-                    
-                    if not s_df_points.empty and len(s_df_points.columns) > 6:
-                        # Get all previous sales for this customer
-                        customer_sales = s_df_points[s_df_points.iloc[:, 5].str.contains(cust_name, case=False, na=False)]
-                        if not customer_sales.empty:
-                            current_total_points = pd.to_numeric(customer_sales.iloc[:, 6], errors='coerce').sum()
-                    
-                    # New total points after this sale
-                    new_total_points = current_total_points + points
-                    
-                    # Save each item in cart
-                    for cart_item in st.session_state.bill_cart:
-                        item_name = cart_item['Item']
-                        sold_qty = cart_item['Qty']
-                        unit = cart_item['Unit']
-                        rate = cart_item['Rate']
-                        amount = cart_item['Amount']
-                        
-                        # Calculate actual profit based on purchase cost
-                        inv_df_check = load_data("Inventory")
                         purchase_cost = 0
-                        
-                        if not inv_df_check.empty:
-                            item_cost_rows = inv_df_check[inv_df_check.iloc[:, 0] == item_name]
-                            if not item_cost_rows.empty:
-                                # Get LATEST purchase rate (not average!)
-                                latest_purchase_rate = pd.to_numeric(item_cost_rows.iloc[-1, 3], errors='coerce')
-                                purchase_cost = sold_qty * latest_purchase_rate
-                            else:
-                                # New item - no purchase history, profit = sale amount
-                                purchase_cost = 0
-                        else:
-                            purchase_cost = 0
-                        
-                        profit = amount - purchase_cost
-                        # Save to Sales sheet with GST info
-                        save_data("Sales", [
-                            str(today_dt),
-                            item_name,
-                            f"{sold_qty} {unit}",
-                            amount,
-                            payment_mode,
-                            customer_info,
-                            points,
-                            profit,
-                            gst_info
-                        ])
-                        
-                        # ✅ STOCK TRACKING (Info only - no new entry)
-                inv_df = load_data("Inventory")
-                if not inv_df.empty:
-                    product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
+                else:
+                    purchase_cost = 0
+                
+                profit = amount - purchase_cost
+                
+                save_data("Sales", [
+                    str(today_dt),
+                    item_name,
+                    f"{sold_qty} {unit}",
+                    amount,
+                    payment_info,
+                    customer_info,
+                    points,
+                    profit,
+                    gst_info
+                ])
+                
+                inv_df_update = load_data("Inventory")
+                if not inv_df_update.empty:
+                    product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name].tail(1)
                     
                     if not product_rows.empty:
                         current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
                         new_stock = current_stock - sold_qty
                         
-                        # Show info only, don't save new entry
+                        save_data("Inventory", [
+                            item_name,
+                            new_stock,
+                            unit,
+                            current_rate,
+                            new_stock * current_rate,
+                            str(today_dt),
+                            f"Sale to {customer_info} - Stock updated"
+                        ])
+                        
                         st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
-                        
-                    # Handle payment
-                    if payment_mode == "Cash":
-                        update_balance(total, "Cash", 'add')
-                        st.success(f"Rs.{total:,.2f} added to Cash")
-                    elif payment_mode == "Online":
-                        update_balance(total, "Online", 'add')
-                        st.success(f"Rs.{total:,.2f} added to Online")
-                    else:  # Udhaar
-                        save_data("CustomerKhata", [customer_info, total, str(today_dt), "Sale on credit"])
-                        st.warning(f"Rs.{total:,.2f} added to {customer_info}'s due")
-                    
-                    # Show GST invoice info if enabled
-                    if enable_gst:
-                        st.success(f"🧾 GST Invoice Generated!")
-                        st.info(f"📋 GSTIN: {customer_gstin} | Rate: {gst_rate} | Type: {invoice_type}")
-                    
-                    # Show cumulative points
-                    if points > 0:
-                        st.success(f"✅ Sale completed! {customer_info} earned {points} points this time! 👑")
-                        st.info(f"📊 Total Points: {new_total_points} (Previous: {current_total_points} + New: {points})")
-                    else:
-                        st.success(f"✅ Sale completed!")
-                    
-                    # WhatsApp Message Feature
-                    if cust_phone and cust_phone.strip():
-                        st.divider()
-                        st.markdown("### 📱 Send WhatsApp Message")
-                        
-                        # Clean phone number (remove spaces, dashes, etc.)
-                        clean_phone = ''.join(filter(str.isdigit, cust_phone))
-                        
-                        # Add country code if not present
-                        if not clean_phone.startswith('91') and len(clean_phone) == 10:
-                            clean_phone = '91' + clean_phone
-                        
-                        # ✅ Get customer's PREVIOUS total points (before this sale)
-                        s_df_whatsapp = load_data("Sales")
-                        previous_points_total = 0
-                        
-                        if not s_df_whatsapp.empty and len(s_df_whatsapp.columns) > 6:
-                            # Get all previous sales for this customer
-                            customer_previous = s_df_whatsapp[s_df_whatsapp.iloc[:, 5].str.contains(cust_name, case=False, na=False)]
-                            if not customer_previous.empty:
-                                previous_points_total = int(pd.to_numeric(customer_previous.iloc[:, 6], errors='coerce').sum())
-                        
-                        # ✅ Calculate NEW total points
-                        new_points_total = previous_points_total + points
-                        
-                        items_list = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.bill_cart])
-                        
-                        msg_lines = []
-                        msg_lines.append("LAIKA PET MART")
-                        msg_lines.append("")
-                        msg_lines.append(f"Hello {cust_name}!")
-                        msg_lines.append("")
-                        msg_lines.append("Thank you for shopping with us!")
-                        msg_lines.append("")
-                        msg_lines.append("*Bill Details:*")
-                        msg_lines.append("=" * 30)
-                        msg_lines.append(f"Items: {items_list}")
-                        msg_lines.append(f"Total Amount: Rs.{total:,.2f}")
-                        msg_lines.append("")
-                        msg_lines.append("*Payment:*")
-                        msg_lines.append(payment_info)
-                        
-                        if points > 0:
-                            msg_lines.append("")
-                            msg_lines.append("=" * 30)
-                            msg_lines.append(f"*Points Earned Today:* {points} points")
-                            msg_lines.append(f"*Your Total Points:* {new_points_total} points")
-                            msg_lines.append("")
-                            msg_lines.append("Keep collecting points for rewards!")
-                        else:
-                            msg_lines.append("")
-                            msg_lines.append("Purchase Rs.100+ to earn points!")
-                        
-                        if enable_gst:
-                            msg_lines.append("")
-                            msg_lines.append("=" * 30)
-                            msg_lines.append(f"GST Invoice: Yes")
-                            msg_lines.append(f"GSTIN: {customer_gstin}")
-                        
-                        msg_lines.append("")
-                        msg_lines.append("=" * 30)
-                        msg_lines.append(f"Date: {today_dt.strftime('%d %B %Y')}")
-                        msg_lines.append("")
-                        msg_lines.append("Thank you! Visit again soon!")
-                        
-                        message = "\n".join(msg_lines)
-                        
-                        import urllib.parse
-                        encoded_message = urllib.parse.quote(message)
-                        
-                        whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_message}"
-                        
-                        col1, col2 = st.columns([1, 3])
-                        
-                        with col1:
-                            st.success(f"📱 {cust_phone}")
-                        
-                        with col2:
-                            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background: #25D366; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%;">💬 Send WhatsApp Message</button></a>', unsafe_allow_html=True)
-                        
-                        with st.expander("📄 Preview Message"):
-                            st.text(message)
-                    
-                    st.session_state.bill_cart = []
-                    st.balloons()
-                    time.sleep(3)
-                    st.rerun()
+            
+            payment_success = True
+            
+            if cash_amount > 0:
+                if update_balance(cash_amount, "Cash", 'add'):
+                    st.success(f"💵 Cash: ₹{cash_amount:,.2f} added")
+                else:
+                    payment_success = False
+            
+            if online_amount > 0:
+                if update_balance(online_amount, "Online", 'add'):
+                    st.success(f"🏦 Online: ₹{online_amount:,.2f} added")
+                else:
+                    payment_success = False
+            
+            if udhaar_amount > 0:
+                save_data("CustomerKhata", [customer_info, udhaar_amount, str(today_dt), "Sale on credit"])
+                st.warning(f"📒 Udhaar: ₹{udhaar_amount:,.2f} added to due")
+            
+            if enable_gst:
+                st.success(f"🧾 GST Invoice Generated!")
+            
+            if points > 0:
+                st.success(f"✅ {customer_info} earned {points} points!")
             else:
-                st.error("⚠️ Please enter customer name!")
+                st.success(f"✅ Sale completed!")
+            
+            st.divider()
+            st.markdown("### 💰 Payment Breakdown")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("💵 Cash", f"₹{cash_amount:,.2f}")
+            col2.metric("🏦 Online", f"₹{online_amount:,.2f}")
+            col3.metric("📒 Udhaar", f"₹{udhaar_amount:,.2f}")
+            col4.metric("✅ Total", f"₹{total:,.2f}")
+            
+            st.session_state.bill_cart = []
+            st.balloons()
+            time.sleep(3)
+            st.rerun()
+    
     else:
         st.info("🛒 Cart is empty. Add items to start billing.")
     
-    # View Recent Sales with Delete and WhatsApp Option
     st.divider()
     st.markdown("### 📋 Today's Bills")
     
@@ -1408,154 +1397,11 @@ elif menu == "🧾 Billing":
         today_sales = s_df[s_df['Date'] == today_dt]
         
         if not today_sales.empty:
-            # Group by customer
-            customer_bills = {}
-            
-            for idx, row in today_sales.iterrows():
-                customer = str(row.iloc[5]) if len(row) > 5 else "Unknown Customer"
-                
-                if customer not in customer_bills:
-                    customer_bills[customer] = {
-                        'items': [],
-                        'total_amount': 0,
-                        'total_points': 0,
-                        'payment': str(row.iloc[4]) if len(row) > 4 else "N/A",
-                        'indices': []
-                    }
-                
-                item_name = str(row.iloc[1]) if len(row) > 1 else "Item"
-                quantity = str(row.iloc[2]) if len(row) > 2 else "0"
-                amount = float(row.iloc[3]) if len(row) > 3 else 0
-                points = int(float(row.iloc[6])) if len(row) > 6 and pd.notna(row.iloc[6]) else 0
-                
-                customer_bills[customer]['items'].append({
-                    'name': item_name,
-                    'qty': quantity,
-                    'amount': amount,
-                    'index': idx
-                })
-                customer_bills[customer]['total_amount'] += amount
-                customer_bills[customer]['total_points'] += points
-                customer_bills[customer]['indices'].append(idx)
-            
-            st.success(f"✅ {len(customer_bills)} customers today | {len(today_sales)} total items")
-            
-            for customer, bill_data in reversed(list(customer_bills.items())):
-                cust_phone = ""
-                cust_name = customer
-                if "(" in customer and ")" in customer:
-                    cust_name = customer.split("(")[0].strip()
-                    cust_phone = customer.split("(")[1].split(")")[0].strip()
-                
-                with st.container():
-                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-                    
-                    with col1:
-                        st.write(f"**👤 {cust_name}**")
-                        items_text = ", ".join([f"{item['name']} ({item['qty']})" for item in bill_data['items']])
-                        st.caption(items_text)
-                        st.write(f"**💰 Total: ₹{bill_data['total_amount']:,.0f}** | 💳 {bill_data['payment']}")
-                    
-                    with col2:
-                        st.metric("Points", f"👑 {bill_data['total_points']}", delta=None)
-                    
-                    with col3:
-                        if cust_phone:
-                            clean_phone = ''.join(filter(str.isdigit, cust_phone))
-                            if not clean_phone.startswith('91') and len(clean_phone) == 10:
-                                clean_phone = '91' + clean_phone
-                            
-                            items_list = "\n".join([f"  • {item['name']} - {item['qty']} = ₹{item['amount']:,.0f}" for item in bill_data['items']])
-                            
-                            message = f"""LAIKA PET MART
-
-Hello {cust_name}!
-
-Thank you for shopping with us!
-
-*Bill Details:*
-Items Purchased:
-{items_list}
-
-Total Amount: Rs.{bill_data['total_amount']:,.2f}
-Payment Mode: {bill_data['payment']}"""
-                            
-                            if bill_data['total_points'] > 0:
-                                message += f"""
-
-Total Points Earned: {bill_data['total_points']}
-Keep collecting points for amazing rewards!"""
-                            else:
-                                message += f"""
-
-Purchase Rs.100+ to earn royalty points!"""
-                            
-                            message += f"""
-
-Date: {today_dt.strftime('%d %B %Y')}
-
-Thank you for your purchase!
-Visit us again soon!"""
-                            
-                            import urllib.parse
-                            encoded_message = urllib.parse.quote(message)
-                            whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_message}"
-                            
-                            st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><button style="background: #25D366; color: white; padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; width: 100%;">💬 Send</button></a>', unsafe_allow_html=True)
-                        else:
-                            st.caption("❌ No phone")
-                    
-                    with col4:
-                        if st.button("🗑️", key=f"del_customer_{hash(customer)}", help="Delete all bills for this customer"):
-                            total_reversed = 0
-                            
-                            for item in bill_data['items']:
-                                item_name = item['name']
-                                qty_str = item['qty']
-                                amount = item['amount']
-                                
-                                qty_parts = qty_str.split()
-                                qty = float(qty_parts[0]) if len(qty_parts) > 0 else 0
-                                unit = qty_parts[1] if len(qty_parts) > 1 else "Pcs"
-                                
-                                inv_df = load_data("Inventory")
-                                if not inv_df.empty:
-                                    product_rows = inv_df[inv_df.iloc[:, 0] == item_name].tail(1)
-                                    if not product_rows.empty:
-                                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
-                                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
-                                        new_stock = current_stock + qty
-                                        
-                                        save_data("Inventory", [
-                                            item_name,
-                                            new_stock,
-                                            unit,
-                                            current_rate,
-                                            new_stock * current_rate,
-                                            str(today_dt),
-                                            f"Bill deleted - stock restored"
-                                        ])
-                                
-                                total_reversed += amount
-                            
-                            if bill_data['payment'] == "Cash":
-                                update_balance(total_reversed, "Cash", 'subtract')
-                            elif bill_data['payment'] == "Online":
-                                update_balance(total_reversed, "Online", 'subtract')
-                            
-                            st.success(f"✅ All bills for {cust_name} deleted!")
-                            st.info(f"💰 ₹{total_reversed:,.0f} reversed | 📦 Stock restored")
-                            st.warning("⚠️ Also delete from Google Sheets Sales tab")
-                            time.sleep(2)
-                            st.rerun()
-                    
-                    st.divider()
+            st.success(f"✅ {len(today_sales)} bills today")
         else:
-            st.info("📋 No bills created today yet. Start billing above!")
-            st.caption("💡 Yesterday's bills are automatically cleared")
+            st.info("No bills today")
     else:
-        st.info("No sales data available")
-# ========================================
+        st.info("No sales data")# ========================================
 # MENU 3: PURCHASE
 # ========================================
 elif menu == "📦 Purchase":
@@ -3272,6 +3118,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
