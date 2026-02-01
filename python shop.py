@@ -102,6 +102,126 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+def save_data(sheet_name, data_list):
+    try:
+        response = requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list, timeout=15)
+        return response.text.strip() == "Success"
+    except Exception as e:
+        st.error(f"Save error: {str(e)}")
+        return False
+
+def load_data(sheet_name):
+    try:
+        url = f"{SHEET_LINK}{sheet_name}&cache={time.time()}"
+        df = pd.read_csv(url)
+        df.columns = df.columns.str.strip()
+        date_col = next((c for c in df.columns if 'date' in c.lower()), None)
+        if date_col:
+            df[date_col] = pd.to_datetime(df[date_col], errors='coerce', dayfirst=True).dt.date
+            df = df.rename(columns={date_col: 'Date'})
+        return df
+    except: 
+        return pd.DataFrame()
+
+def update_stock_in_sheet(item_name, new_qty):
+    """Update stock directly in Google Sheets"""
+    try:
+        item_name = str(item_name).strip().upper()
+        
+        payload = {
+            "action": "update_stock",
+            "sheet": "Inventory",
+            "item_name": item_name,
+            "new_qty": float(new_qty)
+        }
+        
+        response = requests.post(SCRIPT_URL, json=payload, timeout=10)
+        response_text = response.text.strip()
+        
+        if "Stock Updated" in response_text:
+            return True
+        else:
+            st.warning(f"Update response: {response_text}")
+            return False
+            
+    except Exception as e:
+        st.error(f"Stock update error: {str(e)}")
+        return False
+
+def get_balance_from_sheet(mode):
+    """Get LATEST balance from Google Sheets"""
+    try:
+        b_df = load_data("Balances")
+        if b_df.empty or len(b_df.columns) < 2:
+            return 0.0
+        
+        rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
+        
+        if len(rows) > 0:
+            latest_balance = rows.iloc[-1, 1]
+            return float(pd.to_numeric(latest_balance, errors='coerce'))
+        
+        return 0.0
+    except Exception as e:
+        st.error(f"Error loading balance: {str(e)}")
+        return 0.0
+
+def get_current_balance(mode):
+    """Get current balance"""
+    if mode == "Cash":
+        if st.session_state.manual_cash is None:
+            st.session_state.manual_cash = get_balance_from_sheet("Cash")
+        return st.session_state.manual_cash
+    elif mode == "Online":
+        if st.session_state.manual_online is None:
+            st.session_state.manual_online = get_balance_from_sheet("Online")
+        return st.session_state.manual_online
+    return 0.0
+
+def set_balance(mode, amount):
+    """Set balance manually"""
+    if mode == "Cash":
+        st.session_state.manual_cash = amount
+    elif mode == "Online":
+        st.session_state.manual_online = amount
+    
+    try:
+        if save_data("Balances", [mode, amount]):
+            time.sleep(0.5)
+            return True
+        return False
+    except:
+        return False
+
+def update_balance(amount, mode, operation='add'):
+    """Update balance"""
+    if mode not in ["Cash", "Online"]:
+        return True
+    
+    try:
+        current_bal = get_current_balance(mode)
+        
+        if operation == 'add':
+            new_bal = current_bal + amount
+        else:
+            new_bal = current_bal - amount
+        
+        if mode == "Cash":
+            st.session_state.manual_cash = new_bal
+        elif mode == "Online":
+            st.session_state.manual_online = new_bal
+        
+        if save_data("Balances", [mode, new_bal]):
+            st.success(f"✅ {mode}: ₹{current_bal:,.2f} → ₹{new_bal:,.2f}")
+            time.sleep(0.5)
+            return True
+        else:
+            st.error(f"❌ Failed to save {mode} balance!")
+            return False
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        return False
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
 
@@ -3186,6 +3306,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
