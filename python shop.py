@@ -160,16 +160,16 @@ def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
     try:
         b_df = load_data("Balances")
-        if b_df.empty or len(b_df.columns) < 2:
+            if b_df.empty or len(b_df.columns) < 2:
             return 0.0
         
-        rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
+            rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
         
-        if len(rows) > 0:
-            latest_balance = rows.iloc[-1, 1]
-            return float(pd.to_numeric(latest_balance, errors='coerce'))
+                if len(rows) > 0:
+                latest_balance = rows.iloc[-1, 1]
+                return float(pd.to_numeric(latest_balance, errors='coerce'))
         
-        return 0.0
+            return 0.0
     except Exception as e:
         st.error(f"Error loading balance: {str(e)}")
         return 0.0
@@ -3187,6 +3187,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
