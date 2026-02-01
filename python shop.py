@@ -141,7 +141,6 @@ def load_data(sheet_name):
     except: 
         return pd.DataFrame()
 
-# AUTOMATIC STOCK UPDATE - Google Sheets mein bhi
                 inv_df_update = load_data("Inventory")
                 if not inv_df_update.empty:
                     product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name]
@@ -3185,6 +3184,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
