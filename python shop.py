@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta, date
 import time
+import urllib.parse
 
 # --- 1. SETUP & CONNECTION ---
 st.set_page_config(page_title="LAIKA PET MART", layout="wide")
@@ -99,6 +100,24 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
+    
+    /* WhatsApp button styling */
+    .whatsapp-button {
+        background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 10px;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4);
+        transition: all 0.3s ease;
+    }
+    
+    .whatsapp-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(37, 211, 102, 0.6);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -118,6 +137,8 @@ if 'manual_online' not in st.session_state:
     st.session_state.manual_online = None
 if 'balance_initialized' not in st.session_state:
     st.session_state.balance_initialized = False
+if 'last_sale_details' not in st.session_state:
+    st.session_state.last_sale_details = None
 
 def save_data(sheet_name, data_list):
     try:
@@ -238,6 +259,181 @@ def update_balance(amount, mode, operation='add'):
     except Exception as e:
         st.error(f"Error: {str(e)}")
         return False
+
+def get_item_purchase_rate(item_name):
+    """Get the latest purchase rate for an item from Inventory"""
+    try:
+        inv_df = load_data("Inventory")
+        if not inv_df.empty and len(inv_df.columns) > 3:
+            # Filter for this item
+            item_rows = inv_df[inv_df.iloc[:, 0].str.strip().str.upper() == str(item_name).strip().upper()]
+            
+            if not item_rows.empty:
+                # Get the most recent purchase rate (last row)
+                last_purchase_rate = pd.to_numeric(item_rows.iloc[-1, 3], errors='coerce')
+                return float(last_purchase_rate) if pd.notna(last_purchase_rate) else 0.0
+        return 0.0
+    except:
+        return 0.0
+
+def calculate_today_actual_profit():
+    """Calculate actual profit = (Sale Price - Purchase Price) - Expenses"""
+    try:
+        today_dt = datetime.now().date()
+        
+        # Load sales data
+        s_df = load_data("Sales")
+        if s_df.empty or 'Date' not in s_df.columns:
+            return 0.0, 0.0, 0.0, 0.0
+        
+        # Today's sales
+        s_today = s_df[s_df['Date'] == today_dt]
+        
+        total_sale_amount = 0.0
+        total_purchase_cost = 0.0
+        
+        if not s_today.empty:
+            for _, sale_row in s_today.iterrows():
+                item_name = sale_row.iloc[1] if len(sale_row) > 1 else ""
+                sale_amount = pd.to_numeric(sale_row.iloc[3], errors='coerce') if len(sale_row) > 3 else 0.0
+                
+                # Get quantity sold
+                qty_str = sale_row.iloc[2] if len(sale_row) > 2 else "0"
+                try:
+                    qty_sold = float(str(qty_str).split()[0])
+                except:
+                    qty_sold = 0.0
+                
+                # Get purchase rate
+                purchase_rate = get_item_purchase_rate(item_name)
+                
+                # Calculate purchase cost for this sale
+                purchase_cost = qty_sold * purchase_rate
+                
+                total_sale_amount += sale_amount
+                total_purchase_cost += purchase_cost
+        
+        # Today's expenses
+        e_df = load_data("Expenses")
+        today_expense = 0.0
+        
+        if not e_df.empty and len(e_df.columns) > 2:
+            try:
+                e_df['exp_date'] = pd.to_datetime(e_df.iloc[:, 0], errors='coerce').dt.date
+                e_today = e_df[e_df['exp_date'] == today_dt]
+                today_expense = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty else 0.0
+            except:
+                today_expense = 0.0
+        
+        # Calculate actual profit
+        gross_profit = total_sale_amount - total_purchase_cost
+        net_profit = gross_profit - today_expense
+        
+        return total_sale_amount, total_purchase_cost, today_expense, net_profit
+        
+    except Exception as e:
+        st.error(f"Error calculating profit: {str(e)}")
+        return 0.0, 0.0, 0.0, 0.0
+
+def get_customer_royalty_points(customer_name):
+    """Get customer's total royalty points"""
+    try:
+        s_df = load_data("Sales")
+        if s_df.empty or len(s_df.columns) < 7:
+            return 0
+        
+        # Filter sales for this customer
+        customer_sales = s_df[s_df.iloc[:, 5].str.contains(customer_name.split('(')[0].strip(), case=False, na=False)]
+        
+        if not customer_sales.empty:
+            total_points = pd.to_numeric(customer_sales.iloc[:, 6], errors='coerce').sum()
+            return int(total_points)
+        
+        return 0
+    except:
+        return 0
+
+def calculate_royalty_points(amount, is_weekend=False):
+    """Calculate royalty points based on purchase amount"""
+    if is_weekend:
+        return int(amount * 0.05)  # 5% on weekends
+    else:
+        return int(amount * 0.02)  # 2% on weekdays
+
+def generate_whatsapp_bill(customer_name, customer_phone, cart_items, total_amount, payment_info, royalty_points=0):
+    """Generate WhatsApp bill message"""
+    
+    today = datetime.now()
+    is_weekend = today.weekday() >= 5
+    
+    # Calculate points earned on this purchase
+    points_earned = calculate_royalty_points(total_amount, is_weekend)
+    
+    # Get existing points
+    existing_points = get_customer_royalty_points(customer_name)
+    total_points = existing_points + points_earned
+    
+    message = f"""🐾 *LAIKA PET MART* 🐾
+━━━━━━━━━━━━━━━━━━━━
+
+📅 Date: {today.strftime('%d-%m-%Y %I:%M %p')}
+👤 Customer: {customer_name}
+
+━━━━━━━━━━━━━━━━━━━━
+📦 *ITEMS PURCHASED*
+━━━━━━━━━━━━━━━━━━━━
+
+"""
+    
+    for idx, item in enumerate(cart_items, 1):
+        message += f"{idx}. *{item['Item']}*\n"
+        message += f"   Qty: {item['Qty']} {item['Unit']} × ₹{item['Rate']:.2f}\n"
+        message += f"   Amount: ₹{item['Amount']:.2f}\n\n"
+    
+    message += f"""━━━━━━━━━━━━━━━━━━━━
+💰 *PAYMENT SUMMARY*
+━━━━━━━━━━━━━━━━━━━━
+
+Total Amount: ₹{total_amount:,.2f}
+Payment Mode: {payment_info}
+
+━━━━━━━━━━━━━━━━━━━━
+👑 *ROYALTY POINTS*
+━━━━━━━━━━━━━━━━━━━━
+
+Points Earned: +{points_earned} 👑
+Previous Points: {existing_points}
+Total Points: {total_points} 👑
+
+💡 Redeem 100 points for special offers!
+
+━━━━━━━━━━━━━━━━━━━━
+
+Thank you for shopping with us! 🙏
+Visit again! 🐕🐈
+
+📍 Laika Pet Mart
+📞 Contact: [Your Number]
+"""
+    
+    return message, points_earned
+
+def create_whatsapp_link(phone_number, message):
+    """Create WhatsApp link with pre-filled message"""
+    # Clean phone number
+    phone = phone_number.strip().replace('+', '').replace('-', '').replace(' ', '')
+    
+    # Add country code if not present
+    if not phone.startswith('91') and len(phone) == 10:
+        phone = '91' + phone
+    
+    # URL encode the message
+    encoded_message = urllib.parse.quote(message)
+    
+    # Create WhatsApp link
+    whatsapp_url = f"https://wa.me/{phone}?text={encoded_message}"
+    
+    return whatsapp_url
 
 # --- 2. MULTI-USER LOGIN ---
 if 'logged_in' not in st.session_state: 
@@ -505,42 +701,9 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
     
-    # Today's Sales
-    if not s_df.empty and 'Date' in s_df.columns:
-        s_today = s_df[s_df['Date'] == today_dt]
-        today_sale = pd.to_numeric(s_today.iloc[:, 3], errors='coerce').sum() if not s_today.empty else 0
-    else:
-        today_sale = 0
-    
-    # Today's Purchases
-    p_df = load_data("Inventory")
-    today_purchase = 0
-    
-    if not p_df.empty and len(p_df.columns) > 6:
-        try:
-            p_df['pur_date'] = pd.to_datetime(p_df.iloc[:, 5], errors='coerce').dt.date
-            p_today = p_df[
-                (p_df['pur_date'] == today_dt) & 
-                (p_df.iloc[:, 6].str.contains('Cash|Online|Hand|Udhaar|Supplier', case=False, na=False))
-            ]
-            if not p_today.empty:
-                today_purchase = pd.to_numeric(p_today.iloc[:, 4], errors='coerce').sum()
-        except:
-            today_purchase = 0
-    
-    # Today's Expenses
-    if not e_df.empty and len(e_df.columns) > 2:
-        try:
-            e_df['exp_date'] = pd.to_datetime(e_df.iloc[:, 0], errors='coerce').dt.date
-            e_today = e_df[e_df['exp_date'] == today_dt]
-            today_expense = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty else 0
-        except:
-            today_expense = 0
-    else:
-        today_expense = 0
-    
-    # Today's Profit
-    today_profit = today_sale - today_purchase - today_expense
+    # Calculate actual profit
+    today_sale, today_purchase_cost, today_expense, today_net_profit = calculate_today_actual_profit()
+    today_gross_profit = today_sale - today_purchase_cost
     
     st.markdown(f"""
     <div style="display: flex; gap: 15px; margin-bottom: 30px;">
@@ -549,25 +712,83 @@ if menu == "📊 Dashboard":
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_sale:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">🛒 Total Purchase</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase:,.2f}</h2>
+            <p style="margin: 0; font-size: 16px;">🛒 Purchase Cost</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase_cost:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_expense:,.2f}</h2>
         </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
+            <p style="margin: 0; font-size: 16px;">💚 Gross Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_gross_profit:,.2f}</h2>
+        </div>
         <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 16px;">📊 Net Profit</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_profit:,.2f}</h2>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_net_profit:,.2f}</h2>
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Profit breakdown explanation
+    with st.expander("💡 Profit Calculation Details"):
+        st.markdown(f"""
+        ### 📊 Today's Profit Breakdown
+        
+        **Gross Profit** = Sale Amount - Purchase Cost  
+        `₹{today_sale:,.2f} - ₹{today_purchase_cost:,.2f} = ₹{today_gross_profit:,.2f}`
+        
+        **Net Profit** = Gross Profit - Expenses  
+        `₹{today_gross_profit:,.2f} - ₹{today_expense:,.2f} = ₹{today_net_profit:,.2f}`
+        
+        ---
+        
+        **💰 Total Sale:** Total amount received from customers  
+        **🛒 Purchase Cost:** Cost price of items sold (from inventory)  
+        **💸 Expenses:** Other business expenses (rent, salary, etc.)  
+        **💚 Gross Profit:** Profit before expenses  
+        **📊 Net Profit:** Final profit after all deductions  
+        """)
 
 # ========================================
 # MENU 2: BILLING
 # ========================================
 elif menu == "🧾 Billing":
     st.header("🧾 Billing System")
+    
+    # Show WhatsApp option if last sale exists
+    if st.session_state.last_sale_details:
+        st.success("✅ Last sale completed successfully!")
+        
+        sale_data = st.session_state.last_sale_details
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.info(f"📋 Bill for: **{sale_data['customer_name']}**")
+            st.write(f"💰 Amount: ₹{sale_data['total_amount']:,.2f}")
+            st.write(f"👑 Points Earned: {sale_data['points_earned']}")
+        
+        with col2:
+            if sale_data.get('customer_phone'):
+                whatsapp_url = create_whatsapp_link(
+                    sale_data['customer_phone'],
+                    sale_data['whatsapp_message']
+                )
+                
+                st.markdown(f"""
+                <a href="{whatsapp_url}" target="_blank" class="whatsapp-button">
+                    📱 Send Bill on WhatsApp
+                </a>
+                """, unsafe_allow_html=True)
+            else:
+                st.warning("⚠️ No phone number provided")
+        
+        if st.button("🔄 New Sale", type="secondary"):
+            st.session_state.last_sale_details = None
+            st.rerun()
+        
+        st.divider()
     
     inv_df = load_data("Inventory")
     
@@ -591,7 +812,7 @@ elif menu == "🧾 Billing":
                 last_unit = product_stock.iloc[-1, 2] if len(product_stock.columns) > 2 else "Pcs"
                 last_rate = pd.to_numeric(product_stock.iloc[-1, 3], errors='coerce') if len(product_stock.columns) > 3 else 0
                 
-                st.info(f"📦 **Available Stock:** {available_qty} {last_unit}")
+                st.info(f"📦 **Available Stock:** {available_qty} {last_unit} | 💰 **Purchase Rate:** ₹{last_rate}")
                 
                 with col2:
                     max_qty = max(float(available_qty), 0.1) if available_qty > 0 else 1000.0
@@ -609,6 +830,16 @@ elif menu == "🧾 Billing":
                     st.write("**Amount**")
                     st.success(f"₹{qty * rate:,.2f}")
                 
+                # Show profit margin
+                if rate > last_rate:
+                    profit_per_unit = rate - last_rate
+                    total_profit = profit_per_unit * qty
+                    st.success(f"💚 Profit: ₹{total_profit:,.2f} (₹{profit_per_unit:.2f} per unit)")
+                elif rate < last_rate:
+                    loss_per_unit = last_rate - rate
+                    total_loss = loss_per_unit * qty
+                    st.error(f"⚠️ Loss: ₹{total_loss:,.2f} (₹{loss_per_unit:.2f} per unit)")
+                
                 remaining = available_qty - qty
                 if remaining < 2:
                     st.warning(f"⚠️ Low stock alert! Only {remaining} {last_unit} will remain after this sale")
@@ -623,7 +854,8 @@ elif menu == "🧾 Billing":
                                 'Qty': qty,
                                 'Unit': selected_unit,
                                 'Rate': rate,
-                                'Amount': qty * rate
+                                'Amount': qty * rate,
+                                'PurchaseRate': last_rate  # Store purchase rate
                             })
                             st.success(f"✅ Added {item} ({qty} {selected_unit})")
                             time.sleep(0.3)
@@ -642,12 +874,21 @@ elif menu == "🧾 Billing":
         cart_df['Rate_Display'] = '₹' + cart_df['Rate'].astype(str)
         cart_df['Amount_Display'] = '₹' + cart_df['Amount'].apply(lambda x: f"{x:,.2f}")
         
-        display_df = cart_df[['Item', 'Qty_Display', 'Rate_Display', 'Amount_Display']]
-        display_df.columns = ['Item', 'Quantity', 'Rate', 'Amount']
+        # Calculate profit for display
+        cart_df['Profit'] = (cart_df['Rate'] - cart_df['PurchaseRate']) * cart_df['Qty']
+        cart_df['Profit_Display'] = cart_df['Profit'].apply(lambda x: f"₹{x:,.2f}" if x >= 0 else f"-₹{abs(x):,.2f}")
+        
+        display_df = cart_df[['Item', 'Qty_Display', 'Rate_Display', 'Amount_Display', 'Profit_Display']]
+        display_df.columns = ['Item', 'Quantity', 'Rate', 'Amount', 'Profit']
         
         st.dataframe(display_df, use_container_width=True)
         
         total = sum([i['Amount'] for i in st.session_state.bill_cart])
+        total_profit = sum([i.get('Profit', 0) for i in [{'Profit': (item['Rate'] - item.get('PurchaseRate', 0)) * item['Qty']} for item in st.session_state.bill_cart]])
+        
+        col1, col2 = st.columns(2)
+        col1.metric("💰 Total Bill", f"₹{total:,.2f}")
+        col2.metric("💚 Total Profit", f"₹{total_profit:,.2f}")
         
         with st.expander("🗑️ Remove Item"):
             if len(st.session_state.bill_cart) > 0:
@@ -668,7 +909,7 @@ elif menu == "🧾 Billing":
         with col1:
             cust_name = st.text_input("Customer Name *", key="cust_name")
         with col2:
-            cust_phone = st.text_input("Customer Phone", key="cust_phone")
+            cust_phone = st.text_input("Customer Phone (for WhatsApp Bill)", key="cust_phone", placeholder="10-digit mobile number")
         
         st.divider()
         st.markdown("### 💰 Payment Details")
@@ -787,6 +1028,10 @@ elif menu == "🧾 Billing":
             
             payment_info = " | ".join(payment_modes_used)
             
+            # Calculate royalty points
+            is_weekend = datetime.now().weekday() >= 5
+            points_earned = calculate_royalty_points(total, is_weekend)
+            
             for cart_item in st.session_state.bill_cart:
                 item_name = cart_item['Item']
                 sold_qty = cart_item['Qty']
@@ -801,7 +1046,7 @@ elif menu == "🧾 Billing":
                     amount,
                     payment_info,
                     customer_info,
-                    0,
+                    points_earned,
                     0,
                     "No GST"
                 ])
@@ -833,7 +1078,26 @@ elif menu == "🧾 Billing":
                 save_data("CustomerKhata", [customer_info, udhaar_amount, str(today_dt), "Sale on credit"])
                 st.warning(f"📒 Udhaar: ₹{udhaar_amount:,.2f} added to due")
             
-            st.success(f"✅ Sale completed!")
+            # Generate WhatsApp message
+            whatsapp_message, points = generate_whatsapp_bill(
+                cust_name,
+                cust_phone,
+                st.session_state.bill_cart,
+                total,
+                payment_info,
+                points_earned
+            )
+            
+            # Store sale details for WhatsApp
+            st.session_state.last_sale_details = {
+                'customer_name': cust_name,
+                'customer_phone': cust_phone,
+                'total_amount': total,
+                'whatsapp_message': whatsapp_message,
+                'points_earned': points
+            }
+            
+            st.success(f"✅ Sale completed! Profit: ₹{total_profit:,.2f} | Points: {points_earned} 👑")
             
             st.session_state.bill_cart = []
             st.balloons()
