@@ -141,6 +141,28 @@ def load_data(sheet_name):
     except: 
         return pd.DataFrame()
 
+def update_stock_in_sheet(item_name, new_qty):
+    """Update stock directly in Google Sheets (NO new entry)"""
+    try:
+        payload = {
+            "action": "update_stock",
+            "sheet": "Inventory",
+            "item_name": item_name,
+            "new_qty": new_qty
+        }
+        
+        response = requests.post(SCRIPT_URL, json=payload, timeout=10)
+        
+        if "Stock Updated" in response.text or "Success" in response.text:
+            return True
+        else:
+            st.warning(f"⚠️ Update response: {response.text}")
+            return False
+            
+    except Exception as e:
+        st.error(f"Stock update error: {str(e)}")
+        return False
+
 def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
     try:
@@ -1377,20 +1399,25 @@ elif menu == "🧾 Billing":
                 ])
                 
                 # ✅ UPDATE STOCK - Google Sheets mein directly update karo (NO NEW ENTRY)
+                # ✅ AUTOMATIC STOCK UPDATE - Google Sheets mein bhi
                 inv_df_update = load_data("Inventory")
                 if not inv_df_update.empty:
                     product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name]
                     
                     if not product_rows.empty:
-                        # Get LATEST entry details
-                        latest_idx = product_rows.index[-1]
+                        # Get current stock
                         current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                        current_unit = product_rows.iloc[-1, 2]
                         current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                        
+                        # Calculate new stock
                         new_stock = current_stock - sold_qty
                         
-                        # ⚠️ IMPORTANT: Yahan Google Sheets mein DIRECTLY update hona chahiye
-                        # Abhi ke liye sirf message dikhao - Manual update karna padega
-                        st.info(f"📦 {item_name}: Stock {current_stock} → {new_stock} {unit}")
+                        # ✅ UPDATE in Google Sheets (NO new entry)
+                        if update_stock_in_sheet(item_name, new_stock):
+                            st.success(f"✅ {item_name}: {current_stock} → {new_stock} {current_unit}")
+                        else:
+                            st.error(f"❌ Failed to update {item_name} stock")
                         st.warning(f"⚠️ Please MANUALLY update stock in Google Sheets (Row #{latest_idx+2})")
                         st.info(f"🔍 Search: {item_name} - Change Qty from {current_stock} to {new_stock}")
             
@@ -3167,6 +3194,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
