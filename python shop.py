@@ -141,32 +141,21 @@ def load_data(sheet_name):
     except: 
         return pd.DataFrame()
 
-def update_stock_in_sheet(item_name, new_qty):
-    """Update stock directly in Google Sheets (NO new entry)"""
-    try:
-        # Item name ko uppercase kar do
-        item_name = str(item_name).strip().upper()
-        
-        payload = {
-            "action": "update_stock",
-            "sheet": "Inventory",
-            "item_name": item_name,
-            "new_qty": float(new_qty)
-        }
-        
-        response = requests.post(SCRIPT_URL, json=payload, timeout=10)
-        response_text = response.text.strip()
-        
-        if "Stock Updated" in response_text or "Success" in response_text:
-            return True
-        else:
-            st.warning(f"⚠️ Update response: {response_text}")
-            return False
-            
-    except Exception as e:
-        st.error(f"Stock update error: {str(e)}")
-        return False        return False
-
+# AUTOMATIC STOCK UPDATE - Google Sheets mein bhi
+                inv_df_update = load_data("Inventory")
+                if not inv_df_update.empty:
+                    product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name]
+                    
+                    if not product_rows.empty:
+                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                        current_unit = product_rows.iloc[-1, 2]
+                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                        new_stock = current_stock - sold_qty
+                        
+                        if update_stock_in_sheet(item_name, new_stock):
+                            st.success(f"✅ {item_name}: {current_stock} → {new_stock} {current_unit}")
+                        else:
+                            st.error(f"❌ Failed to update {item_name} stock")
 def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
     try:
@@ -3198,6 +3187,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
