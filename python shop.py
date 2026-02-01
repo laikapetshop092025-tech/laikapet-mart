@@ -141,20 +141,6 @@ def load_data(sheet_name):
     except: 
         return pd.DataFrame()
 
-                inv_df_update = load_data("Inventory")
-                if not inv_df_update.empty:
-                    product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name]
-                    
-                    if not product_rows.empty:
-                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
-                        current_unit = product_rows.iloc[-1, 2]
-                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
-                        new_stock = current_stock - sold_qty
-                        
-                        if update_stock_in_sheet(item_name, new_stock):
-                            st.success(f"✅ {item_name}: {current_stock} → {new_stock} {current_unit}")
-                        else:
-                            st.error(f"❌ Failed to update {item_name} stock")
 def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
     try:
@@ -1354,12 +1340,21 @@ elif menu == "🧾 Billing":
             
             payment_info = " | ".join(payment_modes_used)
             
-            for cart_item in st.session_state.bill_cart:
-                item_name = cart_item['Item']
-                sold_qty = cart_item['Qty']
-                unit = cart_item['Unit']
-                rate = cart_item['Rate']
-                amount = cart_item['Amount']
+            # ✅ UPDATE STOCK in Google Sheets
+                inv_df_update = load_data("Inventory")
+                if not inv_df_update.empty:
+                    product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name]
+                    
+                    if not product_rows.empty:
+                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                        current_unit = product_rows.iloc[-1, 2]
+                        current_rate = pd.to_numeric(product_rows.iloc[-1, 3], errors='coerce')
+                        new_stock = current_stock - sold_qty
+                        
+                        if update_stock_in_sheet(item_name, new_stock):
+                            st.success(f"✅ {item_name}: {current_stock} → {new_stock} {current_unit}")
+                        else:
+                            st.error(f"❌ Failed to update {item_name} stock")
                 
                 inv_df_check = load_data("Inventory")
                 purchase_cost = 0
@@ -3184,6 +3179,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
