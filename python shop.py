@@ -155,9 +155,25 @@ def get_balance_from_sheet(mode):
             return float(pd.to_numeric(latest_balance, errors='coerce'))
         
         return 0.0
+    def get_balance_from_sheet(mode):
+    """Get LATEST balance from Google Sheets"""
+    try:
+        b_df = load_data("Balances")
+        if b_df.empty or len(b_df.columns) < 2:
+            return 0.0
+        
+        rows = b_df[b_df.iloc[:, 0].str.strip() == mode]
+        
+        if len(rows) > 0:
+            latest_balance = rows.iloc[-1, 1]
+            return float(pd.to_numeric(latest_balance, errors='coerce'))
+        
+        return 0.0
     except Exception as e:
         st.error(f"Error loading balance: {str(e)}")
-        return 0.0def get_current_balance(mode):
+        return 0.0
+
+def get_current_balance(mode):
     """Get current balance"""
     if mode == "Cash":
         if st.session_state.manual_cash is None:
@@ -168,15 +184,6 @@ def get_balance_from_sheet(mode):
             st.session_state.manual_online = get_balance_from_sheet("Online")
         return st.session_state.manual_online
     return 0.0
-
-def set_balance(mode, amount):
-    """Set balance manually"""
-    if mode == "Cash":
-        st.session_state.manual_cash = amount
-    elif mode == "Online":
-        st.session_state.manual_online = amount
-    
-    try:
         if save_data("Balances", [mode, amount]):
             time.sleep(0.5)
             return True
@@ -3179,6 +3186,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
