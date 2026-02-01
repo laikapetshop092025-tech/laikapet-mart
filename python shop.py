@@ -118,6 +118,15 @@ st.markdown("""
         transform: scale(1.05);
         box-shadow: 0 6px 20px rgba(37, 211, 102, 0.6);
     }
+    
+    /* Bill container */
+    .bill-container {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        margin: 20px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -276,24 +285,22 @@ def get_item_purchase_rate(item_name):
     except:
         return 0.0
 
-def calculate_today_actual_profit():
-    """Calculate actual profit = (Sale Price - Purchase Price) - Expenses"""
+def calculate_profit_for_period(start_date, end_date):
+    """Calculate actual profit for a period = (Sale Price - Purchase Price) - Expenses"""
     try:
-        today_dt = datetime.now().date()
-        
         # Load sales data
         s_df = load_data("Sales")
         if s_df.empty or 'Date' not in s_df.columns:
             return 0.0, 0.0, 0.0, 0.0
         
-        # Today's sales
-        s_today = s_df[s_df['Date'] == today_dt]
+        # Filter sales for the period
+        period_sales = s_df[(s_df['Date'] >= start_date) & (s_df['Date'] <= end_date)]
         
         total_sale_amount = 0.0
         total_purchase_cost = 0.0
         
-        if not s_today.empty:
-            for _, sale_row in s_today.iterrows():
+        if not period_sales.empty:
+            for _, sale_row in period_sales.iterrows():
                 item_name = sale_row.iloc[1] if len(sale_row) > 1 else ""
                 sale_amount = pd.to_numeric(sale_row.iloc[3], errors='coerce') if len(sale_row) > 3 else 0.0
                 
@@ -313,23 +320,23 @@ def calculate_today_actual_profit():
                 total_sale_amount += sale_amount
                 total_purchase_cost += purchase_cost
         
-        # Today's expenses
+        # Period expenses
         e_df = load_data("Expenses")
-        today_expense = 0.0
+        period_expense = 0.0
         
         if not e_df.empty and len(e_df.columns) > 2:
             try:
                 e_df['exp_date'] = pd.to_datetime(e_df.iloc[:, 0], errors='coerce').dt.date
-                e_today = e_df[e_df['exp_date'] == today_dt]
-                today_expense = pd.to_numeric(e_today.iloc[:, 2], errors='coerce').sum() if not e_today.empty else 0.0
+                period_exp = e_df[(e_df['exp_date'] >= start_date) & (e_df['exp_date'] <= end_date)]
+                period_expense = pd.to_numeric(period_exp.iloc[:, 2], errors='coerce').sum() if not period_exp.empty else 0.0
             except:
-                today_expense = 0.0
+                period_expense = 0.0
         
         # Calculate actual profit
         gross_profit = total_sale_amount - total_purchase_cost
-        net_profit = gross_profit - today_expense
+        net_profit = gross_profit - period_expense
         
-        return total_sale_amount, total_purchase_cost, today_expense, net_profit
+        return total_sale_amount, total_purchase_cost, period_expense, net_profit
         
     except Exception as e:
         st.error(f"Error calculating profit: {str(e)}")
@@ -517,8 +524,7 @@ if user_role in ["ceo", "owner"]:
         "🐾 Pet Register",
         "📒 Customer Due",
         "🏢 Supplier Dues",
-        "👑 Royalty Points",
-        "📈 Advanced Reports"
+        "👑 Royalty Points"
     ]
 elif user_role == "manager":
     menu_items = [
@@ -530,8 +536,7 @@ elif user_role == "manager":
         "🐾 Pet Register",
         "📒 Customer Due",
         "🏢 Supplier Dues",
-        "👑 Royalty Points",
-        "📈 Advanced Reports"
+        "👑 Royalty Points"
     ]
 else:  # staff
     menu_items = [
@@ -589,13 +594,15 @@ if menu == "📊 Dashboard":
     else:
         total_customer_due = 0
     
-    # Stock Value Calculation
+    # Stock Value Calculation (only latest stock for each item)
     inv_df = load_data("Inventory")
     if not inv_df.empty and len(inv_df.columns) > 3:
-        inv_df['qty_val'] = pd.to_numeric(inv_df.iloc[:, 1], errors='coerce').fillna(0)
-        inv_df['rate_val'] = pd.to_numeric(inv_df.iloc[:, 3], errors='coerce').fillna(0)
-        inv_df['total_val'] = inv_df['qty_val'] * inv_df['rate_val']
-        total_stock_value = inv_df['total_val'].sum()
+        # Get only the latest entry for each item
+        latest_stock = inv_df.groupby(inv_df.iloc[:, 0]).tail(1)
+        latest_stock['qty_val'] = pd.to_numeric(latest_stock.iloc[:, 1], errors='coerce').fillna(0)
+        latest_stock['rate_val'] = pd.to_numeric(latest_stock.iloc[:, 3], errors='coerce').fillna(0)
+        latest_stock['total_val'] = latest_stock['qty_val'] * latest_stock['rate_val']
+        total_stock_value = latest_stock['total_val'].sum()
     else:
         total_stock_value = 0
     
@@ -695,14 +702,15 @@ if menu == "📊 Dashboard":
     
     st.divider()
     
+    # Today's Report
     st.markdown(f"""
     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 15px; margin-bottom: 25px;">
         <h2 style="color: white; margin: 0; text-align: center;">📈 Today's Report - {today_dt.strftime('%d %B %Y')}</h2>
     </div>
     """, unsafe_allow_html=True)
     
-    # Calculate actual profit
-    today_sale, today_purchase_cost, today_expense, today_net_profit = calculate_today_actual_profit()
+    # Calculate today's profit
+    today_sale, today_purchase_cost, today_expense, today_net_profit = calculate_profit_for_period(today_dt, today_dt)
     today_gross_profit = today_sale - today_purchase_cost
     
     st.markdown(f"""
@@ -715,13 +723,13 @@ if menu == "📊 Dashboard":
             <p style="margin: 0; font-size: 16px;">🛒 Purchase Cost</p>
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase_cost:,.2f}</h2>
         </div>
-        <div style="flex: 1; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_expense:,.2f}</h2>
-        </div>
         <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
             <p style="margin: 0; font-size: 16px;">💚 Gross Profit</p>
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_gross_profit:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_expense:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 16px;">📊 Net Profit</p>
@@ -730,24 +738,71 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
     
+    st.divider()
+    
+    # Monthly Report
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 15px; margin-bottom: 25px;">
+        <h2 style="color: white; margin: 0; text-align: center;">📅 Monthly Report - {curr_m_name} {today_dt.year}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Calculate monthly profit
+    month_start = date(today_dt.year, curr_m, 1)
+    month_sale, month_purchase_cost, month_expense, month_net_profit = calculate_profit_for_period(month_start, today_dt)
+    month_gross_profit = month_sale - month_purchase_cost
+    
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+        <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">💰 Total Sale</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_sale:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">🛒 Purchase Cost</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_purchase_cost:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
+            <p style="margin: 0; font-size: 16px;">💚 Gross Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_gross_profit:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_expense:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 16px;">📊 Net Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_net_profit:,.2f}</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # Profit breakdown explanation
     with st.expander("💡 Profit Calculation Details"):
         st.markdown(f"""
-        ### 📊 Today's Profit Breakdown
+        ### 📊 Profit Breakdown Formula
         
         **Gross Profit** = Sale Amount - Purchase Cost  
-        `₹{today_sale:,.2f} - ₹{today_purchase_cost:,.2f} = ₹{today_gross_profit:,.2f}`
+        - This shows the margin earned on products before expenses
         
         **Net Profit** = Gross Profit - Expenses  
-        `₹{today_gross_profit:,.2f} - ₹{today_expense:,.2f} = ₹{today_net_profit:,.2f}`
+        - This is the actual profit after all business expenses
         
         ---
         
-        **💰 Total Sale:** Total amount received from customers  
-        **🛒 Purchase Cost:** Cost price of items sold (from inventory)  
-        **💸 Expenses:** Other business expenses (rent, salary, etc.)  
-        **💚 Gross Profit:** Profit before expenses  
-        **📊 Net Profit:** Final profit after all deductions  
+        ### 📈 Today's Calculation:
+        
+        **Gross Profit:** ₹{today_sale:,.2f} - ₹{today_purchase_cost:,.2f} = ₹{today_gross_profit:,.2f}
+        
+        **Net Profit:** ₹{today_gross_profit:,.2f} - ₹{today_expense:,.2f} = ₹{today_net_profit:,.2f}
+        
+        ---
+        
+        ### 📅 Monthly Calculation ({curr_m_name}):
+        
+        **Gross Profit:** ₹{month_sale:,.2f} - ₹{month_purchase_cost:,.2f} = ₹{month_gross_profit:,.2f}
+        
+        **Net Profit:** ₹{month_gross_profit:,.2f} - ₹{month_expense:,.2f} = ₹{month_net_profit:,.2f}
         """)
 
 # ========================================
@@ -756,20 +811,33 @@ if menu == "📊 Dashboard":
 elif menu == "🧾 Billing":
     st.header("🧾 Billing System")
     
-    # Show WhatsApp option if last sale exists
+    # Show last sale details and WhatsApp option
     if st.session_state.last_sale_details:
         st.success("✅ Last sale completed successfully!")
         
         sale_data = st.session_state.last_sale_details
         
+        # Display bill in a nice format
+        st.markdown('<div class="bill-container">', unsafe_allow_html=True)
+        
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            st.info(f"📋 Bill for: **{sale_data['customer_name']}**")
-            st.write(f"💰 Amount: ₹{sale_data['total_amount']:,.2f}")
-            st.write(f"👑 Points Earned: {sale_data['points_earned']}")
+            st.markdown(f"### 📋 Bill Summary")
+            st.info(f"**Customer:** {sale_data['customer_name']}")
+            st.info(f"**Date:** {datetime.now().strftime('%d-%m-%Y %I:%M %p')}")
+            
+            st.markdown("#### 📦 Items:")
+            for idx, item in enumerate(sale_data['items'], 1):
+                st.write(f"{idx}. **{item['Item']}** - {item['Qty']} {item['Unit']} × ₹{item['Rate']:.2f} = ₹{item['Amount']:.2f}")
+            
+            st.divider()
+            st.markdown(f"### 💰 Total: ₹{sale_data['total_amount']:,.2f}")
+            st.write(f"**Payment:** {sale_data['payment_info']}")
+            st.success(f"**Points Earned:** {sale_data['points_earned']} 👑")
         
         with col2:
+            st.markdown("### 📱 Send Bill")
             if sale_data.get('customer_phone'):
                 whatsapp_url = create_whatsapp_link(
                     sale_data['customer_phone'],
@@ -777,17 +845,20 @@ elif menu == "🧾 Billing":
                 )
                 
                 st.markdown(f"""
-                <a href="{whatsapp_url}" target="_blank" class="whatsapp-button">
-                    📱 Send Bill on WhatsApp
+                <a href="{whatsapp_url}" target="_blank" class="whatsapp-button" style="width: 100%; text-align: center; margin: 10px 0;">
+                    📱 Send on WhatsApp
                 </a>
                 """, unsafe_allow_html=True)
             else:
                 st.warning("⚠️ No phone number provided")
+            
+            st.divider()
+            
+            if st.button("🔄 New Sale", type="primary", use_container_width=True):
+                st.session_state.last_sale_details = None
+                st.rerun()
         
-        if st.button("🔄 New Sale", type="secondary"):
-            st.session_state.last_sale_details = None
-            st.rerun()
-        
+        st.markdown('</div>', unsafe_allow_html=True)
         st.divider()
     
     inv_df = load_data("Inventory")
@@ -797,6 +868,7 @@ elif menu == "🧾 Billing":
         
         with col1:
             if not inv_df.empty:
+                # Get only latest stock for each item
                 latest_stock = inv_df.groupby(inv_df.iloc[:, 0]).tail(1)
                 items_list = latest_stock.iloc[:, 0].unique().tolist()
                 item = st.selectbox("Select Item", items_list, key="bill_item")
@@ -805,6 +877,7 @@ elif menu == "🧾 Billing":
                 item = None
         
         if item and not inv_df.empty:
+            # Get latest stock for selected item
             product_stock = inv_df[inv_df.iloc[:, 0] == item].tail(1)
             
             if not product_stock.empty:
@@ -855,7 +928,7 @@ elif menu == "🧾 Billing":
                                 'Unit': selected_unit,
                                 'Rate': rate,
                                 'Amount': qty * rate,
-                                'PurchaseRate': last_rate  # Store purchase rate
+                                'PurchaseRate': last_rate
                             })
                             st.success(f"✅ Added {item} ({qty} {selected_unit})")
                             time.sleep(0.3)
@@ -884,7 +957,7 @@ elif menu == "🧾 Billing":
         st.dataframe(display_df, use_container_width=True)
         
         total = sum([i['Amount'] for i in st.session_state.bill_cart])
-        total_profit = sum([i.get('Profit', 0) for i in [{'Profit': (item['Rate'] - item.get('PurchaseRate', 0)) * item['Qty']} for item in st.session_state.bill_cart]])
+        total_profit = sum([(item['Rate'] - item.get('PurchaseRate', 0)) * item['Qty'] for item in st.session_state.bill_cart])
         
         col1, col2 = st.columns(2)
         col1.metric("💰 Total Bill", f"₹{total:,.2f}")
@@ -1094,7 +1167,9 @@ elif menu == "🧾 Billing":
                 'customer_phone': cust_phone,
                 'total_amount': total,
                 'whatsapp_message': whatsapp_message,
-                'points_earned': points
+                'points_earned': points,
+                'payment_info': payment_info,
+                'items': st.session_state.bill_cart.copy()
             }
             
             st.success(f"✅ Sale completed! Profit: ₹{total_profit:,.2f} | Points: {points_earned} 👑")
@@ -1292,6 +1367,7 @@ elif menu == "📋 Live Stock":
     i_df = load_data("Inventory")
     
     if not i_df.empty and len(i_df.columns) > 4:
+        # Get only latest stock for each item (no duplicate entries)
         latest_stock = i_df.groupby(i_df.columns[0]).tail(1).copy()
         
         latest_stock['qty_v'] = pd.to_numeric(latest_stock.iloc[:, 1], errors='coerce').fillna(0)
@@ -1364,71 +1440,52 @@ elif menu == "💰 Expenses":
 elif menu == "🐾 Pet Register":
     st.header("🐾 Pet Register - Pets for Sale")
     
-    tab1, tab2 = st.tabs(["➕ Add Pet", "📋 Available Pets"])
-    
-    with tab1:
-        with st.form("pet_reg"):
-            st.subheader("Register Pet for Sale")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                pet_type = st.selectbox("Pet Type", ["Dog", "Cat", "Rabbit", "Bird", "Hamster", "Other"])
-                pet_breed = st.text_input("Breed *")
-                pet_age = st.number_input("Age (months)", min_value=0, max_value=120, step=1)
-                pet_price = st.number_input("Selling Price (₹) *", min_value=0, step=100)
-            
-            with col2:
-                pet_gender = st.selectbox("Gender", ["Male", "Female"])
-                pet_color = st.text_input("Color")
-            
-            notes = st.text_area("Additional Notes")
-            
-            if st.form_submit_button("💾 Add Pet", type="primary"):
-                if pet_breed and pet_price > 0:
-                    save_data("PetRegister", [
-                        str(today_dt),
-                        pet_type,
-                        pet_breed,
-                        pet_age,
-                        pet_gender,
-                        pet_color,
-                        pet_price,
-                        "Available",
-                        notes
-                    ])
-                    st.success(f"✅ {pet_type} ({pet_breed}) added!")
-                    st.balloons()
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("⚠️ Fill Breed and Price!")
-    
-    with tab2:
-        pets_df = load_data("PetRegister")
+    with st.form("pet_reg"):
+        st.subheader("Register Pet for Sale")
         
-        if not pets_df.empty:
-            st.subheader(f"📊 Total Pets: {len(pets_df)}")
-            
-            for idx, row in pets_df.iterrows():
-                pet_type = row.iloc[1] if len(row) > 1 else "Pet"
-                pet_breed = row.iloc[2] if len(row) > 2 else "Unknown"
-                pet_price = row.iloc[6] if len(row) > 6 else 0
-                
-                with st.expander(f"🐾 {pet_type} - {pet_breed} - ₹{pet_price:,.0f}"):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write(f"**Type:** {pet_type}")
-                        st.write(f"**Breed:** {pet_breed}")
-                        st.write(f"**Age:** {row.iloc[3] if len(row) > 3 else 'N/A'} months")
-                    
-                    with col2:
-                        st.write(f"**Gender:** {row.iloc[4] if len(row) > 4 else 'N/A'}")
-                        st.write(f"**Color:** {row.iloc[5] if len(row) > 5 else 'N/A'}")
-                        st.write(f"**Price:** ₹{pet_price:,.0f}")
-        else:
-            st.info("No pets registered yet.")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            pet_type = st.selectbox("Pet Type", ["Dog", "Cat", "Rabbit", "Bird", "Hamster", "Other"])
+            pet_breed = st.text_input("Breed *")
+            pet_age = st.number_input("Age (months)", min_value=0, max_value=120, step=1)
+            pet_price = st.number_input("Selling Price (₹) *", min_value=0, step=100)
+        
+        with col2:
+            pet_gender = st.selectbox("Gender", ["Male", "Female"])
+            pet_color = st.text_input("Color")
+        
+        notes = st.text_area("Additional Notes")
+        
+        if st.form_submit_button("💾 Add Pet", type="primary"):
+            if pet_breed and pet_price > 0:
+                save_data("PetRegister", [
+                    str(today_dt),
+                    pet_type,
+                    pet_breed,
+                    pet_age,
+                    pet_gender,
+                    pet_color,
+                    pet_price,
+                    "Available",
+                    notes
+                ])
+                st.success(f"✅ {pet_type} ({pet_breed}) added!")
+                st.balloons()
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("⚠️ Fill Breed and Price!")
+    
+    st.divider()
+    
+    # Show registered pets count only
+    pets_df = load_data("PetRegister")
+    if not pets_df.empty:
+        st.metric("📊 Total Pets Registered", len(pets_df))
+        st.info("💡 Pet details are stored in Google Sheets")
+    else:
+        st.info("No pets registered yet.")
 
 # ========================================
 # MENU 7: CUSTOMER DUE
@@ -1609,64 +1666,3 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
-
-# ========================================
-# MENU 10: ADVANCED REPORTS
-# ========================================
-elif menu == "📈 Advanced Reports":
-    st.header("📈 Advanced Sales Reports")
-    
-    s_df = load_data("Sales")
-    
-    if not s_df.empty and len(s_df.columns) > 3:
-        tab1, tab2 = st.tabs(["📊 Best Sellers", "🐌 Slow Moving"])
-        
-        with tab1:
-            st.subheader("🏆 Best Selling Products")
-            
-            try:
-                product_sales = s_df.groupby(s_df.columns[1], as_index=False).agg({
-                    s_df.columns[3]: 'sum'
-                })
-                
-                product_sales['Units_Sold'] = s_df.groupby(s_df.columns[1]).size().values
-                product_sales.columns = ['Product', 'Revenue', 'Units_Sold']
-                product_sales['Revenue'] = pd.to_numeric(product_sales['Revenue'], errors='coerce')
-                product_sales = product_sales.sort_values('Revenue', ascending=False).head(10)
-                
-                if not product_sales.empty:
-                    for idx, row in product_sales.iterrows():
-                        col1, col2, col3 = st.columns([2, 1, 1])
-                        with col1:
-                            st.write(f"**{row['Product']}**")
-                        with col2:
-                            st.metric("Revenue", f"₹{row['Revenue']:,.0f}")
-                        with col3:
-                            st.metric("Units", f"{row['Units_Sold']}")
-                else:
-                    st.info("No data")
-            except:
-                st.info("No data")
-        
-        with tab2:
-            st.subheader("🐌 Slow Moving Products")
-            
-            try:
-                inv_df = load_data("Inventory")
-                if not inv_df.empty:
-                    product_movement = s_df.groupby(s_df.columns[1]).size()
-                    product_movement_df = product_movement.reset_index()
-                    product_movement_df.columns = ['Product', 'Transactions']
-                    slow_movers = product_movement_df.sort_values('Transactions').head(10)
-                    
-                    if not slow_movers.empty:
-                        for idx, row in slow_movers.iterrows():
-                            st.warning(f"⚠️ **{row['Product']}** - {row['Transactions']} transactions")
-                    else:
-                        st.info("No slow movers")
-                else:
-                    st.info("No data")
-            except:
-                st.info("No data")
-    else:
-        st.info("No sales data")
