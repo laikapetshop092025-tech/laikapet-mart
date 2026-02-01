@@ -342,6 +342,25 @@ def calculate_profit_for_period(start_date, end_date):
         st.error(f"Error calculating profit: {str(e)}")
         return 0.0, 0.0, 0.0, 0.0
 
+def get_period_purchases(start_date, end_date):
+    """Get total purchase amount for a specific period"""
+    try:
+        inv_df = load_data("Inventory")
+        if inv_df.empty or 'Date' not in inv_df.columns:
+            return 0.0
+        
+        # Filter purchases for the period
+        period_purchases = inv_df[(inv_df['Date'] >= start_date) & (inv_df['Date'] <= end_date)]
+        
+        if not period_purchases.empty and len(period_purchases.columns) > 4:
+            # Column 4 is total value (qty * rate)
+            total_purchase = pd.to_numeric(period_purchases.iloc[:, 4], errors='coerce').sum()
+            return float(total_purchase) if pd.notna(total_purchase) else 0.0
+        
+        return 0.0
+    except:
+        return 0.0
+
 def get_customer_royalty_points(customer_name):
     """Get customer's total royalty points"""
     try:
@@ -713,6 +732,9 @@ if menu == "📊 Dashboard":
     today_sale, today_purchase_cost, today_expense, today_net_profit = calculate_profit_for_period(today_dt, today_dt)
     today_gross_profit = today_sale - today_purchase_cost
     
+    # Get today's actual purchases (only purchases made today)
+    today_purchases = get_period_purchases(today_dt, today_dt)
+    
     st.markdown(f"""
     <div style="display: flex; gap: 15px; margin-bottom: 30px;">
         <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
@@ -720,8 +742,8 @@ if menu == "📊 Dashboard":
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_sale:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">🛒 Purchase Cost</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase_cost:,.2f}</h2>
+            <p style="margin: 0; font-size: 16px;">🛒 Today's Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchases:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
             <p style="margin: 0; font-size: 16px;">💚 Gross Profit</p>
@@ -752,6 +774,9 @@ if menu == "📊 Dashboard":
     month_sale, month_purchase_cost, month_expense, month_net_profit = calculate_profit_for_period(month_start, today_dt)
     month_gross_profit = month_sale - month_purchase_cost
     
+    # Get month's actual purchases
+    month_purchases = get_period_purchases(month_start, today_dt)
+    
     st.markdown(f"""
     <div style="display: flex; gap: 15px; margin-bottom: 30px;">
         <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
@@ -759,8 +784,8 @@ if menu == "📊 Dashboard":
             <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_sale:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 16px;">🛒 Purchase Cost</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_purchase_cost:,.2f}</h2>
+            <p style="margin: 0; font-size: 16px;">🛒 Total Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_purchases:,.2f}</h2>
         </div>
         <div style="flex: 1; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; text-align: center; color: #333;">
             <p style="margin: 0; font-size: 16px;">💚 Gross Profit</p>
@@ -782,7 +807,7 @@ if menu == "📊 Dashboard":
         st.markdown(f"""
         ### 📊 Profit Breakdown Formula
         
-        **Gross Profit** = Sale Amount - Purchase Cost  
+        **Gross Profit** = Sale Amount - Purchase Cost (of sold items)
         - This shows the margin earned on products before expenses
         
         **Net Profit** = Gross Profit - Expenses  
@@ -792,17 +817,27 @@ if menu == "📊 Dashboard":
         
         ### 📈 Today's Calculation:
         
+        **Sale Amount:** ₹{today_sale:,.2f}  
+        **Purchase Cost (of items sold):** ₹{today_purchase_cost:,.2f}  
         **Gross Profit:** ₹{today_sale:,.2f} - ₹{today_purchase_cost:,.2f} = ₹{today_gross_profit:,.2f}
         
+        **Expenses:** ₹{today_expense:,.2f}  
         **Net Profit:** ₹{today_gross_profit:,.2f} - ₹{today_expense:,.2f} = ₹{today_net_profit:,.2f}
+        
+        **Today's Actual Purchase:** ₹{today_purchases:,.2f} (items bought today)
         
         ---
         
         ### 📅 Monthly Calculation ({curr_m_name}):
         
+        **Sale Amount:** ₹{month_sale:,.2f}  
+        **Purchase Cost (of items sold):** ₹{month_purchase_cost:,.2f}  
         **Gross Profit:** ₹{month_sale:,.2f} - ₹{month_purchase_cost:,.2f} = ₹{month_gross_profit:,.2f}
         
+        **Expenses:** ₹{month_expense:,.2f}  
         **Net Profit:** ₹{month_gross_profit:,.2f} - ₹{month_expense:,.2f} = ₹{month_net_profit:,.2f}
+        
+        **Total Purchase This Month:** ₹{month_purchases:,.2f} (all purchases made)
         """)
 
 # ========================================
@@ -1549,8 +1584,49 @@ elif menu == "📒 Customer Due":
                 
                 st.divider()
                 
+                # Customer due list with payment button
                 for idx, row in sum_df.iterrows():
-                    st.error(f"🔴 **{row['Customer']}** - Due: Rs.{row['Balance']:,.2f}")
+                    customer_name = row['Customer']
+                    due_amount = row['Balance']
+                    
+                    with st.expander(f"🔴 **{customer_name}** - Due: Rs.{due_amount:,.2f}"):
+                        st.write(f"**Outstanding Amount:** ₹{due_amount:,.2f}")
+                        
+                        st.markdown("#### 💰 Record Payment")
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            payment_amt = st.number_input(
+                                "Payment Amount",
+                                min_value=0.0,
+                                max_value=float(due_amount),
+                                value=float(due_amount),
+                                step=10.0,
+                                key=f"pay_amt_{idx}"
+                            )
+                        
+                        with col2:
+                            payment_method = st.selectbox(
+                                "Payment Mode",
+                                ["Cash", "Online"],
+                                key=f"pay_mode_{idx}"
+                            )
+                        
+                        if st.button(f"✅ Receive Payment", key=f"pay_btn_{idx}", type="primary"):
+                            if payment_amt > 0:
+                                # Record negative amount (payment received)
+                                save_data("CustomerKhata", [customer_name, -payment_amt, str(today_dt), f"Payment received via {payment_method}"])
+                                
+                                # Update balance
+                                if payment_method == "Cash":
+                                    update_balance(payment_amt, "Cash", 'add')
+                                elif payment_method == "Online":
+                                    update_balance(payment_amt, "Online", 'add')
+                                
+                                st.success(f"✅ Payment of ₹{payment_amt:,.2f} received from {customer_name}")
+                                time.sleep(1)
+                                st.rerun()
             else:
                 st.success("✅ No outstanding dues!")
             
