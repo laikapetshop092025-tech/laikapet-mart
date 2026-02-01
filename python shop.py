@@ -144,24 +144,28 @@ def load_data(sheet_name):
 def update_stock_in_sheet(item_name, new_qty):
     """Update stock directly in Google Sheets (NO new entry)"""
     try:
+        # Item name ko uppercase kar do
+        item_name = str(item_name).strip().upper()
+        
         payload = {
             "action": "update_stock",
             "sheet": "Inventory",
             "item_name": item_name,
-            "new_qty": new_qty
+            "new_qty": float(new_qty)
         }
         
         response = requests.post(SCRIPT_URL, json=payload, timeout=10)
+        response_text = response.text.strip()
         
-        if "Stock Updated" in response.text or "Success" in response.text:
+        if "Stock Updated" in response_text or "Success" in response_text:
             return True
         else:
-            st.warning(f"⚠️ Update response: {response.text}")
+            st.warning(f"⚠️ Update response: {response_text}")
             return False
             
     except Exception as e:
         st.error(f"Stock update error: {str(e)}")
-        return False
+        return False        return False
 
 def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
@@ -3194,6 +3198,7 @@ elif menu == "⚙️ Super Admin Panel":
 
 else:
     st.info(f"Module: {menu} - Feature under development")
+
 
 
 
