@@ -841,8 +841,11 @@ if menu == "📊 Dashboard":
         """)
 
 # ========================================
-# MENU 2: BILLING
-# ========================================elif menu == "🧾 Billing":
+# COMPLETE BILLING SECTION WITH ROYALTY POINTS
+# Replace your existing Billing section with this
+# ========================================
+
+elif menu == "🧾 Billing":
     st.header("🧾 Billing System")
     
     # Show last sale details and WhatsApp option
@@ -1314,7 +1317,6 @@ if menu == "📊 Dashboard":
     
     else:
         st.info("🛒 Cart is empty. Add items to start billing.")
-
 # ========================================
 # MENU 3: PURCHASE
 # ========================================
@@ -1854,5 +1856,6 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
 
 
