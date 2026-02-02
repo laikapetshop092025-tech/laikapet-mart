@@ -175,9 +175,9 @@ def update_stock_in_sheet(item_name, new_qty):
     try:
         item_name = str(item_name).strip().upper()
         
+        # Direct stock update payload
         payload = {
             "action": "update_stock",
-            "sheet": "Inventory",
             "item_name": item_name,
             "new_qty": float(new_qty)
         }
@@ -185,7 +185,7 @@ def update_stock_in_sheet(item_name, new_qty):
         response = requests.post(SCRIPT_URL, json=payload, timeout=10)
         response_text = response.text.strip()
         
-        if "Stock Updated" in response_text:
+        if "SUCCESS" in response_text or "Updated" in response_text:
             return True
         else:
             st.warning(f"Update response: {response_text}")
@@ -194,7 +194,6 @@ def update_stock_in_sheet(item_name, new_qty):
     except Exception as e:
         st.error(f"Stock update error: {str(e)}")
         return False
-
 def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
     try:
@@ -1228,7 +1227,7 @@ elif menu == "🧾 Billing":
             
             payment_info = " | ".join(payment_modes_used)
             
-            # Save sale with points
+            # ✅ SAVE SALE + UPDATE STOCK
             for cart_item in st.session_state.bill_cart:
                 item_name = cart_item['Item']
                 sold_qty = cart_item['Qty']
@@ -1236,6 +1235,7 @@ elif menu == "🧾 Billing":
                 rate = cart_item['Rate']
                 amount = cart_item['Amount']
                 
+                # 1️⃣ Save Sale Record
                 save_data("Sales", [
                     str(today_dt),
                     item_name,
@@ -1243,25 +1243,27 @@ elif menu == "🧾 Billing":
                     amount,
                     payment_info,
                     customer_info,
-                    total_points_earned,  # Total points including referral and manual
+                    total_points_earned,
                     0,
                     "No GST"
                 ])
                 
-                # Update stock in Google Sheets
-                inv_df_update = load_data("Inventory")
-                if not inv_df_update.empty:
-                    product_rows = inv_df_update[inv_df_update.iloc[:, 0] == item_name]
+                # 2️⃣ Update Stock in Google Sheets
+                inv_df_fresh = load_data("Inventory")
+                if not inv_df_fresh.empty:
+                    product_rows = inv_df_fresh[inv_df_fresh.iloc[:, 0].str.strip().str.upper() == item_name.strip().upper()]
                     
                     if not product_rows.empty:
                         current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
-                        current_unit = product_rows.iloc[-1, 2]
                         new_stock = current_stock - sold_qty
                         
+                        # Update stock using Google Apps Script
                         if update_stock_in_sheet(item_name, new_stock):
-                            st.success(f"✅ {item_name}: {current_stock} → {new_stock} {current_unit}")
+                            st.success(f"✅ Stock Updated: {item_name} ({current_stock} → {new_stock} {unit})")
                         else:
-                            st.warning(f"⚠️ Please manually update {item_name} stock in Google Sheets")
+                            st.error(f"❌ Failed to update {item_name} stock!")
+                    else:
+                        st.warning(f"⚠️ {item_name} not found in inventory!")
             
             # Update balances
             if cash_amount > 0:
@@ -1856,6 +1858,7 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
 
 
 
