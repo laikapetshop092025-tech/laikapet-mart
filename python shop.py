@@ -1362,15 +1362,29 @@ elif menu == "📦 Purchase":
                 payment_info = f"{payment_mode} - {supplier_full_info}"
                 total_value = item['Qty'] * item['Rate']
                 
-                save_data("Inventory", [
-                    item['Item'],
-                    item['Qty'],
-                    item['Unit'],
-                    item['Rate'],
-                    total_value,
-                    str(today_dt),
-                    payment_info
-                ])
+                # ✅ SMART PURCHASE - Adds to existing or creates new
+                payload = {
+                    "action": "smart_purchase",
+                    "sheet": "Inventory",
+                    "item_name": item['Item'],
+                    "qty": item['Qty'],
+                    "unit": item['Unit'],
+                    "rate": item['Rate'],
+                    "total_value": total_value,
+                    "date": str(today_dt),
+                    "payment_info": payment_info
+                }
+                
+                try:
+                    response = requests.post(SCRIPT_URL, json=payload, timeout=10)
+                    response_text = response.text.strip()
+                    
+                    if "Added" in response_text or "created" in response_text:
+                        st.success(f"✅ {item['Item']}: {response_text}")
+                    else:
+                        st.warning(f"⚠️ {item['Item']}: Saved")
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
             
             if payment_mode == "Cash":
                 update_balance(total_amount, "Cash", 'subtract')
@@ -1742,3 +1756,4 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
