@@ -171,26 +171,37 @@ def load_data(sheet_name):
         return pd.DataFrame()
 
 def update_stock_in_sheet(item_name, new_qty):
-    """Update stock directly in Google Sheets"""
+    """Update stock directly in Google Sheets - MINUS KARNA"""
     try:
         item_name = str(item_name).strip().upper()
+        new_qty = float(new_qty)
         
-        # Direct stock update payload
+        st.info(f"🔄 Updating {item_name} stock to {new_qty}...")
+        
         payload = {
             "action": "update_stock",
             "item_name": item_name,
-            "new_qty": float(new_qty)
+            "new_qty": new_qty
         }
         
-        response = requests.post(SCRIPT_URL, json=payload, timeout=10)
+        response = requests.post(SCRIPT_URL, json=payload, timeout=15)
         response_text = response.text.strip()
         
-        if "SUCCESS" in response_text or "Updated" in response_text:
+        st.write(f"Server Response: {response_text}")
+        
+        if "SUCCESS" in response_text:
+            st.success(f"✅ {item_name} stock updated to {new_qty}")
             return True
+        elif "ERROR" in response_text:
+            st.error(f"❌ {response_text}")
+            return False
         else:
-            st.warning(f"Update response: {response_text}")
+            st.warning(f"⚠️ Unexpected response: {response_text}")
             return False
             
+    except Exception as e:
+        st.error(f"❌ Stock update failed: {str(e)}")
+        return False            
     except Exception as e:
         st.error(f"Stock update error: {str(e)}")
         return False
@@ -1227,43 +1238,79 @@ elif menu == "🧾 Billing":
             
             payment_info = " | ".join(payment_modes_used)
             
-            # ✅ SAVE SALE + UPDATE STOCK
-            for cart_item in st.session_state.bill_cart:
+            st.markdown("---")
+            st.subheader("📊 Processing Sale...")
+            
+            # Process each item
+            all_success = True
+            
+            for idx, cart_item in enumerate(st.session_state.bill_cart, 1):
                 item_name = cart_item['Item']
                 sold_qty = cart_item['Qty']
                 unit = cart_item['Unit']
                 rate = cart_item['Rate']
                 amount = cart_item['Amount']
                 
-                # 1️⃣ Save Sale Record
-                save_data("Sales", [
-                    str(today_dt),
-                    item_name,
-                    f"{sold_qty} {unit}",
-                    amount,
-                    payment_info,
-                    customer_info,
-                    total_points_earned,
-                    0,
-                    "No GST"
-                ])
+                st.write(f"**{idx}. {item_name}** - Processing...")
                 
-                # 2️⃣ Update Stock in Google Sheets
+                # 1️⃣ Get current stock
                 inv_df_fresh = load_data("Inventory")
-                if not inv_df_fresh.empty:
-                    product_rows = inv_df_fresh[inv_df_fresh.iloc[:, 0].str.strip().str.upper() == item_name.strip().upper()]
+                
+                if inv_df_fresh.empty:
+                    st.error(f"❌ Inventory sheet is empty!")
+                    all_success = False
+                    continue
+                
+                # Find item (case-insensitive)
+                product_rows = inv_df_fresh[
+                    inv_df_fresh.iloc[:, 0].str.strip().str.upper() == item_name.strip().upper()
+                ]
+                
+                if product_rows.empty:
+                    st.error(f"❌ {item_name} not found in inventory!")
+                    all_success = False
+                    continue
+                
+                # Get latest stock
+                current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                
+                if pd.isna(current_stock):
+                    st.error(f"❌ Invalid stock value for {item_name}")
+                    all_success = False
+                    continue
+                
+                # Calculate new stock
+                new_stock = current_stock - sold_qty
+                
+                st.info(f"📦 {item_name}: {current_stock} → {new_stock} {unit}")
+                
+                # 2️⃣ Update stock in Google Sheets
+                if update_stock_in_sheet(item_name, new_stock):
+                    st.success(f"✅ Stock updated successfully!")
                     
-                    if not product_rows.empty:
-                        current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
-                        new_stock = current_stock - sold_qty
-                        
-                        # Update stock using Google Apps Script
-                        if update_stock_in_sheet(item_name, new_stock):
-                            st.success(f"✅ Stock Updated: {item_name} ({current_stock} → {new_stock} {unit})")
-                        else:
-                            st.error(f"❌ Failed to update {item_name} stock!")
-                    else:
-                        st.warning(f"⚠️ {item_name} not found in inventory!")
+                    # 3️⃣ Save sale record
+                    save_data("Sales", [
+                        str(today_dt),
+                        item_name,
+                        f"{sold_qty} {unit}",
+                        amount,
+                        payment_info,
+                        customer_info,
+                        total_points_earned,
+                        0,
+                        "No GST"
+                    ])
+                    st.success(f"✅ Sale recorded!")
+                    
+                else:
+                    st.error(f"❌ Failed to update {item_name} stock!")
+                    all_success = False
+                
+                st.markdown("---")
+            
+            if not all_success:
+                st.error("⚠️ Some items failed to update. Check Google Sheet manually.")
+                st.stop()
             
             # Update balances
             if cash_amount > 0:
@@ -1284,7 +1331,7 @@ elif menu == "🧾 Billing":
                     -redeem_value,
                     "Points Redemption",
                     customer_info,
-                    -redeem_points,  # Negative points = deduction
+                    -redeem_points,
                     0,
                     "Redemption"
                 ])
@@ -1299,7 +1346,7 @@ elif menu == "🧾 Billing":
                 total_points_earned
             )
             
-            # Store sale details for WhatsApp
+            # Store sale details
             st.session_state.last_sale_details = {
                 'customer_name': cust_name,
                 'customer_phone': cust_phone,
@@ -1310,11 +1357,11 @@ elif menu == "🧾 Billing":
                 'items': st.session_state.bill_cart.copy()
             }
             
-            st.success(f"✅ Sale completed! Profit: ₹{total_profit:,.2f} | Points: {total_points_earned} 👑")
+            st.success(f"🎉 Sale completed! Profit: ₹{total_profit:,.2f} | Points: {total_points_earned} 👑")
             
             st.session_state.bill_cart = []
             st.balloons()
-            time.sleep(2)
+            time.sleep(3)
             st.rerun()
     
     else:
@@ -1858,6 +1905,7 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
 
 
 
