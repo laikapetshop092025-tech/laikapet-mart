@@ -842,8 +842,7 @@ if menu == "📊 Dashboard":
 
 # ========================================
 # MENU 2: BILLING
-# ========================================
-elif menu == "🧾 Billing":
+# ========================================elif menu == "🧾 Billing":
     st.header("🧾 Billing System")
     
     # Show last sale details and WhatsApp option
@@ -1019,10 +1018,91 @@ elif menu == "🧾 Billing":
         with col2:
             cust_phone = st.text_input("Customer Phone (for WhatsApp Bill)", key="cust_phone", placeholder="10-digit mobile number")
         
+        # 👑 ROYALTY POINTS SECTION
+        st.divider()
+        st.markdown("### 👑 Royalty Points & Referral")
+        
+        # Check if customer exists and get their points
+        existing_points = 0
+        if cust_name.strip():
+            existing_points = get_customer_royalty_points(cust_name)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.info(f"**Current Points:** {existing_points} 👑")
+        
+        with col2:
+            # Points that will be earned (only if bill >= 100)
+            is_weekend = datetime.now().weekday() >= 5
+            if total >= 100:
+                points_to_earn = calculate_royalty_points(total, is_weekend)
+                st.success(f"**Will Earn:** +{points_to_earn} 👑")
+            else:
+                st.warning(f"**Min ₹100 needed**")
+                points_to_earn = 0
+        
+        with col3:
+            # Redemption option
+            redeem_points = st.number_input(
+                "Redeem Points (100 = ₹10)",
+                min_value=0,
+                max_value=existing_points,
+                step=100,
+                value=0,
+                key="redeem_points"
+            )
+            
+            if redeem_points > 0:
+                redeem_value = (redeem_points / 100) * 10
+                st.success(f"💰 Discount: ₹{redeem_value:.2f}")
+            else:
+                redeem_value = 0
+        
+        # Referral bonus
+        st.markdown("#### 🎁 Referral Bonus")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            is_referral = st.checkbox("Customer came via Referral", key="is_referral")
+        
+        with col2:
+            if is_referral:
+                referral_bonus = 10
+                st.success(f"🎉 Bonus: +{referral_bonus} points")
+            else:
+                referral_bonus = 0
+        
+        # Manual points adjustment (for owner/CEO only)
+        if user_role in ["ceo", "owner"]:
+            with st.expander("⚙️ Manual Points Adjustment (Admin Only)"):
+                manual_points = st.number_input(
+                    "Add/Remove Points Manually",
+                    min_value=-1000,
+                    max_value=1000,
+                    value=0,
+                    step=10,
+                    key="manual_points",
+                    help="Positive = Add points, Negative = Remove points"
+                )
+                
+                if manual_points != 0:
+                    st.warning(f"{'➕' if manual_points > 0 else '➖'} Manual Adjustment: {abs(manual_points)} points")
+        else:
+            manual_points = 0
+        
+        # Calculate final bill after redemption
+        final_bill = total - redeem_value
+        
         st.divider()
         st.markdown("### 💰 Payment Details")
         
-        st.info(f"💵 **Total Bill Amount:** ₹{total:,.2f}")
+        st.info(f"💵 **Original Bill:** ₹{total:,.2f}")
+        if redeem_value > 0:
+            st.success(f"🎁 **Points Discount:** -₹{redeem_value:.2f}")
+            st.metric("**Final Bill**", f"₹{final_bill:,.2f}", delta=f"-₹{redeem_value:.2f}")
+        else:
+            st.metric("**Final Bill**", f"₹{final_bill:,.2f}")
         
         payment_split = st.radio(
             "Payment Type:",
@@ -1045,13 +1125,13 @@ elif menu == "🧾 Billing":
             )
             
             if single_mode == "Cash":
-                cash_amount = total
+                cash_amount = final_bill
                 st.success(f"💵 **Cash Payment:** ₹{cash_amount:,.2f}")
             elif single_mode == "Online":
-                online_amount = total
+                online_amount = final_bill
                 st.success(f"🏦 **Online Payment:** ₹{online_amount:,.2f}")
             else:
-                udhaar_amount = total
+                udhaar_amount = final_bill
                 st.warning(f"📒 **Credit (Udhaar):** ₹{udhaar_amount:,.2f}")
         
         else:
@@ -1061,31 +1141,31 @@ elif menu == "🧾 Billing":
             
             with col1:
                 st.markdown("**💵 Cash**")
-                cash_amount = st.number_input("Cash Amount", min_value=0.0, max_value=float(total), value=0.0, step=10.0, key="split_cash")
+                cash_amount = st.number_input("Cash Amount", min_value=0.0, max_value=float(final_bill), value=0.0, step=10.0, key="split_cash")
                 if cash_amount > 0:
                     st.success(f"✅ Cash: ₹{cash_amount:,.2f}")
             
             with col2:
                 st.markdown("**🏦 Online**")
-                max_online = float(total - cash_amount)
+                max_online = float(final_bill - cash_amount)
                 online_amount = st.number_input("Online Amount", min_value=0.0, max_value=max_online, value=0.0, step=10.0, key="split_online")
                 if online_amount > 0:
                     st.success(f"✅ Online: ₹{online_amount:,.2f}")
             
             with col3:
                 st.markdown("**📒 Udhaar**")
-                max_udhaar = float(total - cash_amount - online_amount)
+                max_udhaar = float(final_bill - cash_amount - online_amount)
                 udhaar_amount = st.number_input("Udhaar Amount", min_value=0.0, max_value=max_udhaar, value=max_udhaar, step=10.0, key="split_udhaar")
                 if udhaar_amount > 0:
                     st.warning(f"⚠️ Udhaar: ₹{udhaar_amount:,.2f}")
             
             total_paid = cash_amount + online_amount + udhaar_amount
-            remaining = total - total_paid
+            remaining = final_bill - total_paid
             
             st.divider()
             
             col1, col2, col3 = st.columns(3)
-            col1.metric("💰 Total Bill", f"₹{total:,.2f}")
+            col1.metric("💰 Final Bill", f"₹{final_bill:,.2f}")
             col2.metric("✅ Total Entered", f"₹{total_paid:,.2f}")
             
             if remaining > 0.01:
@@ -1101,11 +1181,20 @@ elif menu == "🧾 Billing":
         st.divider()
         st.markdown("### 📊 Final Summary")
         
-        payment_summary_cols = st.columns(4)
-        payment_summary_cols[0].metric("💰 Bill", f"₹{total:,.2f}")
-        payment_summary_cols[1].metric("💵 Cash", f"₹{cash_amount:,.2f}" if cash_amount > 0 else "₹0")
-        payment_summary_cols[2].metric("🏦 Online", f"₹{online_amount:,.2f}" if online_amount > 0 else "₹0")
-        payment_summary_cols[3].metric("📒 Udhaar", f"₹{udhaar_amount:,.2f}" if udhaar_amount > 0 else "₹0")
+        # Calculate total points
+        total_points_earned = points_to_earn + referral_bonus + manual_points
+        
+        summary_cols = st.columns(5)
+        summary_cols[0].metric("💰 Original", f"₹{total:,.2f}")
+        summary_cols[1].metric("🎁 Discount", f"₹{redeem_value:.2f}")
+        summary_cols[2].metric("💵 Final", f"₹{final_bill:,.2f}")
+        summary_cols[3].metric("👑 Points", f"+{total_points_earned}")
+        summary_cols[4].metric("📊 Profit", f"₹{total_profit:,.2f}")
+        
+        payment_summary_cols = st.columns(3)
+        payment_summary_cols[0].metric("💵 Cash", f"₹{cash_amount:,.2f}" if cash_amount > 0 else "₹0")
+        payment_summary_cols[1].metric("🏦 Online", f"₹{online_amount:,.2f}" if online_amount > 0 else "₹0")
+        payment_summary_cols[2].metric("📒 Udhaar", f"₹{udhaar_amount:,.2f}" if udhaar_amount > 0 else "₹0")
         
         can_save = True
         error_msg = ""
@@ -1116,7 +1205,7 @@ elif menu == "🧾 Billing":
         
         if payment_split == "Multiple Payment Modes (Split Payment)":
             total_paid = cash_amount + online_amount + udhaar_amount
-            if abs(total_paid - total) > 0.01:
+            if abs(total_paid - final_bill) > 0.01:
                 can_save = False
                 error_msg = f"⚠️ Payment mismatch!"
         
@@ -1136,10 +1225,7 @@ elif menu == "🧾 Billing":
             
             payment_info = " | ".join(payment_modes_used)
             
-            # Calculate royalty points
-            is_weekend = datetime.now().weekday() >= 5
-            points_earned = calculate_royalty_points(total, is_weekend)
-            
+            # Save sale with points
             for cart_item in st.session_state.bill_cart:
                 item_name = cart_item['Item']
                 sold_qty = cart_item['Qty']
@@ -1154,7 +1240,7 @@ elif menu == "🧾 Billing":
                     amount,
                     payment_info,
                     customer_info,
-                    points_earned,
+                    total_points_earned,  # Total points including referral and manual
                     0,
                     "No GST"
                 ])
@@ -1174,17 +1260,29 @@ elif menu == "🧾 Billing":
                         else:
                             st.warning(f"⚠️ Please manually update {item_name} stock in Google Sheets")
             
+            # Update balances
             if cash_amount > 0:
                 update_balance(cash_amount, "Cash", 'add')
-                st.success(f"💵 Cash: ₹{cash_amount:,.2f} added")
             
             if online_amount > 0:
                 update_balance(online_amount, "Online", 'add')
-                st.success(f"🏦 Online: ₹{online_amount:,.2f} added")
             
             if udhaar_amount > 0:
                 save_data("CustomerKhata", [customer_info, udhaar_amount, str(today_dt), "Sale on credit"])
-                st.warning(f"📒 Udhaar: ₹{udhaar_amount:,.2f} added to due")
+            
+            # Deduct redeemed points
+            if redeem_points > 0:
+                save_data("Sales", [
+                    str(today_dt),
+                    "POINTS REDEEMED",
+                    f"{redeem_points} points",
+                    -redeem_value,
+                    "Points Redemption",
+                    customer_info,
+                    -redeem_points,  # Negative points = deduction
+                    0,
+                    "Redemption"
+                ])
             
             # Generate WhatsApp message
             whatsapp_message, points = generate_whatsapp_bill(
@@ -1193,7 +1291,7 @@ elif menu == "🧾 Billing":
                 st.session_state.bill_cart,
                 total,
                 payment_info,
-                points_earned
+                total_points_earned
             )
             
             # Store sale details for WhatsApp
@@ -1202,12 +1300,12 @@ elif menu == "🧾 Billing":
                 'customer_phone': cust_phone,
                 'total_amount': total,
                 'whatsapp_message': whatsapp_message,
-                'points_earned': points,
+                'points_earned': total_points_earned,
                 'payment_info': payment_info,
                 'items': st.session_state.bill_cart.copy()
             }
             
-            st.success(f"✅ Sale completed! Profit: ₹{total_profit:,.2f} | Points: {points_earned} 👑")
+            st.success(f"✅ Sale completed! Profit: ₹{total_profit:,.2f} | Points: {total_points_earned} 👑")
             
             st.session_state.bill_cart = []
             st.balloons()
@@ -1756,4 +1854,5 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
 
