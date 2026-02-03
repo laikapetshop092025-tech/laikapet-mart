@@ -309,13 +309,17 @@ if user_role in ["ceo", "owner", "manager"]:
         "🏢 Supplier Dues",
         "🐕 Pet Register",
         "💰 Expenses",
-        "⭐ Loyalty Points"
+        "💉 Services",
+        "⭐ Loyalty Points",
+        "🎁 Offers & Discount",
+        "📈 Analysis Report"
     ]
 else:
     menu_items = [
         "📊 Dashboard", 
         "🧾 Billing", 
-        "📋 Live Stock"
+        "📋 Live Stock",
+        "💉 Services"
     ]
 
 for item in menu_items:
@@ -745,14 +749,10 @@ elif menu == "🧾 Billing":
                             if due_amount > 0:
                                 save_data("CustomerKhata", [cust_name, due_amount])
                             
-                            # Calculate and save loyalty points
-                            loyalty_points = calculate_loyalty_points(total_amount, bill_date)
-                            if loyalty_points > 0:
-                                save_data("LoyaltyPoints", [cust_name, loyalty_points, bill_date.strftime("%d/%m/%Y")])
-                            
-                            st.success(f"✅ Bill generated successfully! Loyalty Points: {loyalty_points}")
+                            st.success(f"✅ Bill generated successfully!")
+                            st.info("💡 Don't forget to add loyalty points manually from Loyalty Points section!")
                             st.session_state.bill_cart = []
-                            time.sleep(1)
+                            time.sleep(2)
                             st.rerun()
                         else:
                             st.error("❌ Error generating bill!")
@@ -777,10 +777,7 @@ elif menu == "🧾 Billing":
                         msg += f"Cash Paid: ₹{cash_paid:,.2f}\n"
                         msg += f"Online Paid: ₹{online_paid:,.2f}\n"
                         msg += f"Due: ₹{due_amount:,.2f}\n\n"
-                        
-                        loyalty_pts = calculate_loyalty_points(total_amount, bill_date)
-                        msg += f"Loyalty Points Earned: {loyalty_pts}\n"
-                        msg += f"\nThank you for shopping with us! 🐾"
+                        msg += f"Thank you for shopping with us! 🐾"
                         
                         # Create WhatsApp link
                         phone = cust_phone.replace("+", "").replace(" ", "")
@@ -874,10 +871,27 @@ elif menu == "📦 Purchase":
         st.divider()
         st.subheader("Add Items to Purchase")
         
+        # Load inventory to show existing items
+        inv_df = load_data("Inventory")
+        existing_items = []
+        if not inv_df.empty:
+            existing_items = sorted(inv_df.iloc[:, 0].unique().tolist())
+        
+        # Option to select existing or add new
+        item_option = st.radio("Item Selection", ["Existing Item", "New Item"], horizontal=True, key="item_option")
+        
         col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
         
         with col1:
-            item_name = st.text_input("Item Name", key="purch_item_name")
+            if item_option == "Existing Item":
+                if existing_items:
+                    selected_item = st.selectbox("Select Existing Item", existing_items, key="purch_existing_item")
+                    item_name = selected_item
+                else:
+                    st.warning("No existing items! Please select 'New Item'")
+                    item_name = ""
+            else:
+                item_name = st.text_input("New Item Name", key="purch_new_item_name").upper()
         
         with col2:
             item_qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.5, key="purch_qty")
@@ -1366,20 +1380,362 @@ elif menu == "💰 Expenses":
             st.info("No expenses found!")
 
 # ==========================================
-# MENU 9: LOYALTY POINTS
+# MENU 9: SERVICES
+# ==========================================
+elif menu == "💉 Services":
+    st.header("💉 Service Management")
+    
+    st.info("💡 Track vaccination, grooming, and other pet services here. Payment automatically adds to Cash/Online balance.")
+    
+    tab1, tab2 = st.tabs(["➕ Add Service", "📋 Service History"])
+    
+    with tab1:
+        st.subheader("Record Service")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            service_date = st.date_input("Service Date", value=today_dt, key="service_date")
+            customer_name = st.text_input("Customer Name", key="service_customer")
+            customer_phone = st.text_input("Customer Phone", key="service_phone")
+        
+        with col2:
+            pet_name = st.text_input("Pet Name (Optional)", key="service_pet_name")
+            pet_type = st.selectbox("Pet Type", ["Dog", "Cat", "Bird", "Other"], key="service_pet_type")
+        
+        st.divider()
+        st.subheader("Service Details")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            service_type = st.selectbox("Service Type", 
+                                       ["Vaccination", "Grooming", "Health Checkup", "Training", "Nail Cutting", 
+                                        "Bathing", "Ear Cleaning", "Deworming", "Other"],
+                                       key="service_type")
+            
+            if service_type == "Other":
+                service_type = st.text_input("Specify Service", key="service_other")
+        
+        with col2:
+            service_amount = st.number_input("Service Charge ₹", min_value=0.0, value=0.0, step=50.0, key="service_amount")
+            payment_mode = st.radio("Payment Mode", ["💵 Cash", "🏦 Online"], horizontal=True, key="service_payment")
+        
+        service_notes = st.text_area("Notes/Details", placeholder="e.g., Vaccine name, next due date, etc.", key="service_notes")
+        
+        st.divider()
+        
+        if st.button("✅ Save Service", type="primary", use_container_width=True):
+            if not customer_name:
+                st.error("Please enter customer name!")
+            elif service_amount <= 0:
+                st.error("Please enter service amount!")
+            else:
+                service_data = [
+                    service_date.strftime("%d/%m/%Y"),
+                    customer_name,
+                    customer_phone,
+                    pet_name if pet_name else "N/A",
+                    pet_type,
+                    service_type,
+                    service_amount,
+                    payment_mode.replace("💵 ", "").replace("🏦 ", ""),
+                    service_notes,
+                    st.session_state.username
+                ]
+                
+                if save_data("Services", service_data):
+                    # Update balance
+                    mode = "Cash" if payment_mode == "💵 Cash" else "Online"
+                    update_balance(service_amount, mode, operation='add')
+                    
+                    st.success(f"✅ Service recorded! ₹{service_amount:,.2f} added to {mode}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Error saving service!")
+    
+    with tab2:
+        st.subheader("📋 Service History")
+        
+        services_df = load_data("Services")
+        
+        if not services_df.empty:
+            # Filter options
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                filter_date = st.date_input("Filter by Date", value=today_dt, key="filter_service_date")
+            
+            with col2:
+                if st.button("🔍 Filter", key="filter_services"):
+                    st.rerun()
+            
+            with col3:
+                if st.button("🔄 Show All", key="show_all_services"):
+                    filter_date = None
+                    st.rerun()
+            
+            # Calculate total
+            if len(services_df.columns) > 6:
+                total_services = pd.to_numeric(services_df.iloc[:, 6], errors='coerce').sum()
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; margin: 20px 0;">
+                    <h2 style="margin: 0;">Total Service Income: ₹{total_services:,.2f}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            # Display services
+            display_df = services_df
+            if filter_date and 'Date' in services_df.columns:
+                display_df = services_df[services_df['Date'] == filter_date]
+            
+            if not display_df.empty:
+                for idx, row in display_df.iterrows():
+                    with st.expander(f"🐾 {row.iloc[1] if len(row) > 1 else 'Customer'} - {row.iloc[5] if len(row) > 5 else 'Service'} - ₹{row.iloc[6] if len(row) > 6 else 0:.2f}"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Date:** {row.iloc[0] if len(row) > 0 else 'N/A'}")
+                            st.write(f"**Customer:** {row.iloc[1] if len(row) > 1 else 'N/A'}")
+                            st.write(f"**Phone:** {row.iloc[2] if len(row) > 2 else 'N/A'}")
+                            st.write(f"**Pet Name:** {row.iloc[3] if len(row) > 3 else 'N/A'}")
+                        
+                        with col2:
+                            st.write(f"**Pet Type:** {row.iloc[4] if len(row) > 4 else 'N/A'}")
+                            st.write(f"**Service:** {row.iloc[5] if len(row) > 5 else 'N/A'}")
+                            st.write(f"**Amount:** ₹{row.iloc[6] if len(row) > 6 else 0:.2f}")
+                            st.write(f"**Payment:** {row.iloc[7] if len(row) > 7 else 'N/A'}")
+                        
+                        if len(row) > 8 and row.iloc[8]:
+                            st.write(f"**Notes:** {row.iloc[8]}")
+            else:
+                st.info("No services found for selected date!")
+        else:
+            st.info("No services recorded yet!")
+
+# ==========================================
+# MENU 10: OFFERS & DISCOUNT
+# ==========================================
+elif menu == "🎁 Offers & Discount":
+    st.header("🎁 Offers & Discount Management")
+    
+    tab1, tab2 = st.tabs(["➕ Create Offer", "📋 Active Offers"])
+    
+    with tab1:
+        st.subheader("Create New Offer/Discount")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            offer_name = st.text_input("🏷️ Offer Name", placeholder="e.g., Diwali Mega Sale", key="offer_name")
+            offer_type = st.selectbox("Offer Type", 
+                                     ["Percentage Discount", "Flat Discount", "Buy 1 Get 1", "Combo Offer", "Free Gift", "Custom Offer"],
+                                     key="offer_type")
+            
+            if offer_type == "Percentage Discount":
+                discount_percent = st.number_input("Discount %", min_value=0, max_value=100, value=10, key="discount_percent")
+                offer_description = f"{discount_percent}% OFF on all items"
+            elif offer_type == "Flat Discount":
+                flat_amount = st.number_input("Discount Amount ₹", min_value=0.0, value=100.0, step=10.0, key="flat_amount")
+                min_purchase = st.number_input("Minimum Purchase ₹", min_value=0.0, value=500.0, step=50.0, key="min_purchase")
+                offer_description = f"₹{flat_amount} OFF on purchase above ₹{min_purchase}"
+            elif offer_type == "Buy 1 Get 1":
+                product_name = st.text_input("Product Name", key="b1g1_product")
+                offer_description = f"Buy 1 Get 1 FREE on {product_name}"
+            elif offer_type == "Combo Offer":
+                combo_items = st.text_area("Combo Items (comma separated)", placeholder="Dog Food, Dog Shampoo, Dog Toy", key="combo_items")
+                combo_price = st.number_input("Combo Price ₹", min_value=0.0, value=500.0, step=50.0, key="combo_price")
+                offer_description = f"Combo Deal: {combo_items} at ₹{combo_price}"
+            elif offer_type == "Free Gift":
+                gift_item = st.text_input("Free Gift Item", key="gift_item")
+                min_bill = st.number_input("Minimum Bill Amount ₹", min_value=0.0, value=1000.0, step=100.0, key="min_bill")
+                offer_description = f"Free {gift_item} on purchase above ₹{min_bill}"
+            else:
+                offer_description = st.text_area("Custom Offer Description", placeholder="Describe your offer here...", key="custom_offer")
+        
+        with col2:
+            offer_valid_from = st.date_input("Valid From", value=today_dt, key="offer_from")
+            offer_valid_till = st.date_input("Valid Till", value=today_dt + timedelta(days=7), key="offer_till")
+            
+            offer_status = st.radio("Status", ["Active", "Inactive"], horizontal=True, key="offer_status")
+            
+            st.markdown("### 👁️ Preview")
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white; margin-top: 10px;">
+                <h3 style="margin: 0 0 10px 0;">🎁 {offer_name if offer_name else 'Your Offer Name'}</h3>
+                <p style="margin: 0; font-size: 16px;">{offer_description if offer_description else 'Offer description will appear here'}</p>
+                <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">Valid: {offer_valid_from.strftime('%d/%m/%Y')} - {offer_valid_till.strftime('%d/%m/%Y')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            if st.button("✅ Create Offer", type="primary", use_container_width=True):
+                if offer_name and offer_description:
+                    offer_data = [
+                        offer_name,
+                        offer_type,
+                        offer_description,
+                        offer_valid_from.strftime("%d/%m/%Y"),
+                        offer_valid_till.strftime("%d/%m/%Y"),
+                        offer_status,
+                        st.session_state.username,
+                        today_dt.strftime("%d/%m/%Y")
+                    ]
+                    
+                    if save_data("Offers", offer_data):
+                        st.success(f"✅ Offer '{offer_name}' created successfully!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Error creating offer!")
+                else:
+                    st.error("Please fill offer name and description!")
+        
+        with col2:
+            if st.button("📱 Generate WhatsApp Message", use_container_width=True):
+                if offer_name and offer_description:
+                    wa_msg = f"*🎁 {offer_name.upper()}*\n\n"
+                    wa_msg += f"{offer_description}\n\n"
+                    wa_msg += f"📅 Valid from {offer_valid_from.strftime('%d/%m/%Y')} to {offer_valid_till.strftime('%d/%m/%Y')}\n\n"
+                    wa_msg += f"🐕 Visit LAIKA PET MART today!\n"
+                    wa_msg += f"Call us for more details! 📞"
+                    
+                    st.text_area("WhatsApp Message (Copy & Share)", wa_msg, height=200)
+                else:
+                    st.error("Please fill offer details first!")
+    
+    with tab2:
+        st.subheader("📋 All Offers")
+        
+        offers_df = load_data("Offers")
+        
+        if not offers_df.empty:
+            # Filter active offers
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                filter_status = st.selectbox("Filter by Status", ["All", "Active", "Inactive"], key="filter_offer_status")
+            
+            with col2:
+                if st.button("🔄 Refresh Offers", key="refresh_offers"):
+                    st.rerun()
+            
+            st.divider()
+            
+            # Display offers
+            for idx, row in offers_df.iterrows():
+                if len(row) >= 6:
+                    offer_status = row.iloc[5] if len(row) > 5 else "Active"
+                    
+                    if filter_status == "All" or filter_status == offer_status:
+                        status_color = "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)" if offer_status == "Active" else "linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)"
+                        
+                        with st.container():
+                            st.markdown(f"""
+                            <div style="background: {status_color}; padding: 20px; border-radius: 12px; color: white; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="flex: 1;">
+                                        <h3 style="margin: 0 0 10px 0;">🎁 {row.iloc[0]}</h3>
+                                        <p style="margin: 0; font-size: 16px;">{row.iloc[2]}</p>
+                                        <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">📅 Valid: {row.iloc[3]} - {row.iloc[4]}</p>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span style="background: rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 20px; font-weight: bold;">
+                                            {offer_status}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            col1, col2 = st.columns([4, 1])
+                            
+                            with col2:
+                                if st.button("🗑️ Delete", key=f"del_offer_{idx}", use_container_width=True):
+                                    st.warning("Delete functionality coming soon!")
+        else:
+            st.info("No offers created yet! Create your first offer above.")
+
+# ==========================================
+# MENU 11: LOYALTY POINTS
 # ==========================================
 elif menu == "⭐ Loyalty Points":
     st.header("⭐ Loyalty Points Management")
     
-    st.info("""
-    **Loyalty Points System:**
-    - ₹100 purchase = 2 points (Monday to Friday)
-    - ₹100 purchase = 4 points (Saturday & Sunday)
-    """)
+    st.info("💡 Manually add loyalty points to customers. Points accumulate over time!")
     
-    tab1, tab2 = st.tabs(["🔍 Check Points", "📊 All Customers"])
+    tab1, tab2, tab3 = st.tabs(["➕ Add Points", "🔍 Check Points", "📊 All Customers"])
     
     with tab1:
+        st.subheader("Add Loyalty Points")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            customer_name = st.text_input("Customer Name", key="loyalty_add_customer")
+            points_to_add = st.number_input("Points to Add", min_value=1, value=2, step=1, key="points_add")
+        
+        with col2:
+            points_date = st.date_input("Date", value=today_dt, key="points_date")
+            reason = st.text_input("Reason (Optional)", placeholder="e.g., Purchase, Referral, Special bonus", key="points_reason")
+        
+        # Show current points
+        if customer_name:
+            current_points = get_customer_loyalty_points(customer_name)
+            new_total = current_points + points_to_add
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white; margin: 20px 0;">
+                <div style="display: flex; justify-content: space-around; text-align: center;">
+                    <div>
+                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">Current Points</p>
+                        <h2 style="margin: 5px 0;">⭐ {current_points}</h2>
+                    </div>
+                    <div>
+                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">Adding</p>
+                        <h2 style="margin: 5px 0;">➕ {points_to_add}</h2>
+                    </div>
+                    <div>
+                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">New Total</p>
+                        <h2 style="margin: 5px 0;">🎯 {new_total}</h2>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        if st.button("✅ Add Points", type="primary", use_container_width=True):
+            if not customer_name:
+                st.error("Please enter customer name!")
+            elif points_to_add <= 0:
+                st.error("Please enter valid points!")
+            else:
+                points_data = [
+                    customer_name,
+                    points_to_add,
+                    points_date.strftime("%d/%m/%Y"),
+                    reason if reason else "Manual Entry",
+                    st.session_state.username
+                ]
+                
+                if save_data("LoyaltyPoints", points_data):
+                    st.success(f"✅ {points_to_add} points added to {customer_name}!")
+                    st.balloons()
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Error adding points!")
+    
+    with tab2:
         st.subheader("Check Customer Points")
         
         customer_name = st.text_input("Enter Customer Name", key="loyalty_search")
@@ -1394,10 +1750,28 @@ elif menu == "⭐ Loyalty Points":
                     <h1 style="margin: 10px 0;">⭐ {points} Points</h1>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # Show transaction history
+                st.divider()
+                st.subheader("📜 Points History")
+                
+                loyalty_df = load_data("LoyaltyPoints")
+                if not loyalty_df.empty:
+                    customer_history = loyalty_df[loyalty_df.iloc[:, 0].str.strip().str.upper() == customer_name.strip().upper()]
+                    
+                    if not customer_history.empty:
+                        for idx, row in customer_history.iterrows():
+                            points_val = int(pd.to_numeric(row.iloc[1], errors='coerce'))
+                            date_val = row.iloc[2] if len(row) > 2 else "N/A"
+                            reason_val = row.iloc[3] if len(row) > 3 else "N/A"
+                            
+                            st.info(f"**{date_val}**: +{points_val} points - {reason_val}")
+                    else:
+                        st.info("No history found")
             else:
                 st.error("Please enter customer name!")
     
-    with tab2:
+    with tab3:
         st.subheader("📊 All Customer Points")
         
         loyalty_df = load_data("LoyaltyPoints")
@@ -1406,8 +1780,253 @@ elif menu == "⭐ Loyalty Points":
             customer_points = loyalty_df.groupby(loyalty_df.columns[0])[loyalty_df.columns[1]].sum()
             customer_points = customer_points.sort_values(ascending=False)
             
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; margin-bottom: 20px;">
+                <h3 style="margin: 0;">🏆 Top Loyalty Customers 🏆</h3>
+            </div>
+            """, unsafe_allow_html=True)
+            
             for idx, (customer, points) in enumerate(customer_points.items(), 1):
-                medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else "⭐"
-                st.info(f"{medal} **{customer}**: {int(points)} points")
+                # Medal selection
+                if idx == 1:
+                    medal_icon = "🥇"
+                    color = "linear-gradient(135deg, #ffd89b 0%, #19547b 100%)"
+                elif idx == 2:
+                    medal_icon = "🥈"
+                    color = "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)"
+                elif idx == 3:
+                    medal_icon = "🥉"
+                    color = "linear-gradient(135deg, #fa709a 0%, #fee140 100%)"
+                else:
+                    medal_icon = "⭐"
+                    color = "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+                
+                st.markdown(f"""
+                <div style="background: {color}; padding: 15px 20px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; color: white;">
+                    <div style="font-size: 18px; font-weight: bold;">{medal_icon} {customer}</div>
+                    <div style="font-size: 24px; font-weight: bold;">⭐ {int(points)}</div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("No loyalty points data found!")
+
+# ==========================================
+# MENU 11: ANALYSIS REPORT
+# ==========================================
+elif menu == "📈 Analysis Report":
+    st.header("📈 Business Analysis Report")
+    
+    # Date Range Selection
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        analysis_from = st.date_input("From Date", value=today_dt.replace(day=1), key="analysis_from")
+    
+    with col2:
+        analysis_to = st.date_input("To Date", value=today_dt, key="analysis_to")
+    
+    with col3:
+        st.write("")
+        st.write("")
+        if st.button("📊 Generate Report", type="primary", use_container_width=True):
+            st.rerun()
+    
+    st.divider()
+    
+    # Load all data
+    bills_df = load_data("Bills")
+    purchase_df = load_data("Purchases")
+    expense_df = load_data("Expenses")
+    customer_df = load_data("CustomerKhata")
+    supplier_df = load_data("SupplierDues")
+    inv_df = load_data("Inventory")
+    
+    # Calculate metrics for selected period
+    period_sales = 0
+    period_purchase = 0
+    period_expense = 0
+    
+    if not bills_df.empty and 'Date' in bills_df.columns:
+        period_bills = bills_df[(bills_df['Date'] >= analysis_from) & (bills_df['Date'] <= analysis_to)]
+        if len(period_bills.columns) > 6:
+            period_sales = pd.to_numeric(period_bills.iloc[:, 6], errors='coerce').sum()
+    
+    if not purchase_df.empty and 'Date' in purchase_df.columns:
+        period_purchases = purchase_df[(purchase_df['Date'] >= analysis_from) & (purchase_df['Date'] <= analysis_to)]
+        if len(period_purchases.columns) > 5:
+            period_purchase = pd.to_numeric(period_purchases.iloc[:, 5], errors='coerce').sum()
+    
+    if not expense_df.empty and 'Date' in expense_df.columns:
+        period_expenses = expense_df[(expense_df['Date'] >= analysis_from) & (expense_df['Date'] <= analysis_to)]
+        if len(period_expenses.columns) > 2:
+            period_expense = pd.to_numeric(period_expenses.iloc[:, 2], errors='coerce').sum()
+    
+    period_profit = period_sales - period_purchase - period_expense
+    
+    # Display Period Summary
+    st.subheader(f"📅 Period Summary ({analysis_from.strftime('%d/%m/%Y')} to {analysis_to.strftime('%d/%m/%Y')})")
+    
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+        <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+            <p style="margin: 0; font-size: 16px;">💰 Total Sales</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{period_sales:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);">
+            <p style="margin: 0; font-size: 16px;">📦 Total Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{period_purchase:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(250, 112, 154, 0.4);">
+            <p style="margin: 0; font-size: 16px;">💸 Total Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{period_expense:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(48, 207, 208, 0.4);">
+            <p style="margin: 0; font-size: 16px;">📈 Net Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{period_profit:,.2f}</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Current Balances & Dues
+    st.divider()
+    st.subheader("💼 Current Financial Status")
+    
+    cash_bal = get_current_balance("Cash")
+    online_bal = get_current_balance("Online")
+    
+    # Customer Dues
+    total_customer_due = 0
+    if not customer_df.empty and len(customer_df.columns) >= 2:
+        customer_df_copy = customer_df.copy()
+        customer_df_copy.iloc[:, 1] = pd.to_numeric(customer_df_copy.iloc[:, 1], errors='coerce').fillna(0)
+        customer_dues = customer_df_copy.groupby(customer_df_copy.columns[0])[customer_df_copy.columns[1]].sum()
+        total_customer_due = customer_dues[customer_dues > 0].sum()
+    
+    # Supplier Dues
+    total_supplier_due = 0
+    if not supplier_df.empty and len(supplier_df.columns) >= 2:
+        supplier_df_copy = supplier_df.copy()
+        supplier_df_copy.iloc[:, 1] = pd.to_numeric(supplier_df_copy.iloc[:, 1], errors='coerce').fillna(0)
+        supplier_dues = supplier_df_copy.groupby(supplier_df_copy.columns[0])[supplier_df_copy.columns[1]].sum()
+        total_supplier_due = supplier_dues[supplier_dues > 0].sum()
+    
+    # Stock Value
+    total_stock_value = 0
+    if not inv_df.empty and len(inv_df.columns) > 3:
+        latest_stock = inv_df.groupby(inv_df.iloc[:, 0]).tail(1)
+        latest_stock['qty_val'] = pd.to_numeric(latest_stock.iloc[:, 1], errors='coerce').fillna(0)
+        latest_stock['rate_val'] = pd.to_numeric(latest_stock.iloc[:, 3], errors='coerce').fillna(0)
+        latest_stock['total_val'] = latest_stock['qty_val'] * latest_stock['rate_val']
+        total_stock_value = latest_stock['total_val'].sum()
+    
+    col1, col2, col3 = st.columns(3)
+    
+    col1.markdown(f"""
+    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);">
+        <p style="margin: 0; font-size: 16px;">💵 Cash in Hand</p>
+        <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{cash_bal:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col2.markdown(f"""
+    <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(67, 233, 123, 0.4);">
+        <p style="margin: 0; font-size: 16px;">🏦 Online Balance</p>
+        <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{online_bal:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col3.markdown(f"""
+    <div style="background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(255, 153, 102, 0.4);">
+        <p style="margin: 0; font-size: 16px;">📦 Stock Value</p>
+        <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{total_stock_value:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.write("")
+    
+    col1, col2 = st.columns(2)
+    
+    col1.markdown(f"""
+    <div style="background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(255, 216, 155, 0.4);">
+        <p style="margin: 0; font-size: 16px;">📒 Customer Dues (Receivable)</p>
+        <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{total_customer_due:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col2.markdown(f"""
+    <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(250, 112, 154, 0.4);">
+        <p style="margin: 0; font-size: 16px;">🏢 Supplier Dues (Payable)</p>
+        <h2 style="margin: 10px 0 0 0; font-size: 28px;">₹{total_supplier_due:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Key Insights
+    st.divider()
+    st.subheader("💡 Key Insights")
+    
+    profit_margin = (period_profit / period_sales * 100) if period_sales > 0 else 0
+    net_working_capital = cash_bal + online_bal + total_customer_due - total_supplier_due
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white;">
+            <h4 style="margin: 0 0 15px 0;">📊 Performance Metrics</h4>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"**Profit Margin:** {profit_margin:.2f}%")
+        st.markdown(f"**Sales per Day:** ₹{period_sales / max((analysis_to - analysis_from).days + 1, 1):,.2f}")
+        
+        if period_sales > 0:
+            st.markdown(f"**Expense Ratio:** {(period_expense/period_sales*100):.2f}%")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; color: white;">
+            <h4 style="margin: 0 0 15px 0;">💼 Financial Health</h4>
+            <p style="margin: 5px 0;"><strong>Net Working Capital:</strong> ₹{net_working_capital:,.2f}</p>
+            <p style="margin: 5px 0;"><strong>Total Assets:</strong> ₹{cash_bal + online_bal + total_stock_value:,.2f}</p>
+            <p style="margin: 5px 0;"><strong>Current Ratio:</strong> {((cash_bal + online_bal + total_customer_due) / max(total_supplier_due, 1)):.2f}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Top Performers
+    st.divider()
+    st.subheader("🏆 Top Performers")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 👥 Top Customers")
+        if not bills_df.empty and 'Date' in bills_df.columns:
+            period_bills = bills_df[(bills_df['Date'] >= analysis_from) & (bills_df['Date'] <= analysis_to)]
+            if not period_bills.empty and len(period_bills.columns) > 6:
+                customer_sales = period_bills.groupby(period_bills.columns[1])[period_bills.columns[6]].apply(lambda x: pd.to_numeric(x, errors='coerce').sum())
+                top_customers = customer_sales.nlargest(5)
+                
+                for idx, (customer, amount) in enumerate(top_customers.items(), 1):
+                    medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else "⭐"
+                    st.success(f"{medal} **{customer}**: ₹{amount:,.2f}")
+            else:
+                st.info("No customer data for this period")
+        else:
+            st.info("No customer data available")
+    
+    with col2:
+        st.markdown("#### 🛍️ Top Selling Products")
+        if not bills_df.empty and 'Date' in bills_df.columns:
+            period_bills = bills_df[(bills_df['Date'] >= analysis_from) & (bills_df['Date'] <= analysis_to)]
+            if not period_bills.empty and len(period_bills.columns) > 6:
+                product_sales = period_bills.groupby(period_bills.columns[3])[period_bills.columns[6]].apply(lambda x: pd.to_numeric(x, errors='coerce').sum())
+                top_products = product_sales.nlargest(5)
+                
+                for idx, (product, amount) in enumerate(top_products.items(), 1):
+                    medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else "⭐"
+                    st.success(f"{medal} **{product}**: ₹{amount:,.2f}")
+            else:
+                st.info("No product data for this period")
+        else:
+            st.info("No product data available")
