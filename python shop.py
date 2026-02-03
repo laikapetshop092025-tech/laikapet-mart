@@ -1805,7 +1805,8 @@ elif menu == "⭐ Loyalty Points":
                     medal_icon = "⭐"
                 
                 # Simple text display without f-string in HTML
-                st.info(f"{medal_icon} **{customer}**: {int(points)} Points")
+                display_text = f"{medal_icon} {customer}: {int(points)} Points"
+                st.info(display_text)
         else:
             st.info("No loyalty points data found!")
 
