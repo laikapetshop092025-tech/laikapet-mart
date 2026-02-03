@@ -409,6 +409,42 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
     
+    # Manual Balance Adjustment Section
+    if user_role in ["ceo", "owner"]:
+        with st.expander("⚙️ Manually Adjust Balances", expanded=False):
+            st.warning("⚠️ Use this only if balances are incorrect. This will override current values!")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.subheader("💵 Cash Balance")
+                new_cash = st.number_input("Set Cash Balance", min_value=0.0, value=float(cash_bal), step=100.0, key="manual_cash_input")
+                if st.button("✅ Update Cash", key="update_cash_btn", use_container_width=True):
+                    if save_data("Balances", ["Cash", new_cash]):
+                        st.session_state.manual_cash = new_cash
+                        st.success(f"✅ Cash updated to ₹{new_cash:,.2f}")
+                        time.sleep(1)
+                        st.rerun()
+            
+            with col2:
+                st.subheader("🏦 Online Balance")
+                new_online = st.number_input("Set Online Balance", min_value=0.0, value=float(online_bal), step=100.0, key="manual_online_input")
+                if st.button("✅ Update Online", key="update_online_btn", use_container_width=True):
+                    if save_data("Balances", ["Online", new_online]):
+                        st.session_state.manual_online = new_online
+                        st.success(f"✅ Online updated to ₹{new_online:,.2f}")
+                        time.sleep(1)
+                        st.rerun()
+            
+            with col3:
+                st.subheader("📊 Quick Actions")
+                if st.button("🔄 Refresh All Data", key="refresh_data", use_container_width=True):
+                    st.session_state.manual_cash = None
+                    st.session_state.manual_online = None
+                    st.success("✅ Data refreshed!")
+                    time.sleep(0.5)
+                    st.rerun()
+    
     # Daily Report
     st.divider()
     st.subheader("📅 Today's Report")
@@ -443,6 +479,53 @@ if menu == "📊 Dashboard":
     col2.metric("📦 Purchase", f"₹{today_purchase:,.2f}")
     col3.metric("💸 Expense", f"₹{today_expense:,.2f}")
     col4.metric("📈 Profit", f"₹{today_profit:,.2f}", delta=f"{today_profit:,.2f}")
+    
+    # Manual Today's Report Adjustment
+    if user_role in ["ceo", "owner", "manager"]:
+        with st.expander("⚙️ Manually Adjust Today's Report", expanded=False):
+            st.warning("⚠️ Use this to correct today's figures if needed!")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                adj_sales = st.number_input("Adjust Sales", value=float(today_sales), step=100.0, key="adj_sales")
+                adj_purchase = st.number_input("Adjust Purchase", value=float(today_purchase), step=100.0, key="adj_purchase")
+            
+            with col2:
+                adj_expense = st.number_input("Adjust Expense", value=float(today_expense), step=100.0, key="adj_expense")
+                adj_profit = adj_sales - adj_purchase - adj_expense
+                st.metric("Adjusted Profit", f"₹{adj_profit:,.2f}")
+            
+            st.info(f"""
+            **Preview:**
+            - Sales: ₹{today_sales:,.2f} → ₹{adj_sales:,.2f}
+            - Purchase: ₹{today_purchase:,.2f} → ₹{adj_purchase:,.2f}
+            - Expense: ₹{today_expense:,.2f} → ₹{adj_expense:,.2f}
+            - Profit: ₹{today_profit:,.2f} → ₹{adj_profit:,.2f}
+            """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("✅ Save Adjustments", key="save_daily_adj", type="primary", use_container_width=True):
+                    # Save adjustment entry
+                    save_data("DailyAdjustments", [
+                        today_dt.strftime("%d/%m/%Y"),
+                        adj_sales,
+                        adj_purchase,
+                        adj_expense,
+                        adj_profit,
+                        st.session_state.username
+                    ])
+                    st.success("✅ Today's report adjusted!")
+                    time.sleep(1)
+                    st.rerun()
+            
+            with col2:
+                if st.button("🔄 Reset to Calculated", key="reset_daily", use_container_width=True):
+                    st.info("Values reset to auto-calculated!")
+                    time.sleep(0.5)
+                    st.rerun()
     
     # Monthly Report
     st.divider()
@@ -956,74 +1039,75 @@ elif menu == "📋 Live Stock":
 elif menu == "📒 Customer Due":
     st.header("📒 Customer Due Management")
     
-    tab1, tab2 = st.tabs(["💰 Receive Payment", "📊 Customer Dues"])
+    k_df = load_data("CustomerKhata")
     
-    with tab1:
-        st.subheader("Receive Customer Payment")
+    if not k_df.empty and len(k_df.columns) >= 2:
+        # Convert amount column to numeric
+        k_df_copy = k_df.copy()
+        k_df_copy.iloc[:, 1] = pd.to_numeric(k_df_copy.iloc[:, 1], errors='coerce').fillna(0)
         
-        k_df = load_data("CustomerKhata")
+        customer_dues = k_df_copy.groupby(k_df_copy.columns[0])[k_df_copy.columns[1]].sum()
+        customers_with_due = customer_dues[customer_dues > 0]
         
-        if not k_df.empty and len(k_df.columns) > 1:
-            # Get unique customers with dues
-            customer_dues = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum()
-            customers_with_due = customer_dues[customer_dues > 0].index.tolist()
+        if not customers_with_due.empty:
+            st.subheader("📊 All Customer Dues")
             
-            if customers_with_due:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    selected_customer = st.selectbox("Select Customer", customers_with_due, key="cust_due_select")
-                    current_due = customer_dues[selected_customer]
-                    st.metric("Current Due", f"₹{current_due:,.2f}")
-                
-                with col2:
-                    payment_amount = st.number_input("Payment Amount", min_value=0.0, max_value=float(current_due), value=float(current_due), step=10.0, key="cust_payment")
-                    payment_mode = st.radio("Payment Mode", ["💵 Cash", "🏦 Online"], horizontal=True, key="cust_payment_mode")
-                
-                if st.button("✅ Receive Payment", type="primary", use_container_width=True):
-                    if payment_amount > 0:
-                        # Save negative entry to reduce due
-                        if save_data("CustomerKhata", [selected_customer, -payment_amount]):
-                            # Update balance
-                            mode = "Cash" if payment_mode == "💵 Cash" else "Online"
-                            update_balance(payment_amount, mode, operation='add')
+            for idx, (customer, due) in enumerate(customers_with_due.items()):
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    
+                    with col1:
+                        st.markdown(f"### 👤 {customer}")
+                        st.markdown(f"**Due Amount: ₹{due:,.2f}**")
+                    
+                    with col2:
+                        with st.expander("💰 Make Payment", expanded=False):
+                            payment_amount = st.number_input(
+                                "Payment Amount", 
+                                min_value=0.0, 
+                                max_value=float(due), 
+                                value=float(due),
+                                step=10.0,
+                                key=f"cust_pay_{idx}_{customer}"
+                            )
                             
-                            st.success(f"✅ Payment of ₹{payment_amount:,.2f} received from {selected_customer}!")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("Error saving payment!")
-                    else:
-                        st.error("Please enter payment amount!")
-            else:
-                st.info("No customers with pending dues!")
-        else:
-            st.info("No customer dues found!")
-    
-    with tab2:
-        st.subheader("📊 All Customer Dues")
-        
-        k_df = load_data("CustomerKhata")
-        
-        if not k_df.empty and len(k_df.columns) > 1:
-            customer_dues = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum()
-            customers_with_due = customer_dues[customer_dues > 0]
-            
-            if not customers_with_due.empty:
-                for customer, due in customers_with_due.items():
-                    st.info(f"👤 **{customer}**: ₹{due:,.2f}")
+                            payment_mode = st.radio(
+                                "Payment Mode",
+                                ["💵 Cash", "🏦 Online"],
+                                horizontal=True,
+                                key=f"cust_mode_{idx}_{customer}"
+                            )
+                            
+                            if st.button("✅ Receive", key=f"cust_receive_{idx}_{customer}", type="primary", use_container_width=True):
+                                if payment_amount > 0:
+                                    # Save negative entry to reduce due
+                                    if save_data("CustomerKhata", [customer, -payment_amount]):
+                                        # Update balance
+                                        mode = "Cash" if payment_mode == "💵 Cash" else "Online"
+                                        update_balance(payment_amount, mode, operation='add')
+                                        
+                                        st.success(f"✅ ₹{payment_amount:,.2f} received!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error("Error saving payment!")
+                    
+                    with col3:
+                        st.write("")
                 
                 st.divider()
-                total_due = customers_with_due.sum()
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-                    <h2 style="margin: 0;">Total Customer Due: ₹{total_due:,.2f}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.success("✅ No pending customer dues!")
+            
+            # Total Due Summary
+            total_due = customers_with_due.sum()
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; margin-top: 20px;">
+                <h2 style="margin: 0;">Total Customer Due: ₹{total_due:,.2f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.info("No customer dues found!")
+            st.success("✅ No pending customer dues!")
+    else:
+        st.info("No customer dues found!")
 
 # ==========================================
 # MENU 6: SUPPLIER DUES
@@ -1031,74 +1115,75 @@ elif menu == "📒 Customer Due":
 elif menu == "🏢 Supplier Dues":
     st.header("🏢 Supplier Dues Management")
     
-    tab1, tab2 = st.tabs(["💰 Pay Supplier", "📊 Supplier Dues"])
+    sup_df = load_data("SupplierDues")
     
-    with tab1:
-        st.subheader("Pay Supplier Due")
+    if not sup_df.empty and len(sup_df.columns) >= 2:
+        # Convert amount column to numeric
+        sup_df_copy = sup_df.copy()
+        sup_df_copy.iloc[:, 1] = pd.to_numeric(sup_df_copy.iloc[:, 1], errors='coerce').fillna(0)
         
-        sup_df = load_data("SupplierDues")
+        supplier_dues = sup_df_copy.groupby(sup_df_copy.columns[0])[sup_df_copy.columns[1]].sum()
+        suppliers_with_due = supplier_dues[supplier_dues > 0]
         
-        if not sup_df.empty and len(sup_df.columns) > 1:
-            # Get unique suppliers with dues
-            supplier_dues = sup_df.groupby(sup_df.columns[0])[sup_df.columns[1]].sum()
-            suppliers_with_due = supplier_dues[supplier_dues > 0].index.tolist()
+        if not suppliers_with_due.empty:
+            st.subheader("📊 All Supplier Dues")
             
-            if suppliers_with_due:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    selected_supplier = st.selectbox("Select Supplier", suppliers_with_due, key="sup_due_select")
-                    current_due = supplier_dues[selected_supplier]
-                    st.metric("Current Due", f"₹{current_due:,.2f}")
-                
-                with col2:
-                    payment_amount = st.number_input("Payment Amount", min_value=0.0, max_value=float(current_due), value=float(current_due), step=10.0, key="sup_payment")
-                    payment_mode = st.radio("Payment Mode", ["💵 Cash", "🏦 Online"], horizontal=True, key="sup_payment_mode")
-                
-                if st.button("✅ Pay Supplier", type="primary", use_container_width=True):
-                    if payment_amount > 0:
-                        # Save negative entry to reduce due
-                        if save_data("SupplierDues", [selected_supplier, -payment_amount, today_dt.strftime("%d/%m/%Y")]):
-                            # Update balance
-                            mode = "Cash" if payment_mode == "💵 Cash" else "Online"
-                            update_balance(payment_amount, mode, operation='subtract')
+            for idx, (supplier, due) in enumerate(suppliers_with_due.items()):
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    
+                    with col1:
+                        st.markdown(f"### 🏢 {supplier}")
+                        st.markdown(f"**Due Amount: ₹{due:,.2f}**")
+                    
+                    with col2:
+                        with st.expander("💰 Make Payment", expanded=False):
+                            payment_amount = st.number_input(
+                                "Payment Amount", 
+                                min_value=0.0, 
+                                max_value=float(due), 
+                                value=float(due),
+                                step=10.0,
+                                key=f"sup_pay_{idx}_{supplier}"
+                            )
                             
-                            st.success(f"✅ Payment of ₹{payment_amount:,.2f} made to {selected_supplier}!")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("Error saving payment!")
-                    else:
-                        st.error("Please enter payment amount!")
-            else:
-                st.info("No suppliers with pending dues!")
-        else:
-            st.info("No supplier dues found!")
-    
-    with tab2:
-        st.subheader("📊 All Supplier Dues")
-        
-        sup_df = load_data("SupplierDues")
-        
-        if not sup_df.empty and len(sup_df.columns) > 1:
-            supplier_dues = sup_df.groupby(sup_df.columns[0])[sup_df.columns[1]].sum()
-            suppliers_with_due = supplier_dues[supplier_dues > 0]
-            
-            if not suppliers_with_due.empty:
-                for supplier, due in suppliers_with_due.items():
-                    st.warning(f"🏢 **{supplier}**: ₹{due:,.2f}")
+                            payment_mode = st.radio(
+                                "Payment Mode",
+                                ["💵 Cash", "🏦 Online"],
+                                horizontal=True,
+                                key=f"sup_mode_{idx}_{supplier}"
+                            )
+                            
+                            if st.button("✅ Pay Now", key=f"sup_pay_btn_{idx}_{supplier}", type="primary", use_container_width=True):
+                                if payment_amount > 0:
+                                    # Save negative entry to reduce due
+                                    if save_data("SupplierDues", [supplier, -payment_amount, today_dt.strftime("%d/%m/%Y")]):
+                                        # Update balance
+                                        mode = "Cash" if payment_mode == "💵 Cash" else "Online"
+                                        update_balance(payment_amount, mode, operation='subtract')
+                                        
+                                        st.success(f"✅ ₹{payment_amount:,.2f} paid!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error("Error saving payment!")
+                    
+                    with col3:
+                        st.write("")
                 
                 st.divider()
-                total_due = suppliers_with_due.sum()
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
-                    <h2 style="margin: 0;">Total Supplier Due: ₹{total_due:,.2f}</h2>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.success("✅ No pending supplier dues!")
+            
+            # Total Due Summary
+            total_due = suppliers_with_due.sum()
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; margin-top: 20px;">
+                <h2 style="margin: 0;">Total Supplier Due: ₹{total_due:,.2f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.info("No supplier dues found!")
+            st.success("✅ No pending supplier dues!")
+    else:
+        st.info("No supplier dues found!")
 
 # ==========================================
 # MENU 7: PET REGISTER
