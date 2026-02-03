@@ -1692,24 +1692,31 @@ elif menu == "⭐ Loyalty Points":
             current_points = get_customer_loyalty_points(customer_name)
             new_total = current_points + points_to_add
             
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white; margin: 20px 0;">
-                <div style="display: flex; justify-content: space-around; text-align: center;">
-                    <div>
-                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">Current Points</p>
-                        <h2 style="margin: 5px 0; font-size: 24px; font-weight: bold;">⭐ {current_points}</h2>
-                    </div>
-                    <div>
-                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">Adding</p>
-                        <h2 style="margin: 5px 0; font-size: 24px; font-weight: bold;">➕ {points_to_add}</h2>
-                    </div>
-                    <div>
-                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">New Total</p>
-                        <h2 style="margin: 5px 0; font-size: 24px; font-weight: bold;">🎯 {new_total}</h2>
-                    </div>
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Current Points</p>
+                    <h2 style="margin: 10px 0; font-size: 28px;">★ {current_points}</h2>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Adding</p>
+                    <h2 style="margin: 10px 0; font-size: 28px;">+ {points_to_add}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">New Total</p>
+                    <h2 style="margin: 10px 0; font-size: 28px;">● {new_total}</h2>
+                </div>
+                """, unsafe_allow_html=True)
         
         st.divider()
         
