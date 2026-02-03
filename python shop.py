@@ -201,10 +201,8 @@ def update_stock_in_sheet(item_name, new_qty):
             
     except Exception as e:
         st.error(f"❌ Stock update failed: {str(e)}")
-        return False            
-    except Exception as e:
-        st.error(f"Stock update error: {str(e)}")
         return False
+    except Exception as e:
 def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
     try:
@@ -1504,51 +1502,156 @@ elif menu == "📦 Purchase":
         if not can_save:
             st.error("⚠️ Please enter Supplier Name and Phone!")
         
-        if st.button("💾 SAVE PURCHASE", type="primary", use_container_width=True, disabled=not can_save):
-            supplier_full_info = f"{supplier_name} ({supplier_phone})"
+        if st.button("💾 COMPLETE SALE", type="primary", use_container_width=True, disabled=not can_save):
+            customer_info = f"{cust_name} ({cust_phone})" if cust_phone else cust_name
             
-            for item in st.session_state.purchase_cart:
-                payment_info = f"{payment_mode} - {supplier_full_info}"
-                total_value = item['Qty'] * item['Rate']
+            payment_modes_used = []
+            if cash_amount > 0:
+                payment_modes_used.append(f"Cash: ₹{cash_amount:,.2f}")
+            if online_amount > 0:
+                payment_modes_used.append(f"Online: ₹{online_amount:,.2f}")
+            if udhaar_amount > 0:
+                payment_modes_used.append(f"Udhaar: ₹{udhaar_amount:,.2f}")
+            
+            payment_info = " | ".join(payment_modes_used)
+            
+            st.markdown("---")
+            st.subheader("📊 Processing Sale...")
+            
+            all_success = True
+            
+            # Process each item
+            for idx, cart_item in enumerate(st.session_state.bill_cart, 1):
+                item_name = cart_item['Item']
+                sold_qty = cart_item['Qty']
+                unit = cart_item['Unit']
+                rate = cart_item['Rate']
+                amount = cart_item['Amount']
                 
-                # ✅ SMART PURCHASE - Adds to existing or creates new
-                payload = {
-                    "action": "smart_purchase",
-                    "sheet": "Inventory",
-                    "item_name": item['Item'],
-                    "qty": item['Qty'],
-                    "unit": item['Unit'],
-                    "rate": item['Rate'],
-                    "total_value": total_value,
-                    "date": str(today_dt),
-                    "payment_info": payment_info
-                }
+                st.write(f"**{idx}. {item_name}** - Processing...")
                 
-                try:
-                    response = requests.post(SCRIPT_URL, json=payload, timeout=10)
-                    response_text = response.text.strip()
+                # Get current stock
+                inv_df_fresh = load_data("Inventory")
+                
+                if inv_df_fresh.empty:
+                    st.error(f"❌ Inventory sheet is empty!")
+                    all_success = False
+                    continue
+                
+                # Find item
+                product_rows = inv_df_fresh[
+                    inv_df_fresh.iloc[:, 0].str.strip().str.upper() == item_name.strip().upper()
+                ]
+                
+                if product_rows.empty:
+                    st.error(f"❌ {item_name} not found in inventory!")
+                    all_success = False
+                    continue
+                
+                # Get latest stock
+                current_stock = pd.to_numeric(product_rows.iloc[-1, 1], errors='coerce')
+                
+                if pd.isna(current_stock):
+                    st.error(f"❌ Invalid stock value for {item_name}")
+                    all_success = False
+                    continue
+                
+                # Calculate new stock
+                new_stock = current_stock - sold_qty
+                
+                st.info(f"📦 {item_name}: {current_stock} → {new_stock} {unit}")
+                
+                # Update stock
+                if update_stock_in_sheet(item_name, new_stock):
+                    st.success(f"✅ Stock updated!")
                     
-                    if "Added" in response_text or "created" in response_text:
-                        st.success(f"✅ {item['Item']}: {response_text}")
-                    else:
-                        st.warning(f"⚠️ {item['Item']}: Saved")
-                except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
+                    # Save sale record
+                    save_data("Sales", [
+                        str(today_dt),
+                        item_name,
+                        f"{sold_qty} {unit}",
+                        amount,
+                        payment_info,
+                        customer_info,
+                        total_points_earned,
+                        0,
+                        "No GST"
+                    ])
+                    st.success(f"✅ Sale recorded!")
+                    
+                else:
+                    st.error(f"❌ Failed to update {item_name} stock!")
+                    all_success = False
+                
+                st.markdown("---")
             
-            if payment_mode == "Cash":
-                update_balance(total_amount, "Cash", 'subtract')
-                st.success(f"✅ ₹{total_amount:,.2f} deducted from Cash")
-            elif payment_mode == "Online":
-                update_balance(total_amount, "Online", 'subtract')
-                st.success(f"✅ ₹{total_amount:,.2f} deducted from Online")
-            elif payment_mode == "By Hand":
+            if not all_success:
+                st.error("⚠️ Some items failed to update. Check manually.")
+                st.stop()
+            
+            # ✅ UPDATE BALANCES
+            if cash_amount > 0:
+                if update_balance(cash_amount, "Cash", 'add'):
+                    st.success(f"✅ Cash balance updated: +₹{cash_amount:,.2f}")
+            
+            if online_amount > 0:
+                if update_balance(online_amount, "Online", 'add'):
+                    st.success(f"✅ Online balance updated: +₹{online_amount:,.2f}")
+            
+            if udhaar_amount > 0:
+                save_data("CustomerKhata", [customer_info, udhaar_amount, str(today_dt), "Sale on credit"])
+                st.warning(f"📒 Udhaar added: ₹{udhaar_amount:,.2f}")
+            
+            # Deduct redeemed points
+            if redeem_points > 0:
+                save_data("Sales", [
+                    str(today_dt),
+                    "POINTS REDEEMED",
+                    f"{redeem_points} points",
+                    -redeem_value,
+                    "Points Redemption",
+                    customer_info,
+                    -redeem_points,
+                    0,
+                    "Redemption"
+                ])
+            
+            # Generate WhatsApp message
+            whatsapp_message, points = generate_whatsapp_bill(
+                cust_name,
+                cust_phone,
+                st.session_state.bill_cart,
+                total,
+                payment_info,
+                total_points_earned
+            )
+            
+            # Store sale details
+            st.session_state.last_sale_details = {
+                'customer_name': cust_name,
+                'customer_phone': cust_phone,
+                'total_amount': total,
+                'whatsapp_message': whatsapp_message,
+                'points_earned': total_points_earned,
+                'payment_info': payment_info,
+                'items': st.session_state.bill_cart.copy()
+            }
+            
+            st.success(f"🎉 Sale completed! Profit: ₹{total_profit:,.2f} | Points: {total_points_earned} 👑")
+            
+            st.session_state.bill_cart = []
+            st.balloons()
+            time.sleep(3)
+            st.rerun()
+                else:
+                    st.error("❌ Failed to save hand investment!")
+                    
+            else:  # Udhaar
                 items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
-                save_data("HandInvestments", [str(today_dt), supplier_full_info, total_amount, items_note, "Purchase by hand"])
-                st.success(f"✅ ₹{total_amount:,.2f} invested from pocket!")
-            else:
-                items_note = ", ".join([f"{item['Item']} ({item['Qty']} {item['Unit']})" for item in st.session_state.purchase_cart])
-                save_data("Dues", [supplier_full_info, total_amount, str(today_dt), f"Purchase: {items_note}"])
-                st.success(f"✅ ₹{total_amount:,.2f} added to {supplier_name}'s dues!")
+                if save_data("Dues", [supplier_full_info, total_amount, str(today_dt), f"Purchase: {items_note}"]):
+                    st.success(f"✅ ₹{total_amount:,.2f} added to {supplier_name}'s dues!")
+                else:
+                    st.error("❌ Failed to save supplier dues!")
             
             st.session_state.purchase_cart = []
             st.balloons()
@@ -1778,16 +1881,22 @@ elif menu == "📒 Customer Due":
                         
                         if st.button(f"✅ Receive Payment", key=f"pay_btn_{idx}", type="primary"):
                             if payment_amt > 0:
-                                # Record negative amount (payment received)
+                                # Record payment
                                 save_data("CustomerKhata", [customer_name, -payment_amt, str(today_dt), f"Payment received via {payment_method}"])
                                 
-                                # Update balance
+                                # ✅ UPDATE BALANCE
                                 if payment_method == "Cash":
-                                    update_balance(payment_amt, "Cash", 'add')
+                                    if update_balance(payment_amt, "Cash", 'add'):
+                                        st.success(f"✅ Payment of ₹{payment_amt:,.2f} received | Cash balance updated")
+                                    else:
+                                        st.error("❌ Failed to update Cash balance!")
+                                        
                                 elif payment_method == "Online":
-                                    update_balance(payment_amt, "Online", 'add')
+                                    if update_balance(payment_amt, "Online", 'add'):
+                                        st.success(f"✅ Payment of ₹{payment_amt:,.2f} received | Online balance updated")
+                                    else:
+                                        st.error("❌ Failed to update Online balance!")
                                 
-                                st.success(f"✅ Payment of ₹{payment_amt:,.2f} received from {customer_name}")
                                 time.sleep(1)
                                 st.rerun()
             else:
@@ -1818,19 +1927,27 @@ elif menu == "🏢 Supplier Dues":
             if st.form_submit_button("💾 Save", type="primary"):
                 if a > 0 and s.strip():
                     if "Credit" in t or "Liya" in t:
+                        # Supplier से माल लिया (Credit)
                         final_amt = a
                         save_data("Dues", [s, final_amt, str(today_dt), m, "Credit"])
-                        st.success(f"✅ ₹{a:,.2f} credit added")
+                        st.success(f"✅ ₹{a:,.2f} credit added to {s}")
                     else:
+                        # Supplier को payment किया
                         final_amt = -a
                         save_data("Dues", [s, final_amt, str(today_dt), m, "Payment"])
                         
+                        # ✅ UPDATE BALANCE
                         if m == "Cash":
-                            update_balance(a, "Cash", 'subtract')
+                            if update_balance(a, "Cash", 'subtract'):
+                                st.success(f"✅ ₹{a:,.2f} payment done | Cash balance updated")
+                            else:
+                                st.error("❌ Failed to update Cash balance!")
+                                
                         elif m == "Online":
-                            update_balance(a, "Online", 'subtract')
-                        
-                        st.success(f"✅ ₹{a:,.2f} payment recorded")
+                            if update_balance(a, "Online", 'subtract'):
+                                st.success(f"✅ ₹{a:,.2f} payment done | Online balance updated")
+                            else:
+                                st.error("❌ Failed to update Online balance!")
                     
                     time.sleep(1)
                     st.rerun()
@@ -1905,6 +2022,7 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
 
 
 
