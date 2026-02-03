@@ -1804,8 +1804,9 @@ elif menu == "⭐ Loyalty Points":
                 else:
                     medal_icon = "⭐"
                 
-                # Simple text display without f-string
-                display_text = str(medal_icon) + " " + str(customer) + ": " + str(int(points)) + " Points"
+                # Simple text display using format method
+                points_val = int(points)
+                display_text = "{} {}: {} Points".format(medal_icon, customer, points_val)
                 st.info(display_text)
         else:
             st.info("No loyalty points data found!")
