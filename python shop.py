@@ -1697,15 +1697,15 @@ elif menu == "⭐ Loyalty Points":
                 <div style="display: flex; justify-content: space-around; text-align: center;">
                     <div>
                         <p style="margin: 0; font-size: 14px; opacity: 0.9;">Current Points</p>
-                        <h2 style="margin: 5px 0;">⭐ {current_points}</h2>
+                        <h2 style="margin: 5px 0; font-size: 24px; font-weight: bold;">⭐ {current_points}</h2>
                     </div>
                     <div>
                         <p style="margin: 0; font-size: 14px; opacity: 0.9;">Adding</p>
-                        <h2 style="margin: 5px 0;">➕ {points_to_add}</h2>
+                        <h2 style="margin: 5px 0; font-size: 24px; font-weight: bold;">➕ {points_to_add}</h2>
                     </div>
                     <div>
                         <p style="margin: 0; font-size: 14px; opacity: 0.9;">New Total</p>
-                        <h2 style="margin: 5px 0;">🎯 {new_total}</h2>
+                        <h2 style="margin: 5px 0; font-size: 24px; font-weight: bold;">🎯 {new_total}</h2>
                     </div>
                 </div>
             </div>
