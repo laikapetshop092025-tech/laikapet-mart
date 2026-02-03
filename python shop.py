@@ -1754,7 +1754,7 @@ elif menu == "⭐ Loyalty Points":
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 30px; border-radius: 12px; text-align: center; color: white; margin: 20px 0;">
                     <h3 style="margin: 0;">{customer_name}</h3>
-                    <h1 style="margin: 10px 0;">⭐ {points} Points</h1>
+                    <h1 style="margin: 10px 0;">★ {points} Points</h1>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1805,13 +1805,13 @@ elif menu == "⭐ Loyalty Points":
                     medal_icon = "🥉"
                     color = "linear-gradient(135deg, #fa709a 0%, #fee140 100%)"
                 else:
-                    medal_icon = "⭐"
+                    medal_icon = "★"
                     color = "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
                 
                 st.markdown(f"""
                 <div style="background: {color}; padding: 15px 20px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; color: white;">
                     <div style="font-size: 18px; font-weight: bold;">{medal_icon} {customer}</div>
-                    <div style="font-size: 24px; font-weight: bold;">⭐ {int(points)}</div>
+                    <div style="font-size: 24px; font-weight: bold;">★ {int(points)}</div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
