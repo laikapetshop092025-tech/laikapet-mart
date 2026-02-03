@@ -691,6 +691,45 @@ elif menu == "🧾 Billing":
             st.divider()
             st.subheader("💳 Payment Details")
             
+            # Manual Discount Option
+            st.markdown("#### 💰 Discount")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                discount_type = st.selectbox("Discount Type", 
+                                            ["No Discount", "Percentage (%)", "Flat Amount (₹)"],
+                                            key="discount_type")
+            
+            discount_value = 0
+            discount_amount = 0
+            
+            if discount_type == "Percentage (%)":
+                with col2:
+                    discount_value = st.number_input("Discount %", min_value=0.0, max_value=100.0, value=10.0, step=1.0, key="discount_percent")
+                    discount_amount = (total_amount * discount_value) / 100
+                
+                with col3:
+                    st.metric("Discount Amount", f"₹{discount_amount:,.2f}")
+            
+            elif discount_type == "Flat Amount (₹)":
+                with col2:
+                    discount_amount = st.number_input("Discount ₹", min_value=0.0, max_value=float(total_amount), value=0.0, step=10.0, key="discount_flat")
+                
+                with col3:
+                    discount_percent = (discount_amount / total_amount * 100) if total_amount > 0 else 0
+                    st.metric("Discount %", f"{discount_percent:.1f}%")
+            
+            if discount_amount > 0:
+                discount_reason = st.text_input("Discount Reason", placeholder="e.g., Regular customer, Festival offer, Bulk purchase", key="discount_reason")
+            else:
+                discount_reason = ""
+            
+            # Calculate amount after discount
+            amount_after_discount = total_amount - discount_amount
+            
+            st.divider()
+            
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -700,8 +739,101 @@ elif menu == "🧾 Billing":
                 online_paid = st.number_input("🏦 Online Paid", min_value=0.0, value=0.0, step=10.0, key="online_paid")
             
             with col3:
-                due_amount = total_amount - cash_paid - online_paid
+                due_amount = amount_after_discount - cash_paid - online_paid
                 st.metric("📒 Due Amount", f"₹{due_amount:,.2f}")
+            
+            # Show bill summary if discount applied
+            if discount_amount > 0:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 15px; border-radius: 10px; color: white; margin: 10px 0;">
+                    <p style="margin: 0;"><strong>Original Amount:</strong> ₹{total_amount:,.2f}</p>
+                    <p style="margin: 5px 0;"><strong>Discount:</strong> -₹{discount_amount:,.2f}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Amount to Pay:</strong> ₹{amount_after_discount:,.2f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Loyalty Points Section
+            st.divider()
+            st.subheader("⭐ Loyalty Points")
+            
+            # Show current points first
+            current_customer_points = 0
+            if cust_name:
+                current_customer_points = get_customer_loyalty_points(cust_name)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 10px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 14px;">Current Points</p>
+                    <h2 style="margin: 5px 0; font-size: 32px;">{current_customer_points}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                loyalty_points = st.number_input("Points to Give", min_value=0, value=2, step=1, key="bill_loyalty_points", 
+                                                help="Manually set loyalty points for this purchase")
+            
+            loyalty_reason = st.text_input("Reason (Optional)", value="Purchase", key="bill_loyalty_reason",
+                                          placeholder="e.g., Purchase, Special Offer")
+            
+            # Redeem Points Option
+            st.divider()
+            use_redeem = st.checkbox("🎁 Redeem Loyalty Points", key="use_redeem")
+            
+            redeem_points = 0
+            redeem_value = 0
+            
+            if use_redeem and current_customer_points > 0:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    redeem_points = st.number_input("Points to Redeem", 
+                                                   min_value=0, 
+                                                   max_value=current_customer_points, 
+                                                   value=min(10, current_customer_points),
+                                                   step=1,
+                                                   key="redeem_points")
+                    st.info("💡 1 Point = ₹1")
+                
+                with col2:
+                    redeem_value = redeem_points * 1  # 1 point = 1 rupee
+                    st.metric("Discount Amount", f"₹{redeem_value}")
+                    
+                    remaining_points = current_customer_points - redeem_points
+                    st.metric("Points After Redeem", f"{remaining_points}")
+            
+            # Update due amount if redeeming points
+            if redeem_value > 0:
+                final_amount = amount_after_discount - redeem_value
+                cash_paid_adjusted = cash_paid
+                online_paid_adjusted = online_paid
+                due_amount_adjusted = final_amount - cash_paid_adjusted - online_paid_adjusted
+            else:
+                final_amount = amount_after_discount
+                cash_paid_adjusted = cash_paid
+                online_paid_adjusted = online_paid
+                due_amount_adjusted = due_amount
+            
+            # Show final summary
+            if redeem_value > 0 or discount_amount > 0:
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 15px; border-radius: 10px; color: white; margin: 10px 0;">
+                    <h4 style="margin: 0 0 10px 0;">Final Bill Summary</h4>
+                    <p style="margin: 0;"><strong>Original Amount:</strong> ₹{total_amount:,.2f}</p>
+                    {f'<p style="margin: 5px 0;"><strong>Manual Discount:</strong> -₹{discount_amount:,.2f}</p>' if discount_amount > 0 else ''}
+                    {f'<p style="margin: 5px 0;"><strong>Points Discount:</strong> -₹{redeem_value:,.2f} ({redeem_points} points)</p>' if redeem_value > 0 else ''}
+                    <p style="margin: 5px 0;"><strong>Final Amount:</strong> ₹{final_amount:,.2f}</p>
+                    <p style="margin: 5px 0;"><strong>Paid:</strong> ₹{cash_paid_adjusted + online_paid_adjusted:,.2f}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Due:</strong> ₹{due_amount_adjusted:,.2f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Show points preview
+            if cust_name:
+                new_total_points = current_customer_points + loyalty_points - redeem_points
+                st.success(f"🎯 Today's Points: **+{loyalty_points}** | Redeemed: **-{redeem_points}** | Final Balance: **{new_total_points}** points")
             
             # Generate Bill Button
             st.divider()
@@ -737,6 +869,17 @@ elif menu == "🧾 Billing":
                                 break
                         
                         if all_saved:
+                            # Redeem Points - Save negative entry
+                            if redeem_points > 0:
+                                redeem_data = [
+                                    cust_name,
+                                    -redeem_points,  # Negative to deduct
+                                    bill_date.strftime("%d/%m/%Y"),
+                                    f"Redeemed (₹{redeem_value} discount)",
+                                    st.session_state.username
+                                ]
+                                save_data("LoyaltyPoints", redeem_data)
+                            
                             # Update Cash Balance
                             if cash_paid > 0:
                                 update_balance(cash_paid, "Cash", operation='add')
@@ -746,11 +889,25 @@ elif menu == "🧾 Billing":
                                 update_balance(online_paid, "Online", operation='add')
                             
                             # Save Customer Due if any
-                            if due_amount > 0:
-                                save_data("CustomerKhata", [cust_name, due_amount])
+                            if due_amount_adjusted > 0:
+                                save_data("CustomerKhata", [cust_name, due_amount_adjusted])
+                            
+                            # Add Loyalty Points (new points earned)
+                            if loyalty_points > 0:
+                                points_data = [
+                                    cust_name,
+                                    loyalty_points,
+                                    bill_date.strftime("%d/%m/%Y"),
+                                    loyalty_reason if loyalty_reason else "Purchase",
+                                    st.session_state.username
+                                ]
+                                save_data("LoyaltyPoints", points_data)
                             
                             st.success(f"✅ Bill generated successfully!")
-                            st.info("💡 Don't forget to add loyalty points manually from Loyalty Points section!")
+                            if loyalty_points > 0:
+                                st.info(f"⭐ {loyalty_points} loyalty points added!")
+                            if redeem_points > 0:
+                                st.success(f"🎁 {redeem_points} points redeemed (₹{redeem_value} discount)!")
                             st.session_state.bill_cart = []
                             time.sleep(2)
                             st.rerun()
@@ -773,10 +930,40 @@ elif menu == "🧾 Billing":
                             msg += f"  Qty: {item['Qty']} × ₹{item['Rate']} = ₹{item['Amount']:.2f}\n\n"
                         
                         msg += f"{'='*30}\n"
-                        msg += f"Total: ₹{total_amount:,.2f}\n"
+                        msg += f"Subtotal: ₹{total_amount:,.2f}\n"
+                        
+                        # Show manual discount if applied
+                        if discount_amount > 0:
+                            msg += f"Discount: -₹{discount_amount:,.2f}"
+                            if discount_reason:
+                                msg += f" ({discount_reason})"
+                            msg += "\n"
+                        
+                        # Show redeem discount if applied
+                        if redeem_value > 0:
+                            msg += f"Points Discount: -₹{redeem_value:,.2f} ({redeem_points} points)\n"
+                        
+                        # Show final amount if any discount
+                        if discount_amount > 0 or redeem_value > 0:
+                            msg += f"Final Amount: ₹{final_amount:,.2f}\n"
+                        
                         msg += f"Cash Paid: ₹{cash_paid:,.2f}\n"
                         msg += f"Online Paid: ₹{online_paid:,.2f}\n"
-                        msg += f"Due: ₹{due_amount:,.2f}\n\n"
+                        msg += f"Due: ₹{due_amount_adjusted:,.2f}\n\n"
+                        
+                        msg += f"{'='*30}\n"
+                        msg += f"*LOYALTY POINTS*\n"
+                        msg += f"Previous Balance: {current_customer_points} points\n"
+                        
+                        if loyalty_points > 0:
+                            msg += f"Earned Today: +{loyalty_points} points 🎉\n"
+                        
+                        if redeem_points > 0:
+                            msg += f"Redeemed Today: -{redeem_points} points\n"
+                        
+                        final_points = current_customer_points + loyalty_points - redeem_points
+                        msg += f"*New Balance: {final_points} points* ⭐\n\n"
+                        
                         msg += f"Thank you for shopping with us! 🐾"
                         
                         # Create WhatsApp link
