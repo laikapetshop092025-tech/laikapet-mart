@@ -474,11 +474,28 @@ if menu == "📊 Dashboard":
     
     today_profit = today_sales - today_purchase - today_expense
     
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Sales", f"₹{today_sales:,.2f}")
-    col2.metric("📦 Purchase", f"₹{today_purchase:,.2f}")
-    col3.metric("💸 Expense", f"₹{today_expense:,.2f}")
-    col4.metric("📈 Profit", f"₹{today_profit:,.2f}", delta=f"{today_profit:,.2f}")
+    # Colorful Today's Report Cards
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+        <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+            <p style="margin: 0; font-size: 16px;">💰 Sales</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_sales:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);">
+            <p style="margin: 0; font-size: 16px;">📦 Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_purchase:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(250, 112, 154, 0.4);">
+            <p style="margin: 0; font-size: 16px;">💸 Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_expense:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(48, 207, 208, 0.4);">
+            <p style="margin: 0; font-size: 16px;">📈 Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{today_profit:,.2f}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">{'+' if today_profit >= 0 else ''}{today_profit:,.2f}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Manual Today's Report Adjustment
     if user_role in ["ceo", "owner", "manager"]:
@@ -558,11 +575,28 @@ if menu == "📊 Dashboard":
     
     month_profit = month_sales - month_purchase - month_expense
     
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Sales", f"₹{month_sales:,.2f}")
-    col2.metric("📦 Purchase", f"₹{month_purchase:,.2f}")
-    col3.metric("💸 Expense", f"₹{month_expense:,.2f}")
-    col4.metric("📈 Profit", f"₹{month_profit:,.2f}", delta=f"{month_profit:,.2f}")
+    # Colorful Monthly Report Cards
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+        <div style="flex: 1; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);">
+            <p style="margin: 0; font-size: 16px;">💰 Sales</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_sales:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(67, 233, 123, 0.4);">
+            <p style="margin: 0; font-size: 16px;">📦 Purchase</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_purchase:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(255, 153, 102, 0.4);">
+            <p style="margin: 0; font-size: 16px;">💸 Expense</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_expense:,.2f}</h2>
+        </div>
+        <div style="flex: 1; background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(255, 216, 155, 0.4);">
+            <p style="margin: 0; font-size: 16px;">📈 Profit</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 32px;">₹{month_profit:,.2f}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">{'+' if month_profit >= 0 else ''}{month_profit:,.2f}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # MENU 2: BILLING
