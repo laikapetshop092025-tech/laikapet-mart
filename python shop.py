@@ -1816,11 +1816,17 @@ elif menu == "📒 Customer Due":
                         save_data("CustomerKhata", [cust, -amt, str(today_dt), f"Payment: {note}"])
                         
                         if pay_mode == "Cash":
-                            update_balance(amt, "Cash", 'add')
+                            if update_balance(amt, "Cash", 'add'):
+                                st.success(f"✅ Payment Rs.{amt:,.2f} received | Cash updated")
+                            else:
+                                st.error("❌ Failed to update Cash balance!")
                         elif pay_mode == "Online":
-                            update_balance(amt, "Online", 'add')
-                        
-                        st.success(f"✅ Payment Rs.{amt:,.2f} received")
+                            if update_balance(amt, "Online", 'add'):
+                                st.success(f"✅ Payment Rs.{amt:,.2f} received | Online updated")
+                            else:
+                                st.error("❌ Failed to update Online balance!")
+                        else:
+                            st.success(f"✅ Payment Rs.{amt:,.2f} received")
                     else:
                         save_data("CustomerKhata", [cust, amt, str(today_dt), f"Credit: {note}"])
                         st.success(f"✅ Credit Rs.{amt:,.2f} given")
@@ -1849,7 +1855,6 @@ elif menu == "📒 Customer Due":
                 
                 st.divider()
                 
-                # Customer due list with payment button
                 for idx, row in sum_df.iterrows():
                     customer_name = row['Customer']
                     due_amount = row['Balance']
@@ -1880,16 +1885,13 @@ elif menu == "📒 Customer Due":
                         
                         if st.button(f"✅ Receive Payment", key=f"pay_btn_{idx}", type="primary"):
                             if payment_amt > 0:
-                                # Record payment
                                 save_data("CustomerKhata", [customer_name, -payment_amt, str(today_dt), f"Payment received via {payment_method}"])
                                 
-                                # ✅ UPDATE BALANCE
                                 if payment_method == "Cash":
                                     if update_balance(payment_amt, "Cash", 'add'):
                                         st.success(f"✅ Payment of ₹{payment_amt:,.2f} received | Cash balance updated")
                                     else:
                                         st.error("❌ Failed to update Cash balance!")
-                                        
                                 elif payment_method == "Online":
                                     if update_balance(payment_amt, "Online", 'add'):
                                         st.success(f"✅ Payment of ₹{payment_amt:,.2f} received | Online balance updated")
@@ -1906,7 +1908,6 @@ elif menu == "📒 Customer Due":
             st.dataframe(k_df, use_container_width=True)
         else:
             st.info("No due records yet.")
-
 # ========================================
 # MENU 8: SUPPLIER DUES
 # ========================================
@@ -1926,27 +1927,25 @@ elif menu == "🏢 Supplier Dues":
             if st.form_submit_button("💾 Save", type="primary"):
                 if a > 0 and s.strip():
                     if "Credit" in t or "Liya" in t:
-                        # Supplier से माल लिया (Credit)
                         final_amt = a
                         save_data("Dues", [s, final_amt, str(today_dt), m, "Credit"])
                         st.success(f"✅ ₹{a:,.2f} credit added to {s}")
                     else:
-                        # Supplier को payment किया
                         final_amt = -a
                         save_data("Dues", [s, final_amt, str(today_dt), m, "Payment"])
                         
-                        # ✅ UPDATE BALANCE
                         if m == "Cash":
                             if update_balance(a, "Cash", 'subtract'):
                                 st.success(f"✅ ₹{a:,.2f} payment done | Cash balance updated")
                             else:
                                 st.error("❌ Failed to update Cash balance!")
-                                
                         elif m == "Online":
                             if update_balance(a, "Online", 'subtract'):
                                 st.success(f"✅ ₹{a:,.2f} payment done | Online balance updated")
                             else:
                                 st.error("❌ Failed to update Online balance!")
+                        else:
+                            st.success(f"✅ ₹{a:,.2f} payment recorded")
                     
                     time.sleep(1)
                     st.rerun()
@@ -1978,7 +1977,6 @@ elif menu == "🏢 Supplier Dues":
             st.dataframe(d_df, use_container_width=True)
         else:
             st.info("No supplier transactions yet.")
-
 # ========================================
 # MENU 9: ROYALTY POINTS
 # ========================================
@@ -2021,6 +2019,7 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
 
 
 
