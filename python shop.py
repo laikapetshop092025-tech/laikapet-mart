@@ -202,7 +202,7 @@ def update_stock_in_sheet(item_name, new_qty):
     except Exception as e:
         st.error(f"❌ Stock update failed: {str(e)}")
         return False
-    except Exception as e:
+
 def get_balance_from_sheet(mode):
     """Get LATEST balance from Google Sheets"""
     try:
@@ -220,7 +220,6 @@ def get_balance_from_sheet(mode):
     except Exception as e:
         st.error(f"Error loading balance: {str(e)}")
         return 0.0
-
 def get_current_balance(mode):
     """Get current balance"""
     if mode == "Cash":
@@ -2022,6 +2021,7 @@ elif menu == "👑 Royalty Points":
                 st.metric("Spent", f"₹{row['Total_Spent']:,.0f}")
     else:
         st.info("No sales data available.")
+
 
 
 
