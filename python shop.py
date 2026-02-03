@@ -1698,7 +1698,7 @@ elif menu == "⭐ Loyalty Points":
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
                     <p style="margin: 0; font-size: 14px; opacity: 0.9;">Current Points</p>
-                    <h2 style="margin: 10px 0; font-size: 28px;">★ {current_points}</h2>
+                    <h2 style="margin: 10px 0; font-size: 28px;">{current_points}</h2>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -1706,7 +1706,7 @@ elif menu == "⭐ Loyalty Points":
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
                     <p style="margin: 0; font-size: 14px; opacity: 0.9;">Adding</p>
-                    <h2 style="margin: 10px 0; font-size: 28px;">+ {points_to_add}</h2>
+                    <h2 style="margin: 10px 0; font-size: 28px;">{points_to_add}</h2>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -1714,7 +1714,7 @@ elif menu == "⭐ Loyalty Points":
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
                     <p style="margin: 0; font-size: 14px; opacity: 0.9;">New Total</p>
-                    <h2 style="margin: 10px 0; font-size: 28px;">● {new_total}</h2>
+                    <h2 style="margin: 10px 0; font-size: 28px;">{new_total}</h2>
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -1754,7 +1754,7 @@ elif menu == "⭐ Loyalty Points":
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 30px; border-radius: 12px; text-align: center; color: white; margin: 20px 0;">
                     <h3 style="margin: 0;">{customer_name}</h3>
-                    <h1 style="margin: 10px 0;">★ {points} Points</h1>
+                    <h1 style="margin: 10px 0;">{points} Points</h1>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1805,13 +1805,13 @@ elif menu == "⭐ Loyalty Points":
                     medal_icon = "🥉"
                     color = "linear-gradient(135deg, #fa709a 0%, #fee140 100%)"
                 else:
-                    medal_icon = "★"
+                    medal_icon = "⭐"
                     color = "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
                 
                 st.markdown(f"""
                 <div style="background: {color}; padding: 15px 20px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; color: white;">
                     <div style="font-size: 18px; font-weight: bold;">{medal_icon} {customer}</div>
-                    <div style="font-size: 24px; font-weight: bold;">★ {int(points)}</div>
+                    <div style="font-size: 24px; font-weight: bold;">{int(points)} Points</div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
