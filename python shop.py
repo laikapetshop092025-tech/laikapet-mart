@@ -1797,23 +1797,15 @@ elif menu == "⭐ Loyalty Points":
                 # Medal selection
                 if idx == 1:
                     medal_icon = "🥇"
-                    color = "linear-gradient(135deg, #ffd89b 0%, #19547b 100%)"
                 elif idx == 2:
                     medal_icon = "🥈"
-                    color = "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)"
                 elif idx == 3:
                     medal_icon = "🥉"
-                    color = "linear-gradient(135deg, #fa709a 0%, #fee140 100%)"
                 else:
                     medal_icon = "⭐"
-                    color = "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
                 
-                st.markdown(f"""
-                <div style="background: {color}; padding: 15px 20px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; color: white;">
-                    <div style="font-size: 18px; font-weight: bold;">{medal_icon} {customer}</div>
-                    <div style="font-size: 24px; font-weight: bold;">{int(points)} Points</div>
-                </div>
-                """, unsafe_allow_html=True)
+                # Simple text display without f-string in HTML
+                st.info(f"{medal_icon} **{customer}**: {int(points)} Points")
         else:
             st.info("No loyalty points data found!")
 
