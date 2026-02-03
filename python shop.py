@@ -1804,8 +1804,12 @@ elif menu == "⭐ Loyalty Points":
                 else:
                     medal_icon = "⭐"
                 
-                # Simple text display using format method
-                points_val = int(points)
+                # Simple text display using safe conversion
+                try:
+                    points_val = int(float(points))
+                except:
+                    points_val = 0
+                
                 display_text = "{} {}: {} Points".format(medal_icon, customer, points_val)
                 st.info(display_text)
         else:
