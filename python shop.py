@@ -94,11 +94,32 @@ def load_data(sheet_name):
     except: 
         return pd.DataFrame()
 
-def update_stock_in_sheet(item_name, new_qty):
-    """Update stock in Google Sheets"""
+def update_stock_in_sheet(item_name, qty_change, operation='subtract'):
+    """Update stock in Google Sheets - subtract for sales, add for purchase"""
     try:
         item_name = str(item_name).strip().upper()
-        new_qty = float(new_qty)
+        qty_change = float(qty_change)
+        
+        # Get current stock
+        inv_df = load_data("Inventory")
+        if inv_df.empty:
+            return False
+        
+        item_rows = inv_df[inv_df.iloc[:, 0].str.strip().str.upper() == item_name]
+        if item_rows.empty:
+            return False
+        
+        latest_row = item_rows.iloc[-1]
+        current_qty = float(pd.to_numeric(latest_row.iloc[1], errors='coerce'))
+        
+        if operation == 'subtract':
+            new_qty = current_qty - qty_change
+        else:
+            new_qty = current_qty + qty_change
+        
+        if new_qty < 0:
+            st.error(f"❌ Insufficient stock for {item_name}!")
+            return False
         
         payload = {
             "action": "update_stock",
@@ -166,13 +187,58 @@ def update_balance(amount, mode, operation='add'):
             st.session_state.manual_online = new_bal
         
         if save_data("Balances", [mode, new_bal]):
-            st.success(f"✅ {mode}: ₹{current_bal:,.2f} → ₹{new_bal:,.2f}")
             return True
         else:
             return False
     except Exception as e:
         st.error(f"Error: {str(e)}")
         return False
+
+def calculate_loyalty_points(amount, bill_date):
+    """Calculate loyalty points - 2 points per ₹100 on weekdays, 4 points on weekends"""
+    try:
+        points_base = (amount // 100) * 2
+        
+        # Check if weekend (Saturday=5, Sunday=6)
+        if bill_date.weekday() >= 5:
+            points_base = points_base * 2
+        
+        return int(points_base)
+    except:
+        return 0
+
+def get_customer_loyalty_points(customer_name):
+    """Get total loyalty points for a customer"""
+    try:
+        loyalty_df = load_data("LoyaltyPoints")
+        if loyalty_df.empty:
+            return 0
+        
+        customer_rows = loyalty_df[loyalty_df.iloc[:, 0].str.strip().str.upper() == customer_name.strip().upper()]
+        if customer_rows.empty:
+            return 0
+        
+        total_points = pd.to_numeric(customer_rows.iloc[:, 1], errors='coerce').sum()
+        return int(total_points)
+    except:
+        return 0
+
+def get_item_purchase_rate(item_name):
+    """Get the purchase rate of an item from inventory"""
+    try:
+        inv_df = load_data("Inventory")
+        if inv_df.empty:
+            return 0.0
+        
+        item_rows = inv_df[inv_df.iloc[:, 0].str.strip().str.upper() == item_name.strip().upper()]
+        if item_rows.empty:
+            return 0.0
+        
+        latest_row = item_rows.iloc[-1]
+        purchase_rate = float(pd.to_numeric(latest_row.iloc[3], errors='coerce'))
+        return purchase_rate
+    except:
+        return 0.0
 
 # --- MULTI-USER LOGIN ---
 if 'logged_in' not in st.session_state: 
@@ -240,7 +306,10 @@ if user_role in ["ceo", "owner", "manager"]:
         "📦 Purchase", 
         "📋 Live Stock", 
         "📒 Customer Due",
-        "🏢 Supplier Dues"
+        "🏢 Supplier Dues",
+        "🐕 Pet Register",
+        "💰 Expenses",
+        "⭐ Loyalty Points"
     ]
 else:
     menu_items = [
@@ -340,21 +409,496 @@ if menu == "📊 Dashboard":
     </div>
     """, unsafe_allow_html=True)
     
-    st.info("✅ Dashboard loaded successfully!")
+    # Daily Report
+    st.divider()
+    st.subheader("📅 Today's Report")
+    
+    bills_df = load_data("Bills")
+    purchase_df = load_data("Purchases")
+    expense_df = load_data("Expenses")
+    
+    today_sales = 0
+    today_purchase = 0
+    today_expense = 0
+    
+    if not bills_df.empty and 'Date' in bills_df.columns:
+        today_bills = bills_df[bills_df['Date'] == today_dt]
+        if len(today_bills.columns) > 6:
+            today_sales = pd.to_numeric(today_bills.iloc[:, 6], errors='coerce').sum()
+    
+    if not purchase_df.empty and 'Date' in purchase_df.columns:
+        today_purchases = purchase_df[purchase_df['Date'] == today_dt]
+        if len(today_purchases.columns) > 5:
+            today_purchase = pd.to_numeric(today_purchases.iloc[:, 5], errors='coerce').sum()
+    
+    if not expense_df.empty and 'Date' in expense_df.columns:
+        today_expenses = expense_df[expense_df['Date'] == today_dt]
+        if len(today_expenses.columns) > 2:
+            today_expense = pd.to_numeric(today_expenses.iloc[:, 2], errors='coerce').sum()
+    
+    today_profit = today_sales - today_purchase - today_expense
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("💰 Sales", f"₹{today_sales:,.2f}")
+    col2.metric("📦 Purchase", f"₹{today_purchase:,.2f}")
+    col3.metric("💸 Expense", f"₹{today_expense:,.2f}")
+    col4.metric("📈 Profit", f"₹{today_profit:,.2f}", delta=f"{today_profit:,.2f}")
+    
+    # Monthly Report
+    st.divider()
+    st.subheader("📊 Monthly Report")
+    
+    current_month = today_dt.month
+    current_year = today_dt.year
+    
+    month_sales = 0
+    month_purchase = 0
+    month_expense = 0
+    
+    if not bills_df.empty and 'Date' in bills_df.columns:
+        month_bills = bills_df[(bills_df['Date'].apply(lambda x: x.month if pd.notna(x) else 0) == current_month) & 
+                               (bills_df['Date'].apply(lambda x: x.year if pd.notna(x) else 0) == current_year)]
+        if len(month_bills.columns) > 6:
+            month_sales = pd.to_numeric(month_bills.iloc[:, 6], errors='coerce').sum()
+    
+    if not purchase_df.empty and 'Date' in purchase_df.columns:
+        month_purchases = purchase_df[(purchase_df['Date'].apply(lambda x: x.month if pd.notna(x) else 0) == current_month) & 
+                                      (purchase_df['Date'].apply(lambda x: x.year if pd.notna(x) else 0) == current_year)]
+        if len(month_purchases.columns) > 5:
+            month_purchase = pd.to_numeric(month_purchases.iloc[:, 5], errors='coerce').sum()
+    
+    if not expense_df.empty and 'Date' in expense_df.columns:
+        month_expenses = expense_df[(expense_df['Date'].apply(lambda x: x.month if pd.notna(x) else 0) == current_month) & 
+                                    (expense_df['Date'].apply(lambda x: x.year if pd.notna(x) else 0) == current_year)]
+        if len(month_expenses.columns) > 2:
+            month_expense = pd.to_numeric(month_expenses.iloc[:, 2], errors='coerce').sum()
+    
+    month_profit = month_sales - month_purchase - month_expense
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("💰 Sales", f"₹{month_sales:,.2f}")
+    col2.metric("📦 Purchase", f"₹{month_purchase:,.2f}")
+    col3.metric("💸 Expense", f"₹{month_expense:,.2f}")
+    col4.metric("📈 Profit", f"₹{month_profit:,.2f}", delta=f"{month_profit:,.2f}")
 
 # ==========================================
 # MENU 2: BILLING
 # ==========================================
 elif menu == "🧾 Billing":
     st.header("🧾 Billing System")
-    st.info("🚧 Billing section - Coming in next update")
+    
+    tab1, tab2 = st.tabs(["➕ New Bill", "📜 Bill History"])
+    
+    with tab1:
+        st.subheader("Create New Bill")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            cust_name = st.text_input("👤 Customer Name", key="bill_cust_name")
+            cust_phone = st.text_input("📱 Customer Phone", key="bill_cust_phone")
+        
+        with col2:
+            bill_date = st.date_input("📅 Bill Date", value=today_dt, key="bill_date")
+        
+        st.divider()
+        st.subheader("Add Items to Bill")
+        
+        # Load inventory for item selection
+        inv_df = load_data("Inventory")
+        if not inv_df.empty:
+            item_list = inv_df.iloc[:, 0].unique().tolist()
+            
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+            
+            with col1:
+                selected_item = st.selectbox("Select Item", [""] + item_list, key="bill_item")
+            
+            with col2:
+                item_qty = st.number_input("Quantity (Kg/Pcs)", min_value=0.0, value=1.0, step=0.5, key="bill_qty")
+            
+            with col3:
+                item_rate = st.number_input("Rate per unit", min_value=0.0, value=0.0, step=1.0, key="bill_rate")
+            
+            with col4:
+                st.write("")
+                st.write("")
+                if st.button("➕ Add", key="add_bill_item"):
+                    if selected_item and item_qty > 0 and item_rate > 0:
+                        # Get purchase rate for profit calculation
+                        purchase_rate = get_item_purchase_rate(selected_item)
+                        
+                        st.session_state.bill_cart.append({
+                            'Item': selected_item,
+                            'Qty': item_qty,
+                            'Rate': item_rate,
+                            'Amount': item_qty * item_rate,
+                            'Purchase_Rate': purchase_rate
+                        })
+                        st.success(f"✅ {selected_item} added to cart!")
+                        st.rerun()
+                    else:
+                        st.error("Please fill all fields!")
+        
+        # Display Cart
+        if st.session_state.bill_cart:
+            st.divider()
+            st.subheader("🛒 Cart Items")
+            
+            cart_df = pd.DataFrame(st.session_state.bill_cart)
+            
+            for idx, row in cart_df.iterrows():
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+                col1.write(f"**{row['Item']}**")
+                col2.write(f"{row['Qty']} units")
+                col3.write(f"₹{row['Rate']:.2f}/unit")
+                col4.write(f"₹{row['Amount']:.2f}")
+                
+                if col5.button("🗑️", key=f"del_bill_{idx}"):
+                    st.session_state.bill_cart.pop(idx)
+                    st.rerun()
+            
+            total_amount = cart_df['Amount'].sum()
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; margin: 20px 0;">
+                <h2 style="margin: 0;">Total Amount: ₹{total_amount:,.2f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Payment Details
+            st.divider()
+            st.subheader("💳 Payment Details")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                cash_paid = st.number_input("💵 Cash Paid", min_value=0.0, value=0.0, step=10.0, key="cash_paid")
+            
+            with col2:
+                online_paid = st.number_input("🏦 Online Paid", min_value=0.0, value=0.0, step=10.0, key="online_paid")
+            
+            with col3:
+                due_amount = total_amount - cash_paid - online_paid
+                st.metric("📒 Due Amount", f"₹{due_amount:,.2f}")
+            
+            # Generate Bill Button
+            st.divider()
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("✅ Generate Bill", type="primary", use_container_width=True):
+                    if not cust_name:
+                        st.error("Please enter customer name!")
+                    else:
+                        # Save each item to Bills sheet
+                        all_saved = True
+                        
+                        for item in st.session_state.bill_cart:
+                            bill_data = [
+                                bill_date.strftime("%d/%m/%Y"),
+                                cust_name,
+                                cust_phone,
+                                item['Item'],
+                                item['Qty'],
+                                item['Rate'],
+                                item['Amount']
+                            ]
+                            
+                            if not save_data("Bills", bill_data):
+                                all_saved = False
+                                break
+                            
+                            # Update stock
+                            if not update_stock_in_sheet(item['Item'], item['Qty'], operation='subtract'):
+                                st.error(f"Failed to update stock for {item['Item']}")
+                                all_saved = False
+                                break
+                        
+                        if all_saved:
+                            # Update Cash Balance
+                            if cash_paid > 0:
+                                update_balance(cash_paid, "Cash", operation='add')
+                            
+                            # Update Online Balance
+                            if online_paid > 0:
+                                update_balance(online_paid, "Online", operation='add')
+                            
+                            # Save Customer Due if any
+                            if due_amount > 0:
+                                save_data("CustomerKhata", [cust_name, due_amount])
+                            
+                            # Calculate and save loyalty points
+                            loyalty_points = calculate_loyalty_points(total_amount, bill_date)
+                            if loyalty_points > 0:
+                                save_data("LoyaltyPoints", [cust_name, loyalty_points, bill_date.strftime("%d/%m/%Y")])
+                            
+                            st.success(f"✅ Bill generated successfully! Loyalty Points: {loyalty_points}")
+                            st.session_state.bill_cart = []
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ Error generating bill!")
+            
+            with col2:
+                if st.button("📱 Send WhatsApp Bill", use_container_width=True):
+                    if not cust_phone:
+                        st.error("Please enter customer phone number!")
+                    else:
+                        # Generate bill message
+                        msg = f"*LAIKA PET MART - BILL*\n\n"
+                        msg += f"Customer: {cust_name}\n"
+                        msg += f"Date: {bill_date.strftime('%d/%m/%Y')}\n"
+                        msg += f"{'='*30}\n\n"
+                        
+                        for item in st.session_state.bill_cart:
+                            msg += f"{item['Item']}\n"
+                            msg += f"  Qty: {item['Qty']} × ₹{item['Rate']} = ₹{item['Amount']:.2f}\n\n"
+                        
+                        msg += f"{'='*30}\n"
+                        msg += f"Total: ₹{total_amount:,.2f}\n"
+                        msg += f"Cash Paid: ₹{cash_paid:,.2f}\n"
+                        msg += f"Online Paid: ₹{online_paid:,.2f}\n"
+                        msg += f"Due: ₹{due_amount:,.2f}\n\n"
+                        
+                        loyalty_pts = calculate_loyalty_points(total_amount, bill_date)
+                        msg += f"Loyalty Points Earned: {loyalty_pts}\n"
+                        msg += f"\nThank you for shopping with us! 🐾"
+                        
+                        # Create WhatsApp link
+                        phone = cust_phone.replace("+", "").replace(" ", "")
+                        if not phone.startswith("91"):
+                            phone = "91" + phone
+                        
+                        wa_link = f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
+                        st.markdown(f"[📱 Click to Send Bill on WhatsApp]({wa_link})")
+    
+    with tab2:
+        st.subheader("📜 Bill History")
+        
+        bills_df = load_data("Bills")
+        
+        if not bills_df.empty:
+            # Date filter
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                filter_date = st.date_input("Filter by Date", value=today_dt, key="filter_bill_date")
+            
+            with col2:
+                if st.button("🔍 Filter", key="filter_bills"):
+                    st.rerun()
+            
+            with col3:
+                if st.button("🔄 Show All", key="show_all_bills"):
+                    filter_date = None
+                    st.rerun()
+            
+            # Filter bills
+            if filter_date and 'Date' in bills_df.columns:
+                display_df = bills_df[bills_df['Date'] == filter_date]
+            else:
+                display_df = bills_df
+            
+            if not display_df.empty:
+                st.divider()
+                
+                # Group by date and show bills
+                if 'Date' in display_df.columns:
+                    for bill_date in display_df['Date'].unique():
+                        date_bills = display_df[display_df['Date'] == bill_date]
+                        
+                        st.markdown(f"### 📅 {bill_date.strftime('%d/%m/%Y')}")
+                        
+                        # Group by customer for each date
+                        for idx, row in date_bills.iterrows():
+                            with st.expander(f"Bill #{idx+1} - {row.iloc[1] if len(row) > 1 else 'Unknown'} - ₹{row.iloc[6] if len(row) > 6 else 0:.2f}"):
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    st.write(f"**Customer:** {row.iloc[1] if len(row) > 1 else 'N/A'}")
+                                    st.write(f"**Phone:** {row.iloc[2] if len(row) > 2 else 'N/A'}")
+                                
+                                with col2:
+                                    st.write(f"**Item:** {row.iloc[3] if len(row) > 3 else 'N/A'}")
+                                    st.write(f"**Qty:** {row.iloc[4] if len(row) > 4 else 0} × ₹{row.iloc[5] if len(row) > 5 else 0} = ₹{row.iloc[6] if len(row) > 6 else 0:.2f}")
+                                
+                                if st.button(f"🗑️ Delete Bill #{idx+1}", key=f"del_history_bill_{idx}"):
+                                    st.warning("Delete functionality coming soon!")
+                        
+                        st.divider()
+                else:
+                    st.dataframe(display_df, use_container_width=True)
+            else:
+                st.info("No bills found for selected date!")
+        else:
+            st.info("No bills found!")
 
 # ==========================================
 # MENU 3: PURCHASE
 # ==========================================
 elif menu == "📦 Purchase":
     st.header("📦 Purchase Entry")
-    st.info("🚧 Purchase section - Coming in next update")
+    
+    tab1, tab2 = st.tabs(["➕ New Purchase", "📜 Purchase History"])
+    
+    with tab1:
+        st.subheader("Create New Purchase")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            supplier_name = st.text_input("🏢 Supplier Name", key="purch_supplier")
+            supplier_phone = st.text_input("📱 Supplier Phone", key="purch_phone")
+        
+        with col2:
+            purch_date = st.date_input("📅 Purchase Date", value=today_dt, key="purch_date")
+        
+        st.divider()
+        st.subheader("Add Items to Purchase")
+        
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+        
+        with col1:
+            item_name = st.text_input("Item Name", key="purch_item_name")
+        
+        with col2:
+            item_qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.5, key="purch_qty")
+        
+        with col3:
+            item_unit = st.selectbox("Unit", ["Kg", "Pcs", "Box", "Bag"], key="purch_unit")
+        
+        with col4:
+            item_rate = st.number_input("Rate/Unit", min_value=0.0, value=0.0, step=1.0, key="purch_rate")
+        
+        with col5:
+            st.write("")
+            st.write("")
+            if st.button("➕", key="add_purch_item"):
+                if item_name and item_qty > 0 and item_rate > 0:
+                    st.session_state.purchase_cart.append({
+                        'Item': item_name.upper(),
+                        'Qty': item_qty,
+                        'Unit': item_unit,
+                        'Rate': item_rate,
+                        'Amount': item_qty * item_rate
+                    })
+                    st.success(f"✅ {item_name} added!")
+                    st.rerun()
+        
+        # Display Purchase Cart
+        if st.session_state.purchase_cart:
+            st.divider()
+            st.subheader("🛒 Purchase Cart")
+            
+            cart_df = pd.DataFrame(st.session_state.purchase_cart)
+            
+            for idx, row in cart_df.iterrows():
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+                col1.write(f"**{row['Item']}**")
+                col2.write(f"{row['Qty']} {row['Unit']}")
+                col3.write(f"₹{row['Rate']:.2f}/{row['Unit']}")
+                col4.write(f"₹{row['Amount']:.2f}")
+                
+                if col5.button("🗑️", key=f"del_purch_{idx}"):
+                    st.session_state.purchase_cart.pop(idx)
+                    st.rerun()
+            
+            total_amount = cart_df['Amount'].sum()
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; margin: 20px 0;">
+                <h2 style="margin: 0;">Total Purchase: ₹{total_amount:,.2f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Payment Details
+            st.divider()
+            st.subheader("💳 Payment Mode")
+            
+            payment_mode = st.radio("Select Payment Mode", 
+                                    ["💵 Cash", "🏦 Online", "👋 Hand Investment", "📒 Credit (Supplier Due)"],
+                                    horizontal=True,
+                                    key="purch_payment_mode")
+            
+            if payment_mode == "📒 Credit (Supplier Due)":
+                paid_amount = st.number_input("Paid Amount (if any)", min_value=0.0, value=0.0, step=10.0, key="purch_paid")
+                due_amount = total_amount - paid_amount
+                
+                if paid_amount > 0:
+                    paid_mode = st.radio("Paid via", ["💵 Cash", "🏦 Online"], horizontal=True, key="purch_paid_mode")
+            
+            # Save Purchase Button
+            st.divider()
+            
+            if st.button("✅ Save Purchase", type="primary", use_container_width=True):
+                if not supplier_name:
+                    st.error("Please enter supplier name!")
+                else:
+                    all_saved = True
+                    
+                    for item in st.session_state.purchase_cart:
+                        # Save to Purchases sheet
+                        purch_data = [
+                            purch_date.strftime("%d/%m/%Y"),
+                            supplier_name,
+                            supplier_phone,
+                            item['Item'],
+                            f"{item['Qty']} {item['Unit']}",
+                            item['Amount']
+                        ]
+                        
+                        if not save_data("Purchases", purch_data):
+                            all_saved = False
+                            break
+                        
+                        # Save to Inventory
+                        inv_data = [
+                            item['Item'],
+                            item['Qty'],
+                            item['Unit'],
+                            item['Rate'],
+                            purch_date.strftime("%d/%m/%Y")
+                        ]
+                        
+                        if not save_data("Inventory", inv_data):
+                            all_saved = False
+                            break
+                    
+                    if all_saved:
+                        # Update balances based on payment mode
+                        if payment_mode == "💵 Cash":
+                            update_balance(total_amount, "Cash", operation='subtract')
+                        elif payment_mode == "🏦 Online":
+                            update_balance(total_amount, "Online", operation='subtract')
+                        elif payment_mode == "👋 Hand Investment":
+                            save_data("HandInvestments", [supplier_name, purch_date.strftime("%d/%m/%Y"), total_amount])
+                        elif payment_mode == "📒 Credit (Supplier Due)":
+                            if paid_amount > 0:
+                                if paid_mode == "💵 Cash":
+                                    update_balance(paid_amount, "Cash", operation='subtract')
+                                else:
+                                    update_balance(paid_amount, "Online", operation='subtract')
+                            
+                            if due_amount > 0:
+                                save_data("SupplierDues", [supplier_name, due_amount, purch_date.strftime("%d/%m/%Y")])
+                        
+                        st.success("✅ Purchase saved successfully!")
+                        st.session_state.purchase_cart = []
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Error saving purchase!")
+    
+    with tab2:
+        st.subheader("📜 Purchase History")
+        
+        purch_df = load_data("Purchases")
+        
+        if not purch_df.empty:
+            st.dataframe(purch_df, use_container_width=True)
+        else:
+            st.info("No purchases found!")
 
 # ==========================================
 # MENU 4: LIVE STOCK
@@ -411,11 +955,340 @@ elif menu == "📋 Live Stock":
 # ==========================================
 elif menu == "📒 Customer Due":
     st.header("📒 Customer Due Management")
-    st.info("🚧 Customer Due section - Coming in next update")
+    
+    tab1, tab2 = st.tabs(["💰 Receive Payment", "📊 Customer Dues"])
+    
+    with tab1:
+        st.subheader("Receive Customer Payment")
+        
+        k_df = load_data("CustomerKhata")
+        
+        if not k_df.empty and len(k_df.columns) > 1:
+            # Get unique customers with dues
+            customer_dues = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum()
+            customers_with_due = customer_dues[customer_dues > 0].index.tolist()
+            
+            if customers_with_due:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    selected_customer = st.selectbox("Select Customer", customers_with_due, key="cust_due_select")
+                    current_due = customer_dues[selected_customer]
+                    st.metric("Current Due", f"₹{current_due:,.2f}")
+                
+                with col2:
+                    payment_amount = st.number_input("Payment Amount", min_value=0.0, max_value=float(current_due), value=float(current_due), step=10.0, key="cust_payment")
+                    payment_mode = st.radio("Payment Mode", ["💵 Cash", "🏦 Online"], horizontal=True, key="cust_payment_mode")
+                
+                if st.button("✅ Receive Payment", type="primary", use_container_width=True):
+                    if payment_amount > 0:
+                        # Save negative entry to reduce due
+                        if save_data("CustomerKhata", [selected_customer, -payment_amount]):
+                            # Update balance
+                            mode = "Cash" if payment_mode == "💵 Cash" else "Online"
+                            update_balance(payment_amount, mode, operation='add')
+                            
+                            st.success(f"✅ Payment of ₹{payment_amount:,.2f} received from {selected_customer}!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Error saving payment!")
+                    else:
+                        st.error("Please enter payment amount!")
+            else:
+                st.info("No customers with pending dues!")
+        else:
+            st.info("No customer dues found!")
+    
+    with tab2:
+        st.subheader("📊 All Customer Dues")
+        
+        k_df = load_data("CustomerKhata")
+        
+        if not k_df.empty and len(k_df.columns) > 1:
+            customer_dues = k_df.groupby(k_df.columns[0])[k_df.columns[1]].sum()
+            customers_with_due = customer_dues[customer_dues > 0]
+            
+            if not customers_with_due.empty:
+                for customer, due in customers_with_due.items():
+                    st.info(f"👤 **{customer}**: ₹{due:,.2f}")
+                
+                st.divider()
+                total_due = customers_with_due.sum()
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <h2 style="margin: 0;">Total Customer Due: ₹{total_due:,.2f}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.success("✅ No pending customer dues!")
+        else:
+            st.info("No customer dues found!")
 
 # ==========================================
 # MENU 6: SUPPLIER DUES
 # ==========================================
 elif menu == "🏢 Supplier Dues":
     st.header("🏢 Supplier Dues Management")
-    st.info("🚧 Supplier Dues section - Coming in next update")
+    
+    tab1, tab2 = st.tabs(["💰 Pay Supplier", "📊 Supplier Dues"])
+    
+    with tab1:
+        st.subheader("Pay Supplier Due")
+        
+        sup_df = load_data("SupplierDues")
+        
+        if not sup_df.empty and len(sup_df.columns) > 1:
+            # Get unique suppliers with dues
+            supplier_dues = sup_df.groupby(sup_df.columns[0])[sup_df.columns[1]].sum()
+            suppliers_with_due = supplier_dues[supplier_dues > 0].index.tolist()
+            
+            if suppliers_with_due:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    selected_supplier = st.selectbox("Select Supplier", suppliers_with_due, key="sup_due_select")
+                    current_due = supplier_dues[selected_supplier]
+                    st.metric("Current Due", f"₹{current_due:,.2f}")
+                
+                with col2:
+                    payment_amount = st.number_input("Payment Amount", min_value=0.0, max_value=float(current_due), value=float(current_due), step=10.0, key="sup_payment")
+                    payment_mode = st.radio("Payment Mode", ["💵 Cash", "🏦 Online"], horizontal=True, key="sup_payment_mode")
+                
+                if st.button("✅ Pay Supplier", type="primary", use_container_width=True):
+                    if payment_amount > 0:
+                        # Save negative entry to reduce due
+                        if save_data("SupplierDues", [selected_supplier, -payment_amount, today_dt.strftime("%d/%m/%Y")]):
+                            # Update balance
+                            mode = "Cash" if payment_mode == "💵 Cash" else "Online"
+                            update_balance(payment_amount, mode, operation='subtract')
+                            
+                            st.success(f"✅ Payment of ₹{payment_amount:,.2f} made to {selected_supplier}!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Error saving payment!")
+                    else:
+                        st.error("Please enter payment amount!")
+            else:
+                st.info("No suppliers with pending dues!")
+        else:
+            st.info("No supplier dues found!")
+    
+    with tab2:
+        st.subheader("📊 All Supplier Dues")
+        
+        sup_df = load_data("SupplierDues")
+        
+        if not sup_df.empty and len(sup_df.columns) > 1:
+            supplier_dues = sup_df.groupby(sup_df.columns[0])[sup_df.columns[1]].sum()
+            suppliers_with_due = supplier_dues[supplier_dues > 0]
+            
+            if not suppliers_with_due.empty:
+                for supplier, due in suppliers_with_due.items():
+                    st.warning(f"🏢 **{supplier}**: ₹{due:,.2f}")
+                
+                st.divider()
+                total_due = suppliers_with_due.sum()
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); padding: 20px; border-radius: 12px; text-align: center; color: white;">
+                    <h2 style="margin: 0;">Total Supplier Due: ₹{total_due:,.2f}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.success("✅ No pending supplier dues!")
+        else:
+            st.info("No supplier dues found!")
+
+# ==========================================
+# MENU 7: PET REGISTER
+# ==========================================
+elif menu == "🐕 Pet Register":
+    st.header("🐕 Pet Register")
+    
+    tab1, tab2 = st.tabs(["➕ Register Pet", "📋 Pet Records"])
+    
+    with tab1:
+        st.subheader("Register New Pet")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            pet_type = st.selectbox("Pet Type", ["Dog", "Cat", "Bird", "Other"], key="pet_type")
+            pet_breed = st.text_input("Breed", key="pet_breed")
+            pet_color = st.text_input("Color", key="pet_color")
+            pet_age = st.text_input("Age", key="pet_age")
+        
+        with col2:
+            sale_date = st.date_input("Sale Date", value=today_dt, key="pet_sale_date")
+            customer_name = st.text_input("Customer Name", key="pet_customer")
+            customer_phone = st.text_input("Customer Phone", key="pet_cust_phone")
+            sale_price = st.number_input("Sale Price", min_value=0.0, value=0.0, step=100.0, key="pet_price")
+        
+        st.divider()
+        st.subheader("Vaccination Schedule")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            vaccine_1 = st.text_input("Vaccine 1", key="vaccine_1")
+            vaccine_1_date = st.date_input("Vaccine 1 Date", key="vaccine_1_date")
+        
+        with col2:
+            vaccine_2 = st.text_input("Vaccine 2", key="vaccine_2")
+            vaccine_2_date = st.date_input("Vaccine 2 Date", key="vaccine_2_date")
+        
+        if st.button("✅ Register Pet", type="primary", use_container_width=True):
+            pet_data = [
+                sale_date.strftime("%d/%m/%Y"),
+                pet_type,
+                pet_breed,
+                pet_color,
+                pet_age,
+                customer_name,
+                customer_phone,
+                sale_price,
+                vaccine_1,
+                vaccine_1_date.strftime("%d/%m/%Y"),
+                vaccine_2,
+                vaccine_2_date.strftime("%d/%m/%Y")
+            ]
+            
+            if save_data("PetRegister", pet_data):
+                st.success(f"✅ {pet_type} registered successfully!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("Error registering pet!")
+    
+    with tab2:
+        st.subheader("📋 All Pet Records")
+        
+        pet_df = load_data("PetRegister")
+        
+        if not pet_df.empty:
+            st.dataframe(pet_df, use_container_width=True)
+        else:
+            st.info("No pet records found!")
+
+# ==========================================
+# MENU 8: EXPENSES
+# ==========================================
+elif menu == "💰 Expenses":
+    st.header("💰 Expense Management")
+    
+    tab1, tab2 = st.tabs(["➕ Add Expense", "📊 Expense History"])
+    
+    with tab1:
+        st.subheader("Add New Expense")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            expense_date = st.date_input("Date", value=today_dt, key="exp_date")
+            expense_category = st.selectbox("Category", 
+                                          ["Rent", "Electricity", "Salary", "Transport", "Miscellaneous"],
+                                          key="exp_category")
+        
+        with col2:
+            expense_amount = st.number_input("Amount", min_value=0.0, value=0.0, step=10.0, key="exp_amount")
+            payment_mode = st.radio("Payment Mode", ["💵 Cash", "🏦 Online"], horizontal=True, key="exp_payment")
+        
+        expense_remark = st.text_area("Remarks", key="exp_remark")
+        
+        if st.button("✅ Add Expense", type="primary", use_container_width=True):
+            if expense_amount > 0:
+                exp_data = [
+                    expense_date.strftime("%d/%m/%Y"),
+                    expense_category,
+                    expense_amount,
+                    expense_remark
+                ]
+                
+                if save_data("Expenses", exp_data):
+                    # Update balance
+                    mode = "Cash" if payment_mode == "💵 Cash" else "Online"
+                    update_balance(expense_amount, mode, operation='subtract')
+                    
+                    st.success("✅ Expense added successfully!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Error adding expense!")
+            else:
+                st.error("Please enter expense amount!")
+    
+    with tab2:
+        st.subheader("📊 Expense History")
+        
+        exp_df = load_data("Expenses")
+        
+        if not exp_df.empty:
+            # Monthly summary
+            if 'Date' in exp_df.columns and len(exp_df.columns) > 2:
+                current_month = today_dt.month
+                current_year = today_dt.year
+                
+                month_expenses = exp_df[(exp_df['Date'].apply(lambda x: x.month if pd.notna(x) else 0) == current_month) & 
+                                       (exp_df['Date'].apply(lambda x: x.year if pd.notna(x) else 0) == current_year)]
+                
+                if not month_expenses.empty:
+                    total_month_exp = pd.to_numeric(month_expenses.iloc[:, 2], errors='coerce').sum()
+                    
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); padding: 20px; border-radius: 12px; text-align: center; color: white; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">This Month's Expenses: ₹{total_month_exp:,.2f}</h2>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.divider()
+            st.dataframe(exp_df, use_container_width=True)
+        else:
+            st.info("No expenses found!")
+
+# ==========================================
+# MENU 9: LOYALTY POINTS
+# ==========================================
+elif menu == "⭐ Loyalty Points":
+    st.header("⭐ Loyalty Points Management")
+    
+    st.info("""
+    **Loyalty Points System:**
+    - ₹100 purchase = 2 points (Monday to Friday)
+    - ₹100 purchase = 4 points (Saturday & Sunday)
+    """)
+    
+    tab1, tab2 = st.tabs(["🔍 Check Points", "📊 All Customers"])
+    
+    with tab1:
+        st.subheader("Check Customer Points")
+        
+        customer_name = st.text_input("Enter Customer Name", key="loyalty_search")
+        
+        if st.button("🔍 Search", key="search_loyalty"):
+            if customer_name:
+                points = get_customer_loyalty_points(customer_name)
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%); padding: 30px; border-radius: 12px; text-align: center; color: white; margin: 20px 0;">
+                    <h3 style="margin: 0;">{customer_name}</h3>
+                    <h1 style="margin: 10px 0;">⭐ {points} Points</h1>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error("Please enter customer name!")
+    
+    with tab2:
+        st.subheader("📊 All Customer Points")
+        
+        loyalty_df = load_data("LoyaltyPoints")
+        
+        if not loyalty_df.empty and len(loyalty_df.columns) > 1:
+            customer_points = loyalty_df.groupby(loyalty_df.columns[0])[loyalty_df.columns[1]].sum()
+            customer_points = customer_points.sort_values(ascending=False)
+            
+            for idx, (customer, points) in enumerate(customer_points.items(), 1):
+                medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else "⭐"
+                st.info(f"{medal} **{customer}**: {int(points)} points")
+        else:
+            st.info("No loyalty points data found!")
