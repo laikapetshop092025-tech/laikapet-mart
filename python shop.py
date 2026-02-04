@@ -1538,8 +1538,8 @@ if vaccine_1:
 else:
     vaccine_1_date = today_dt
         
-        with col2:
-            vaccine_2 = st.text_input("Vaccine 2", key="vaccine_2")
+                    with col2:
+                    vaccine_2 = st.text_input("Vaccine 2", key="vaccine_2")
 if vaccine_2:
     vaccine_2_date = st.date_input("Vaccine 2 Date", value=today_dt, key="vaccine_2_date")
 else:
@@ -2622,6 +2622,7 @@ elif menu == "📑 Financial Reports":
         with col3:
             debt_ratio = (total_liabilities/total_assets) if total_assets > 0 else 0
             st.metric("Debt Ratio", f"{debt_ratio:.2f}", help="Lower is better")
+
 
 
 
