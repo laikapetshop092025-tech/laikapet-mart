@@ -635,11 +635,35 @@ elif menu == "🧾 Billing":
             with col1:
                 selected_item = st.selectbox("Select Item", [""] + item_list, key="bill_item")
             
+            # Show purchase rate when item is selected
+            if selected_item:
+                purchase_rate = get_item_purchase_rate(selected_item)
+                st.info(f"💡 **Purchase Rate:** ₹{purchase_rate:.2f} | You can set your selling price below")
+            
             with col2:
                 item_qty = st.number_input("Quantity (Kg/Pcs)", min_value=0.0, value=1.0, step=0.5, key="bill_qty")
             
             with col3:
-                item_rate = st.number_input("Rate per unit", min_value=0.0, value=0.0, step=1.0, key="bill_rate")
+                # Set default selling rate slightly higher than purchase rate if available
+                default_rate = 0.0
+                if selected_item:
+                    purchase_rate = get_item_purchase_rate(selected_item)
+                    default_rate = purchase_rate * 1.2  # 20% markup as default suggestion
+                
+                item_rate = st.number_input("Selling Rate per unit", min_value=0.0, value=default_rate, step=1.0, key="bill_rate")
+            
+            # Show profit margin
+            if selected_item and item_rate > 0:
+                purchase_rate = get_item_purchase_rate(selected_item)
+                profit_per_unit = item_rate - purchase_rate
+                profit_margin = ((profit_per_unit / item_rate) * 100) if item_rate > 0 else 0
+                
+                if profit_per_unit > 0:
+                    st.success(f"📈 Profit: ₹{profit_per_unit:.2f}/unit ({profit_margin:.1f}% margin)")
+                elif profit_per_unit < 0:
+                    st.error(f"⚠️ Loss: ₹{abs(profit_per_unit):.2f}/unit (Selling below cost!)")
+                else:
+                    st.warning("⚠️ No profit - Selling at cost price")
             
             with col4:
                 st.write("")
