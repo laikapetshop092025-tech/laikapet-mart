@@ -844,75 +844,78 @@ elif menu == "🧾 Billing":
                     if not cust_name:
                         st.error("Please enter customer name!")
                     else:
-                        # Save each item to Bills sheet
-                        all_saved = True
-                        
-                        for item in st.session_state.bill_cart:
-                            bill_data = [
-                                bill_date.strftime("%d/%m/%Y"),
-                                cust_name,
-                                cust_phone,
-                                item['Item'],
-                                item['Qty'],
-                                item['Rate'],
-                                item['Amount']
-                            ]
+                        try:
+                            # Save each item to Bills sheet
+                            all_saved = True
                             
-                            if not save_data("Bills", bill_data):
-                                all_saved = False
-                                break
-                            
-                            # Update stock
-                            if not update_stock_in_sheet(item['Item'], item['Qty'], operation='subtract'):
-                                st.error(f"Failed to update stock for {item['Item']}")
-                                all_saved = False
-                                break
-                        
-                        if all_saved:
-                            # Redeem Points - Save negative entry
-                            if redeem_points > 0:
-                                redeem_data = [
-                                    cust_name,
-                                    -redeem_points,  # Negative to deduct
+                            for item in st.session_state.bill_cart:
+                                bill_data = [
                                     bill_date.strftime("%d/%m/%Y"),
-                                    f"Redeemed (₹{redeem_value} discount)",
-                                    st.session_state.username
-                                ]
-                                save_data("LoyaltyPoints", redeem_data)
-                            
-                            # Update Cash Balance
-                            if cash_paid > 0:
-                                update_balance(cash_paid, "Cash", operation='add')
-                            
-                            # Update Online Balance
-                            if online_paid > 0:
-                                update_balance(online_paid, "Online", operation='add')
-                            
-                            # Save Customer Due if any
-                            if due_amount_adjusted > 0:
-                                save_data("CustomerKhata", [cust_name, due_amount_adjusted])
-                            
-                            # Add Loyalty Points (new points earned)
-                            if loyalty_points > 0:
-                                points_data = [
                                     cust_name,
-                                    loyalty_points,
-                                    bill_date.strftime("%d/%m/%Y"),
-                                    loyalty_reason if loyalty_reason else "Purchase",
-                                    st.session_state.username
+                                    cust_phone,
+                                    item['Item'],
+                                    item['Qty'],
+                                    item['Rate'],
+                                    item['Amount']
                                 ]
-                                save_data("LoyaltyPoints", points_data)
+                                
+                                if not save_data("Bills", bill_data):
+                                    all_saved = False
+                                    break
+                                
+                                # Update stock
+                                if not update_stock_in_sheet(item['Item'], item['Qty'], operation='subtract'):
+                                    st.error(f"Failed to update stock for {item['Item']}")
+                                    all_saved = False
+                                    break
                             
-                            st.success(f"✅ Bill generated successfully!")
-                            if loyalty_points > 0:
-                                st.info(f"⭐ {loyalty_points} loyalty points added!")
-                            if redeem_points > 0:
-                                st.success(f"🎁 {redeem_points} points redeemed (₹{redeem_value} discount)!")
-                            st.session_state.bill_cart = []
-                            time.sleep(2)
-                            st.rerun()
-                        else:
-                            st.error("❌ Error generating bill!")
+                            if all_saved:
+                                # Redeem Points - Save negative entry
+                                if redeem_points > 0:
+                                    redeem_data = [
+                                        cust_name,
+                                        -redeem_points,  # Negative to deduct
+                                        bill_date.strftime("%d/%m/%Y"),
+                                        f"Redeemed (₹{redeem_value} discount)",
+                                        st.session_state.username
+                                    ]
+                                    save_data("LoyaltyPoints", redeem_data)
+                                
+                                # Update Cash Balance
+                                if cash_paid > 0:
+                                    update_balance(cash_paid, "Cash", operation='add')
+                                
+                                # Update Online Balance
+                                if online_paid > 0:
+                                    update_balance(online_paid, "Online", operation='add')
+                                
+                                # Save Customer Due if any
+                                if due_amount_adjusted > 0:
+                                    save_data("CustomerKhata", [cust_name, due_amount_adjusted])
+                                
+                                # Add Loyalty Points (new points earned)
+                                if loyalty_points > 0:
+                                    points_data = [
+                                        cust_name,
+                                        loyalty_points,
+                                        bill_date.strftime("%d/%m/%Y"),
+                                        loyalty_reason if loyalty_reason else "Purchase",
+                                        st.session_state.username
+                                    ]
+                                    save_data("LoyaltyPoints", points_data)
+                                
+                                st.success(f"✅ Bill generated successfully!")
+                                if loyalty_points > 0:
+                                    st.info(f"⭐ {loyalty_points} loyalty points added!")
+                                if redeem_points > 0:
+                                    st.success(f"🎁 {redeem_points} points redeemed (₹{redeem_value} discount)!")
+                                st.session_state.bill_cart = []
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error("❌ Error generating bill!")
+                        except Exception as e:
+                            st.error(f"❌ Error generating bill: {str(e)}")
             
             with col2:
                 if st.button("📱 Send WhatsApp Bill", use_container_width=True):
