@@ -58,7 +58,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0gzek4xRRBELWXKjyUq78vMjZ0A9tyUvR_hJ3rkOFeI1k1Agn16lD4kPXbCuVQ/exec" 
+SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxLzemgdwncKlSFgRvQlxfNKRYL9ebRVaoBFDnDrdLFNVGtfqArXzhKshuJET4975W9/exec" 
 SHEET_LINK = "https://docs.google.com/spreadsheets/d/1HHAuSs4aMzfWT2SD2xEzz45TioPdPhTeeWK5jull8Iw/gviz/tq?tqx=out:csv&sheet="
 
 # Initialize session states
@@ -75,9 +75,8 @@ if 'manual_online' not in st.session_state:
 
 def save_data(sheet_name, data_list):
     try:
-        payload = {"sheet": sheet_name, "data": data_list}
-        response = requests.post(SCRIPT_URL, json=payload, timeout=15)
-        return "success" in response.text.lower()
+        response = requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list, timeout=15)
+        return response.text.strip() == "Success"
     except Exception as e:
         st.error(f"Save error: {str(e)}")
         return False
@@ -1533,17 +1532,11 @@ elif menu == "🐕 Pet Register":
         
         with col1:
             vaccine_1 = st.text_input("Vaccine 1", key="vaccine_1")
-if vaccine_1:
-    vaccine_1_date = st.date_input("Vaccine 1 Date", value=today_dt, key="vaccine_1_date")
-else:
-    vaccine_1_date = today_dt
+            vaccine_1_date = st.date_input("Vaccine 1 Date", key="vaccine_1_date")
         
-                    with col2:
-                    vaccine_2 = st.text_input("Vaccine 2", key="vaccine_2")
-if vaccine_2:
-    vaccine_2_date = st.date_input("Vaccine 2 Date", value=today_dt, key="vaccine_2_date")
-else:
-    vaccine_2_date = today_dt
+        with col2:
+            vaccine_2 = st.text_input("Vaccine 2", key="vaccine_2")
+            vaccine_2_date = st.date_input("Vaccine 2 Date", key="vaccine_2_date")
         
         if st.button("✅ Register Pet", type="primary", use_container_width=True):
             pet_data = [
@@ -2622,8 +2615,3 @@ elif menu == "📑 Financial Reports":
         with col3:
             debt_ratio = (total_liabilities/total_assets) if total_assets > 0 else 0
             st.metric("Debt Ratio", f"{debt_ratio:.2f}", help="Lower is better")
-
-
-
-
-
