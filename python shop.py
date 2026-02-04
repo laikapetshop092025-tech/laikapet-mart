@@ -1520,7 +1520,7 @@ elif menu == "🐕 Pet Register":
             pet_color = st.text_input("Color", key="pet_color")
             pet_age = st.text_input("Age", key="pet_age")
         
-            with col2:
+        with col2:
             sale_date = st.date_input("Sale Date", value=today_dt, key="pet_sale_date")
             customer_name = st.text_input("Customer Name", key="pet_customer")
             customer_phone = st.text_input("Customer Phone", key="pet_cust_phone")
@@ -1531,14 +1531,14 @@ elif menu == "🐕 Pet Register":
         
         col1, col2 = st.columns(2)
         
-            with col1:
+        with col1:
             vaccine_1 = st.text_input("Vaccine 1", key="vaccine_1")
 if vaccine_1:
     vaccine_1_date = st.date_input("Vaccine 1 Date", value=today_dt, key="vaccine_1_date")
 else:
     vaccine_1_date = today_dt
         
-            with col2:
+        with col2:
             vaccine_2 = st.text_input("Vaccine 2", key="vaccine_2")
 if vaccine_2:
     vaccine_2_date = st.date_input("Vaccine 2 Date", value=today_dt, key="vaccine_2_date")
@@ -2622,6 +2622,7 @@ elif menu == "📑 Financial Reports":
         with col3:
             debt_ratio = (total_liabilities/total_assets) if total_assets > 0 else 0
             st.metric("Debt Ratio", f"{debt_ratio:.2f}", help="Lower is better")
+
 
 
 
