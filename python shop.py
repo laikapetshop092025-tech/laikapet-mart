@@ -75,8 +75,9 @@ if 'manual_online' not in st.session_state:
 
 def save_data(sheet_name, data_list):
     try:
-        response = requests.post(f"{SCRIPT_URL}?sheet={sheet_name}", json=data_list, timeout=15)
-        return response.text.strip() == "Success"
+        payload = {"sheet": sheet_name, "data": data_list}
+response = requests.post(SCRIPT_URL, json=payload, timeout=15)
+        return "success" in response.text.lower()
     except Exception as e:
         st.error(f"Save error: {str(e)}")
         return False
@@ -1532,11 +1533,17 @@ elif menu == "🐕 Pet Register":
         
         with col1:
             vaccine_1 = st.text_input("Vaccine 1", key="vaccine_1")
-            vaccine_1_date = st.date_input("Vaccine 1 Date", key="vaccine_1_date")
+if vaccine_1:
+    vaccine_1_date = st.date_input("Vaccine 1 Date", value=today_dt, key="vaccine_1_date")
+else:
+    vaccine_1_date = today_dt
         
         with col2:
             vaccine_2 = st.text_input("Vaccine 2", key="vaccine_2")
-            vaccine_2_date = st.date_input("Vaccine 2 Date", key="vaccine_2_date")
+if vaccine_2:
+    vaccine_2_date = st.date_input("Vaccine 2 Date", value=today_dt, key="vaccine_2_date")
+else:
+    vaccine_2_date = today_dt
         
         if st.button("✅ Register Pet", type="primary", use_container_width=True):
             pet_data = [
@@ -2615,3 +2622,4 @@ elif menu == "📑 Financial Reports":
         with col3:
             debt_ratio = (total_liabilities/total_assets) if total_assets > 0 else 0
             st.metric("Debt Ratio", f"{debt_ratio:.2f}", help="Lower is better")
+
