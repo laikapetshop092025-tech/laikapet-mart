@@ -853,21 +853,28 @@ elif menu == "🧾 Billing":
                     remaining_points = current_customer_points - redeem_points
                     st.metric("Points After Redeem", f"{remaining_points}")
             
-            # Update due amount if redeeming points
+            # Update amounts if redeeming points
             if redeem_value > 0:
                 final_amount = amount_after_discount - redeem_value
-                cash_paid_adjusted = cash_paid
-                online_paid_adjusted = online_paid
-                due_amount_adjusted = final_amount - cash_paid_adjusted - online_paid_adjusted
+                
+                # Recalculate payment based on mode
+                if payment_mode == "💵 Cash":
+                    cash_paid_adjusted = final_amount
+                    online_paid_adjusted = 0.0
+                    due_amount_adjusted = 0.0
+                elif payment_mode == "🏦 Online":
+                    cash_paid_adjusted = 0.0
+                    online_paid_adjusted = final_amount
+                    due_amount_adjusted = 0.0
+                else:  # Due
+                    cash_paid_adjusted = 0.0
+                    online_paid_adjusted = 0.0
+                    due_amount_adjusted = final_amount
             else:
                 final_amount = amount_after_discount
                 cash_paid_adjusted = cash_paid
                 online_paid_adjusted = online_paid
-                # Calculate due based on payment mode
-                if payment_mode == "📒 Due (Credit)":
-                    due_amount_adjusted = amount_after_discount
-                else:
-                    due_amount_adjusted = 0.0
+                due_amount_adjusted = due_amount_adjusted  # Already set in payment mode
             
             # Show final summary
             if redeem_value > 0 or discount_amount > 0:
