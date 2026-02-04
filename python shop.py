@@ -863,7 +863,11 @@ elif menu == "🧾 Billing":
                 final_amount = amount_after_discount
                 cash_paid_adjusted = cash_paid
                 online_paid_adjusted = online_paid
-                due_amount_adjusted = due_amount
+                # Calculate due based on payment mode
+                if payment_mode == "📒 Due (Credit)":
+                    due_amount_adjusted = amount_after_discount
+                else:
+                    due_amount_adjusted = 0.0
             
             # Show final summary
             if redeem_value > 0 or discount_amount > 0:
