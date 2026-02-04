@@ -911,6 +911,8 @@ elif menu == "🧾 Billing":
                 if st.button("✅ Generate Bill", type="primary", use_container_width=True):
                     if not cust_name:
                         st.error("Please enter customer name!")
+                    elif len(st.session_state.bill_cart) == 0:
+                        st.error("❌ Cart is empty! Please add items first.")
                     else:
                         try:
                             # Save each item to Bills sheet
