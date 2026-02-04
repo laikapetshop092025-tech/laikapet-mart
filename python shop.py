@@ -755,6 +755,13 @@ elif menu == "🧾 Billing":
             st.divider()
             st.subheader("💳 Payment Details")
             
+            # Initialize all payment variables with default values
+            cash_paid = 0.0
+            online_paid = 0.0
+            due_amount_adjusted = 0.0
+            cash_paid_adjusted = 0.0
+            online_paid_adjusted = 0.0
+            
             # Payment Mode Selection
             payment_mode = st.radio(
                 "Select Payment Mode",
@@ -763,7 +770,7 @@ elif menu == "🧾 Billing":
                 key="bill_payment_mode"
             )
             
-            # Amount fields based on payment mode
+            # Set amounts based on payment mode
             if payment_mode == "💵 Cash":
                 cash_paid = amount_after_discount
                 online_paid = 0.0
@@ -831,6 +838,7 @@ elif menu == "🧾 Billing":
             st.divider()
             use_redeem = st.checkbox("🎁 Redeem Loyalty Points", key="use_redeem")
             
+            # Initialize redeem variables
             redeem_points = 0
             redeem_value = 0
             
@@ -853,11 +861,11 @@ elif menu == "🧾 Billing":
                     remaining_points = current_customer_points - redeem_points
                     st.metric("Points After Redeem", f"{remaining_points}")
             
-            # Update amounts if redeeming points
+            # Calculate final amounts
+            final_amount = amount_after_discount - redeem_value
+            
+            # Adjust payment amounts based on redeem
             if redeem_value > 0:
-                final_amount = amount_after_discount - redeem_value
-                
-                # Recalculate payment based on mode
                 if payment_mode == "💵 Cash":
                     cash_paid_adjusted = final_amount
                     online_paid_adjusted = 0.0
@@ -871,10 +879,10 @@ elif menu == "🧾 Billing":
                     online_paid_adjusted = 0.0
                     due_amount_adjusted = final_amount
             else:
-                final_amount = amount_after_discount
+                # No redeem, use original amounts
                 cash_paid_adjusted = cash_paid
                 online_paid_adjusted = online_paid
-                due_amount_adjusted = due_amount_adjusted  # Already set in payment mode
+                due_amount_adjusted = due_amount_adjusted
             
             # Show final summary
             if redeem_value > 0 or discount_amount > 0:
