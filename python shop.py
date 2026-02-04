@@ -915,13 +915,6 @@ elif menu == "🧾 Billing":
                         st.error("❌ Cart is empty! Please add items first.")
                     else:
                         try:
-                            # Debug info
-                            st.write("DEBUG INFO:")
-                            st.write(f"Customer: {cust_name}")
-                            st.write(f"Cart items: {len(st.session_state.bill_cart)}")
-                            st.write(f"Cash: {cash_paid_adjusted}, Online: {online_paid_adjusted}, Due: {due_amount_adjusted}")
-                            st.write(f"Points: {loyalty_points}")
-                            
                             # Save each item to Bills sheet
                             all_saved = True
                             
