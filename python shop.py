@@ -312,7 +312,8 @@ if user_role in ["ceo", "owner", "manager"]:
         "💉 Services",
         "⭐ Loyalty Points",
         "🎁 Offers & Discount",
-        "📈 Analysis Report"
+        "📈 Analysis Report",
+        "📑 Financial Reports"
     ]
 else:
     menu_items = [
@@ -711,14 +712,11 @@ elif menu == "🧾 Billing":
             </div>
             """, unsafe_allow_html=True)
             
-            # Payment Details
-            st.divider()
-            st.subheader("💳 Payment Details")
-            
             # Manual Discount Option
-            st.markdown("#### 💰 Discount")
+            st.divider()
+            st.subheader("💰 Discount (Optional)")
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             
             with col1:
                 discount_type = st.selectbox("Discount Type", 
@@ -732,53 +730,64 @@ elif menu == "🧾 Billing":
                 with col2:
                     discount_value = st.number_input("Discount %", min_value=0.0, max_value=100.0, value=10.0, step=1.0, key="discount_percent")
                     discount_amount = (total_amount * discount_value) / 100
-                
-                with col3:
-                    st.metric("Discount Amount", f"₹{discount_amount:,.2f}")
             
             elif discount_type == "Flat Amount (₹)":
                 with col2:
                     discount_amount = st.number_input("Discount ₹", min_value=0.0, max_value=float(total_amount), value=0.0, step=10.0, key="discount_flat")
-                
-                with col3:
-                    discount_percent = (discount_amount / total_amount * 100) if total_amount > 0 else 0
-                    st.metric("Discount %", f"{discount_percent:.1f}%")
             
             if discount_amount > 0:
-                discount_reason = st.text_input("Discount Reason", placeholder="e.g., Regular customer, Festival offer, Bulk purchase", key="discount_reason")
+                discount_reason = st.text_input("Discount Reason", placeholder="e.g., Regular customer, Festival offer", key="discount_reason")
+                st.info(f"💡 Discount Applied: ₹{discount_amount:,.2f}")
             else:
                 discount_reason = ""
             
             # Calculate amount after discount
             amount_after_discount = total_amount - discount_amount
             
-            st.divider()
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                cash_paid = st.number_input("💵 Cash Paid", min_value=0.0, value=0.0, step=10.0, key="cash_paid")
-            
-            with col2:
-                online_paid = st.number_input("🏦 Online Paid", min_value=0.0, value=0.0, step=10.0, key="online_paid")
-            
-            with col3:
-                due_amount = amount_after_discount - cash_paid - online_paid
-                st.metric("📒 Due Amount", f"₹{due_amount:,.2f}")
-            
-            # Show bill summary if discount applied
             if discount_amount > 0:
                 st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 15px; border-radius: 10px; color: white; margin: 10px 0;">
-                    <p style="margin: 0;"><strong>Original Amount:</strong> ₹{total_amount:,.2f}</p>
-                    <p style="margin: 5px 0;"><strong>Discount:</strong> -₹{discount_amount:,.2f}</p>
-                    <p style="margin: 5px 0 0 0;"><strong>Amount to Pay:</strong> ₹{amount_after_discount:,.2f}</p>
+                <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 15px; border-radius: 10px; text-align: center; color: white; margin: 10px 0;">
+                    <h3 style="margin: 0;">Amount to Pay: ₹{amount_after_discount:,.2f}</h3>
                 </div>
                 """, unsafe_allow_html=True)
+            
+            # Payment Details
+            st.divider()
+            st.subheader("💳 Payment Details")
+            
+            # Payment Mode Selection
+            payment_mode = st.radio(
+                "Select Payment Mode",
+                ["💵 Cash", "🏦 Online", "📒 Due (Credit)"],
+                horizontal=True,
+                key="bill_payment_mode"
+            )
+            
+            # Amount fields based on payment mode
+            if payment_mode == "💵 Cash":
+                cash_paid = amount_after_discount
+                online_paid = 0.0
+                due_amount_adjusted = 0.0
+                st.success(f"✅ Cash Payment: ₹{cash_paid:,.2f}")
+            
+            elif payment_mode == "🏦 Online":
+                cash_paid = 0.0
+                online_paid = amount_after_discount
+                due_amount_adjusted = 0.0
+                st.success(f"✅ Online Payment: ₹{online_paid:,.2f}")
+            
+            else:  # Due/Credit
+                cash_paid = 0.0
+                online_paid = 0.0
+                due_amount_adjusted = amount_after_discount
+                st.warning(f"📒 Due Amount: ₹{due_amount_adjusted:,.2f} (Will be added to customer account)")
             
             # Loyalty Points Section
             st.divider()
             st.subheader("⭐ Loyalty Points")
+            
+            # Calculate suggested points (₹100 = 2 points)
+            suggested_points = int((amount_after_discount // 100) * 2)
             
             # Show current points first
             current_customer_points = 0
@@ -796,11 +805,27 @@ elif menu == "🧾 Billing":
                 """, unsafe_allow_html=True)
             
             with col2:
-                loyalty_points = st.number_input("Points to Give", min_value=0, value=2, step=1, key="bill_loyalty_points", 
-                                                help="Manually set loyalty points for this purchase")
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 15px; border-radius: 10px; text-align: center; color: white;">
+                    <p style="margin: 0; font-size: 14px;">Suggested Points</p>
+                    <h2 style="margin: 5px 0; font-size: 32px;">{suggested_points}</h2>
+                    <p style="margin: 0; font-size: 12px; opacity: 0.9;">₹100 = 2 points</p>
+                </div>
+                """, unsafe_allow_html=True)
             
-            loyalty_reason = st.text_input("Reason (Optional)", value="Purchase", key="bill_loyalty_reason",
-                                          placeholder="e.g., Purchase, Special Offer")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                loyalty_points = st.number_input("Points to Give", 
+                                                min_value=0, 
+                                                value=suggested_points, 
+                                                step=1, 
+                                                key="bill_loyalty_points", 
+                                                help="Change if you want to give more/less points")
+            
+            with col2:
+                loyalty_reason = st.text_input("Reason (Optional)", value="Purchase", key="bill_loyalty_reason",
+                                              placeholder="e.g., Purchase, Special Offer")
             
             # Redeem Points Option
             st.divider()
@@ -2249,3 +2274,316 @@ elif menu == "📈 Analysis Report":
                 st.info("No product data for this period")
         else:
             st.info("No product data available")
+
+
+# ==========================================
+# MENU 13: FINANCIAL REPORTS
+# ==========================================
+elif menu == "📑 Financial Reports":
+    st.header("📑 Financial Reports")
+    
+    st.info("💼 Professional accounting reports for your business")
+    
+    # Report Selection
+    report_type = st.selectbox("Select Report Type", 
+                               ["Profit & Loss Statement", "Balance Sheet"],
+                               key="financial_report_type")
+    
+    # Date Range
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fin_from = st.date_input("From Date", value=today_dt.replace(day=1), key="fin_from")
+    
+    with col2:
+        fin_to = st.date_input("To Date", value=today_dt, key="fin_to")
+    
+    st.divider()
+    
+    # Load Data
+    bills_df = load_data("Bills")
+    purchase_df = load_data("Purchases")
+    expense_df = load_data("Expenses")
+    services_df = load_data("Services")
+    customer_df = load_data("CustomerKhata")
+    supplier_df = load_data("SupplierDues")
+    inv_df = load_data("Inventory")
+    
+    # ==========================================
+    # PROFIT & LOSS
+    # ==========================================
+    if report_type == "Profit & Loss Statement":
+        st.subheader(f"📊 Profit & Loss Statement")
+        st.caption(f"Period: {fin_from.strftime('%d/%m/%Y')} to {fin_to.strftime('%d/%m/%Y')}")
+        st.divider()
+        
+        # Calculate Income
+        sales_income = 0
+        if not bills_df.empty and 'Date' in bills_df.columns:
+            period_bills = bills_df[(bills_df['Date'] >= fin_from) & (bills_df['Date'] <= fin_to)]
+            if len(period_bills.columns) > 6:
+                sales_income = pd.to_numeric(period_bills.iloc[:, 6], errors='coerce').sum()
+        
+        service_income = 0
+        if not services_df.empty and 'Date' in services_df.columns:
+            period_services = services_df[(services_df['Date'] >= fin_from) & (services_df['Date'] <= fin_to)]
+            if len(period_services.columns) > 6:
+                service_income = pd.to_numeric(period_services.iloc[:, 6], errors='coerce').sum()
+        
+        total_income = sales_income + service_income
+        
+        # Display Income
+        st.markdown("### 💰 INCOME")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Product Sales")
+        with col2:
+            st.write(f"₹{sales_income:,.2f}")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Service Revenue")
+        with col2:
+            st.write(f"₹{service_income:,.2f}")
+        
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**TOTAL INCOME**")
+        with col2:
+            st.markdown(f"**₹{total_income:,.2f}**")
+        
+        st.divider()
+        
+        # Calculate COGS
+        cogs = 0
+        if not purchase_df.empty and 'Date' in purchase_df.columns:
+            period_purchases = purchase_df[(purchase_df['Date'] >= fin_from) & (purchase_df['Date'] <= fin_to)]
+            if len(period_purchases.columns) > 5:
+                cogs = pd.to_numeric(period_purchases.iloc[:, 5], errors='coerce').sum()
+        
+        st.markdown("### 📦 COST OF GOODS SOLD")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Purchases")
+        with col2:
+            st.write(f"₹{cogs:,.2f}")
+        
+        gross_profit = total_income - cogs
+        
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**GROSS PROFIT**")
+        with col2:
+            st.markdown(f"**₹{gross_profit:,.2f}**")
+        
+        st.divider()
+        
+        # Calculate Expenses
+        st.markdown("### 💸 OPERATING EXPENSES")
+        
+        total_expenses = 0
+        if not expense_df.empty and 'Date' in expense_df.columns:
+            period_expenses = expense_df[(expense_df['Date'] >= fin_from) & (expense_df['Date'] <= fin_to)]
+            if len(period_expenses.columns) > 2:
+                expense_by_cat = period_expenses.groupby(period_expenses.columns[1])[period_expenses.columns[2]].apply(
+                    lambda x: pd.to_numeric(x, errors='coerce').sum()
+                )
+                
+                for category, amount in expense_by_cat.items():
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"{category}")
+                    with col2:
+                        st.write(f"₹{amount:,.2f}")
+                    total_expenses += amount
+        
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**TOTAL EXPENSES**")
+        with col2:
+            st.markdown(f"**₹{total_expenses:,.2f}**")
+        
+        st.divider()
+        
+        # NET PROFIT
+        net_profit = gross_profit - total_expenses
+        profit_margin = (net_profit/total_income*100) if total_income > 0 else 0
+        
+        st.markdown("### 📈 NET PROFIT/LOSS")
+        
+        profit_color = "#43e97b 0%, #38f9d7" if net_profit >= 0 else "#ff9966 0%, #ff5e62"
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {profit_color} 100%); padding: 30px; border-radius: 12px; text-align: center; color: white; margin: 20px 0;">
+            <h2 style="margin: 0;">{"NET PROFIT" if net_profit >= 0 else "NET LOSS"}</h2>
+            <h1 style="margin: 10px 0; font-size: 48px;">₹{abs(net_profit):,.2f}</h1>
+            <p style="margin: 0; opacity: 0.9;">Profit Margin: {profit_margin:.2f}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Key Ratios
+        st.divider()
+        st.markdown("### 📊 Financial Ratios")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            gross_margin = (gross_profit/total_income*100) if total_income > 0 else 0
+            st.metric("Gross Margin", f"{gross_margin:.2f}%")
+        
+        with col2:
+            st.metric("Net Margin", f"{profit_margin:.2f}%")
+        
+        with col3:
+            expense_ratio = (total_expenses/total_income*100) if total_income > 0 else 0
+            st.metric("Expense Ratio", f"{expense_ratio:.2f}%")
+    
+    # ==========================================
+    # BALANCE SHEET
+    # ==========================================
+    else:
+        st.subheader(f"📊 Balance Sheet")
+        st.caption(f"As on {fin_to.strftime('%d/%m/%Y')}")
+        st.divider()
+        
+        # ASSETS
+        st.markdown("### 💎 ASSETS")
+        
+        # Cash
+        cash_bal = get_current_balance("Cash")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Cash in Hand")
+        with col2:
+            st.write(f"₹{cash_bal:,.2f}")
+        
+        # Online/Bank
+        online_bal = get_current_balance("Online")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Bank Balance")
+        with col2:
+            st.write(f"₹{online_bal:,.2f}")
+        
+        # Customer Dues (Receivable)
+        receivable = 0
+        if not customer_df.empty and len(customer_df.columns) >= 2:
+            cust_copy = customer_df.copy()
+            cust_copy.iloc[:, 1] = pd.to_numeric(cust_copy.iloc[:, 1], errors='coerce').fillna(0)
+            cust_dues = cust_copy.groupby(cust_copy.columns[0])[cust_copy.columns[1]].sum()
+            receivable = cust_dues[cust_dues > 0].sum()
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Accounts Receivable")
+        with col2:
+            st.write(f"₹{receivable:,.2f}")
+        
+        # Inventory
+        inventory_val = 0
+        if not inv_df.empty and len(inv_df.columns) > 3:
+            latest = inv_df.groupby(inv_df.iloc[:, 0]).tail(1)
+            latest['qty'] = pd.to_numeric(latest.iloc[:, 1], errors='coerce').fillna(0)
+            latest['rate'] = pd.to_numeric(latest.iloc[:, 3], errors='coerce').fillna(0)
+            latest['total'] = latest['qty'] * latest['rate']
+            inventory_val = latest['total'].sum()
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Inventory/Stock")
+        with col2:
+            st.write(f"₹{inventory_val:,.2f}")
+        
+        total_assets = cash_bal + online_bal + receivable + inventory_val
+        
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**TOTAL ASSETS**")
+        with col2:
+            st.markdown(f"**₹{total_assets:,.2f}**")
+        
+        st.divider()
+        
+        # LIABILITIES
+        st.markdown("### 📋 LIABILITIES")
+        
+        # Supplier Dues (Payable)
+        payable = 0
+        if not supplier_df.empty and len(supplier_df.columns) >= 2:
+            supp_copy = supplier_df.copy()
+            supp_copy.iloc[:, 1] = pd.to_numeric(supp_copy.iloc[:, 1], errors='coerce').fillna(0)
+            supp_dues = supp_copy.groupby(supp_copy.columns[0])[supp_copy.columns[1]].sum()
+            payable = supp_dues[supp_dues > 0].sum()
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Accounts Payable")
+        with col2:
+            st.write(f"₹{payable:,.2f}")
+        
+        total_liabilities = payable
+        
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**TOTAL LIABILITIES**")
+        with col2:
+            st.markdown(f"**₹{total_liabilities:,.2f}**")
+        
+        st.divider()
+        
+        # EQUITY
+        st.markdown("### 👤 OWNER'S EQUITY")
+        
+        equity = total_assets - total_liabilities
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write("Owner's Equity")
+        with col2:
+            st.write(f"₹{equity:,.2f}")
+        
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**TOTAL EQUITY**")
+        with col2:
+            st.markdown(f"**₹{equity:,.2f}**")
+        
+        st.divider()
+        
+        # Balance Check
+        st.markdown("### ⚖️ ACCOUNTING EQUATION")
+        
+        liabilities_equity = total_liabilities + equity
+        balanced = abs(total_assets - liabilities_equity) < 1
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px; text-align: center; color: white;">
+            <h3 style="margin: 0;">Assets = Liabilities + Equity</h3>
+            <h2 style="margin: 10px 0;">₹{total_assets:,.2f} = ₹{total_liabilities:,.2f} + ₹{equity:,.2f}</h2>
+            <p style="margin: 0; font-size: 18px;">{"✅ Balanced" if balanced else "⚠️ Check Data"}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Financial Health
+        st.divider()
+        st.markdown("### 📊 Financial Health")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            current_ratio = (total_assets/total_liabilities) if total_liabilities > 0 else 0
+            st.metric("Current Ratio", f"{current_ratio:.2f}", help="Should be > 1.5")
+        
+        with col2:
+            quick_ratio = ((cash_bal + online_bal + receivable)/total_liabilities) if total_liabilities > 0 else 0
+            st.metric("Quick Ratio", f"{quick_ratio:.2f}", help="Should be > 1.0")
+        
+        with col3:
+            debt_ratio = (total_liabilities/total_assets) if total_assets > 0 else 0
+            st.metric("Debt Ratio", f"{debt_ratio:.2f}", help="Lower is better")
