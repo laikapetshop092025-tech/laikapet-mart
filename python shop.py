@@ -76,7 +76,7 @@ if 'manual_online' not in st.session_state:
 def save_data(sheet_name, data_list):
     try:
         payload = {"sheet": sheet_name, "data": data_list}
-response = requests.post(SCRIPT_URL, json=payload, timeout=15)
+        response = requests.post(SCRIPT_URL, json=payload, timeout=15)
         return "success" in response.text.lower()
     except Exception as e:
         st.error(f"Save error: {str(e)}")
@@ -2622,4 +2622,5 @@ elif menu == "📑 Financial Reports":
         with col3:
             debt_ratio = (total_liabilities/total_assets) if total_assets > 0 else 0
             st.metric("Debt Ratio", f"{debt_ratio:.2f}", help="Lower is better")
+
 
